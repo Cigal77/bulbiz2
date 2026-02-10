@@ -1,5 +1,4 @@
 import { Resend } from "npm:resend@2.0.0";
-import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -64,6 +63,19 @@ Deno.serve(async (req: Request) => {
           "Votre artisan";
         const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
 
+        // Generate client token if needed
+        let clientToken = dossier.client_token;
+        const tokenExpiry = dossier.client_token_expires_at ? new Date(dossier.client_token_expires_at) : null;
+        if (!clientToken || !tokenExpiry || tokenExpiry < now) {
+          const tokenBytes = new Uint8Array(32);
+          crypto.getRandomValues(tokenBytes);
+          clientToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+          const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          await supabase.from("dossiers").update({ client_token: clientToken, client_token_expires_at: expiresAt }).eq("id", dossier.id);
+        }
+        const siteUrl = Deno.env.get("SITE_URL") || "https://bulbiz.fr";
+        const clientLink = `${siteUrl}/client?token=${clientToken}`;
+
         try {
           await resend.emails.send({
             from: `${artisanName} <onboarding@resend.dev>`,
@@ -71,9 +83,12 @@ Deno.serve(async (req: Request) => {
             subject: `${artisanName} – Informations complémentaires nécessaires`,
             html: `
               <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <p>Bonjour ${dossier.client_first_name},</p>
+                <p>Bonjour ${dossier.client_first_name || ""},</p>
                 <p>Nous avons bien reçu votre demande mais il nous manque quelques informations pour établir un devis.</p>
-                <p>Pourriez-vous nous préciser la nature exacte du problème et joindre des photos si possible ?</p>
+                <p style="margin: 24px 0;">
+                  <a href="${clientLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Compléter mon dossier</a>
+                </p>
+                <p style="font-size: 13px; color: #6b7280;">Vous pourrez ajouter des photos, vidéos et préciser votre demande.</p>
                 <br/><p style="white-space: pre-line;">${signature}</p>
               </div>
             `,
