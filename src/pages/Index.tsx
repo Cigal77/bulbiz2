@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
 import { StatusCounters } from "@/components/dashboard/StatusCounters";
+import { AppointmentCounters, RdvDateFilters, filterByRdvDate, sortByAppointmentDate, type RdvDateFilter } from "@/components/dashboard/AppointmentCounters";
 import { DossierList } from "@/components/dashboard/DossierList";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { SourceFilter } from "@/components/dashboard/SourceFilter";
@@ -16,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
 import { URGENCY_ORDER } from "@/lib/constants";
+import type { AppointmentStatus } from "@/lib/constants";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
 type DossierSource = Database["public"]["Enums"]["dossier_source"];
@@ -32,8 +34,10 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<DossierStatus | null>(null);
   const [sourceFilter, setSourceFilter] = useState<DossierSource | null>(null);
+  const [rdvFilter, setRdvFilter] = useState<AppointmentStatus | null>(null);
+  const [rdvDateFilter, setRdvDateFilter] = useState<RdvDateFilter>("all");
 
-  // Realtime: listen for quote status changes (client validation/refusal)
+  // Realtime: listen for quote status changes
   useEffect(() => {
     const channel = supabase
       .channel("quote-notifications")
@@ -74,12 +78,35 @@ export default function Dashboard() {
     return c;
   }, [dossiers]);
 
+  // Clear status filter when rdv filter is active and vice versa
+  const handleStatusFilter = (status: DossierStatus | null) => {
+    setStatusFilter(status);
+    if (status) setRdvFilter(null);
+  };
+
+  const handleRdvFilter = (filter: AppointmentStatus | null) => {
+    setRdvFilter(filter);
+    setRdvDateFilter("all");
+    if (filter) setStatusFilter(null);
+  };
+
   const filtered = useMemo(() => {
     if (!dossiers) return [];
     let list = [...dossiers];
 
     if (statusFilter) list = list.filter((d) => d.status === statusFilter);
     if (sourceFilter) list = list.filter((d) => d.source === sourceFilter);
+
+    // RDV filter
+    if (rdvFilter) {
+      list = list.filter((d) => (d as any).appointment_status === rdvFilter);
+      // Apply date filter for confirmed RDVs
+      if (rdvFilter === "rdv_confirmed") {
+        list = filterByRdvDate(list, rdvDateFilter);
+        list = sortByAppointmentDate(list);
+        return list; // Skip default sort
+      }
+    }
 
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -102,7 +129,7 @@ export default function Dashboard() {
     });
 
     return list;
-  }, [dossiers, statusFilter, sourceFilter, search]);
+  }, [dossiers, statusFilter, sourceFilter, search, rdvFilter, rdvDateFilter]);
 
   const handleSelect = (dossier: Dossier) => {
     navigate(`/dossier/${dossier.id}`);
@@ -141,6 +168,20 @@ export default function Dashboard() {
           </Button>
         </div>
 
+        {/* Appointment counters */}
+        {!isLoading && dossiers && (
+          <AppointmentCounters
+            dossiers={dossiers}
+            activeFilter={rdvFilter}
+            onFilterChange={handleRdvFilter}
+          />
+        )}
+
+        {/* RDV date filters (when filtering confirmed RDVs) */}
+        {rdvFilter === "rdv_confirmed" && (
+          <RdvDateFilters active={rdvDateFilter} onChange={setRdvDateFilter} />
+        )}
+
         {/* Status counters */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -149,7 +190,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={setStatusFilter} />
+          <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
         )}
 
         {/* Search + filters */}

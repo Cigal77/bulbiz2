@@ -1,13 +1,73 @@
 import type { Dossier } from "@/hooks/useDossiers";
-import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS, SOURCE_LABELS } from "@/lib/constants";
+import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS, SOURCE_LABELS, APPOINTMENT_STATUS_COLORS } from "@/lib/constants";
+import type { AppointmentStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Phone, MapPin, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check } from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Badge } from "@/components/ui/badge";
 
 interface DossierListProps {
   dossiers: Dossier[];
   onSelect: (dossier: Dossier) => void;
+}
+
+const RDV_BADGE_CONFIG: Partial<Record<AppointmentStatus, { label: string; className: string; icon: React.ReactNode }>> = {
+  rdv_pending: {
+    label: "RDV : créneaux à proposer",
+    className: "bg-warning/15 text-warning border-warning/30",
+    icon: <AlertTriangle className="h-3 w-3" />,
+  },
+  slots_proposed: {
+    label: "RDV : en attente client",
+    className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800/30",
+    icon: <Send className="h-3 w-3" />,
+  },
+  client_selected: {
+    label: "RDV : à confirmer",
+    className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800/30",
+    icon: <Clock className="h-3 w-3" />,
+  },
+};
+
+function AppointmentBadge({ dossier }: { dossier: Dossier }) {
+  const status = ((dossier as any).appointment_status || "none") as AppointmentStatus;
+
+  if (status === "none" || status === "done" || status === "cancelled") return null;
+
+  // Confirmed RDV: show date + time prominently
+  if (status === "rdv_confirmed") {
+    const date = (dossier as any).appointment_date as string | null;
+    const timeStart = (dossier as any).appointment_time_start as string | null;
+    const timeEnd = (dossier as any).appointment_time_end as string | null;
+
+    if (!date) return null;
+
+    const dateStr = format(new Date(date), "EEE d/MM", { locale: fr });
+    const timeStr = timeStart && timeEnd ? `${timeStart.slice(0, 5)}–${timeEnd.slice(0, 5)}` : "";
+
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        <Badge className="bg-success/15 text-success border-success/30 text-[11px] gap-1 font-medium">
+          <Calendar className="h-3 w-3" />
+          RDV : {dateStr}{timeStr ? ` — ${timeStr}` : ""}
+        </Badge>
+      </div>
+    );
+  }
+
+  // Other statuses
+  const config = RDV_BADGE_CONFIG[status];
+  if (!config) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      <Badge className={cn("text-[11px] gap-1 font-medium border", config.className)}>
+        {config.icon}
+        {config.label}
+      </Badge>
+    </div>
+  );
 }
 
 export function DossierList({ dossiers, onSelect }: DossierListProps) {
@@ -34,31 +94,34 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
           className="w-full text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm group"
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex-1 min-w-0 space-y-1.5">
               {/* Client name + urgency */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-foreground truncate">
-                    {dossier.client_first_name || dossier.client_last_name
-                      ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
-                      : "Client sans nom"}
-                  </span>
-                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium", URGENCY_COLORS[dossier.urgency])}>
-                    {URGENCY_LABELS[dossier.urgency]}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-foreground truncate">
+                  {dossier.client_first_name || dossier.client_last_name
+                    ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
+                    : "Client sans nom"}
+                </span>
+                <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium", URGENCY_COLORS[dossier.urgency])}>
+                  {URGENCY_LABELS[dossier.urgency]}
+                </span>
+              </div>
 
-                {/* Category + address */}
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground/80">
-                    {CATEGORY_LABELS[dossier.category]}
+              {/* Category + address */}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground/80">
+                  {CATEGORY_LABELS[dossier.category]}
+                </span>
+                {dossier.address && (
+                  <span className="flex items-center gap-1 truncate">
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{dossier.address}</span>
                   </span>
-                  {dossier.address && (
-                    <span className="flex items-center gap-1 truncate">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      <span className="truncate">{dossier.address}</span>
-                    </span>
-                  )}
-                </div>
+                )}
+              </div>
+
+              {/* RDV badge */}
+              <AppointmentBadge dossier={dossier} />
 
               {/* Phone + source + date */}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -69,7 +132,6 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
                   </span>
                 )}
                 {dossier.client_phone && <span>·</span>}
-                <span>·</span>
                 <span>{SOURCE_LABELS[dossier.source]}</span>
                 <span>·</span>
                 <span>
