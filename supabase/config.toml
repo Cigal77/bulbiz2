@@ -1,1 +1,4 @@
 project_id = "egmhythtnroyyiicuikv"
+
+[functions.generate-labour-summary]
+verify_jwt = false

@@ -1,20 +1,36 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Wrench, Truck, FileText } from "lucide-react";
+import { Plus, Wrench, Truck, FileText, Lightbulb } from "lucide-react";
 import type { QuoteItem } from "@/lib/quote-types";
 import { createEmptyItem, QUOTE_TEMPLATES } from "@/lib/quote-types";
 import { QuoteItemRow } from "./QuoteItemRow";
+import { LabourSummaryBlock } from "./LabourSummaryBlock";
+import { AssistantDrawer } from "./AssistantDrawer";
 
 interface StepItemsProps {
   items: QuoteItem[];
   setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>;
+  labourSummary: string;
+  onLabourSummaryChange: (value: string) => void;
 }
 
-export function StepItems({ items, setItems }: StepItemsProps) {
+export function StepItems({ items, setItems, labourSummary, onLabourSummaryChange }: StepItemsProps) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [problemLabel, setProblemLabel] = useState<string | undefined>();
+
   const addItem = (type: QuoteItem["type"] = "standard") => {
     setItems((prev) => [...prev, createEmptyItem(type)]);
+  };
+
+  const addItemFromAssistant = (item: Omit<QuoteItem, "id">) => {
+    setItems((prev) => [...prev, { ...item, id: crypto.randomUUID() }]);
+  };
+
+  const handleSetLabourContext = (_tags: string[], label: string) => {
+    setProblemLabel(label);
   };
 
   const applyTemplate = (key: string) => {
@@ -44,25 +60,35 @@ export function StepItems({ items, setItems }: StepItemsProps) {
   };
 
   return (
-    <div className="space-y-3">
-      {items.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm font-medium">Aucune ligne</p>
-          <p className="text-xs mt-1">Ajoutez des lignes ou utilisez un modèle.</p>
-        </div>
-      )}
+    <div className="space-y-4">
+      {/* Labour Summary Block */}
+      <LabourSummaryBlock
+        value={labourSummary}
+        onChange={onLabourSummaryChange}
+        problemLabel={problemLabel}
+      />
 
-      {items.map((item, index) => (
-        <QuoteItemRow
-          key={item.id}
-          item={item}
-          index={index}
-          onChange={handleChange}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
-        />
-      ))}
+      {/* Items */}
+      <div className="space-y-3">
+        {items.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm font-medium">Aucune ligne</p>
+            <p className="text-xs mt-1">Ajoutez des lignes, utilisez un modèle ou ouvrez l'assistant.</p>
+          </div>
+        )}
+
+        {items.map((item, index) => (
+          <QuoteItemRow
+            key={item.id}
+            item={item}
+            index={index}
+            onChange={handleChange}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
 
       {/* Add buttons */}
       <div className="flex flex-wrap gap-2 pt-2">
@@ -96,7 +122,20 @@ export function StepItems({ items, setItems }: StepItemsProps) {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button variant="secondary" size="sm" className="gap-1.5" onClick={() => setDrawerOpen(true)}>
+          <Lightbulb className="h-3.5 w-3.5" />
+          Assistant
+        </Button>
       </div>
+
+      {/* Assistant Drawer */}
+      <AssistantDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onAddItem={addItemFromAssistant}
+        onSetLabourContext={handleSetLabourContext}
+      />
     </div>
   );
 }
