@@ -149,6 +149,15 @@ export function useQuoteActions(dossierId: string) {
           action: "appointment_status_change",
           details: "Prise de rendez-vous en attente",
         });
+
+        // Trigger APPOINTMENT_REQUESTED notification
+        try {
+          await supabase.functions.invoke("send-appointment-notification", {
+            body: { event_type: "APPOINTMENT_REQUESTED", dossier_id: dossierId, payload: {} },
+          });
+        } catch (e) {
+          console.error("Notification error after quote signed:", e);
+        }
       }
       if (status === "refuse") {
         await supabase

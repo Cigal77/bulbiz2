@@ -103,6 +103,49 @@ Deno.serve(async (req) => {
         action: "appointment_status_change",
         details: "Prise de rendez-vous en attente",
       });
+
+      // Send APPOINTMENT_REQUESTED notification via the unified service
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const { data: profile } = await supabase
+          .from("profiles").select("company_name, first_name, last_name, phone, email, sms_enabled")
+          .eq("user_id", dossier.user_id).maybeSingle();
+
+        const artisanName = profile?.company_name ||
+          [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+
+        // Send email notification
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (resendKey && dossier.client_email) {
+          const { Resend: ResendClass } = await import("npm:resend@2.0.0");
+          const resendClient = new ResendClass(resendKey);
+          const clientName = dossier.client_first_name || "Bonjour";
+          await resendClient.emails.send({
+            from: `${artisanName} <onboarding@resend.dev>`,
+            to: [dossier.client_email],
+            subject: `${artisanName} souhaite convenir d'un rendez-vous`,
+            html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+              <h2 style="color:#2563eb;">📅 Proposition de rendez-vous</h2>
+              <p>Bonjour ${clientName},</p>
+              <p>Suite à la validation de votre devis, <strong>${artisanName}</strong> souhaite convenir d'un rendez-vous pour l'intervention.</p>
+              <p>Merci de le contacter${profile?.phone ? ` au ${profile.phone}` : ""}${profile?.email ? ` ou par email à ${profile.email}` : ""} pour fixer une date.</p>
+              <br/>
+              <p>Cordialement,<br/>${artisanName}</p>
+            </div>`,
+          });
+          await supabase.from("notification_logs").insert({
+            dossier_id: dossier.id, event_type: "APPOINTMENT_REQUESTED",
+            channel: "email", recipient: dossier.client_email, status: "SENT",
+          });
+          await supabase.from("historique").insert({
+            dossier_id: dossier.id, user_id: dossier.user_id,
+            action: "notification_sent",
+            details: `Email envoyé : proposition de rendez-vous → ${dossier.client_email}`,
+          });
+        }
+      } catch (notifErr) {
+        console.error("Failed to send appointment notification:", notifErr);
+      }
     } else {
       await supabase.from("quotes").update({
         status: "refuse", refused_at: now, refused_reason: reason || null, accepted_ip: ip, accepted_user_agent: userAgent,

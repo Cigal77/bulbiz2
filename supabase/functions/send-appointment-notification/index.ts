@@ -1,0 +1,406 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+type EventType = "APPOINTMENT_REQUESTED" | "SLOTS_PROPOSED" | "APPOINTMENT_CONFIRMED";
+type NotifStatus = "SENT" | "FAILED" | "SKIPPED";
+
+interface NotifResult {
+  email_status: NotifStatus;
+  sms_status: NotifStatus;
+  error_message?: string;
+}
+
+// ── Email templates ──
+function getEmailTemplate(
+  eventType: EventType,
+  payload: Record<string, unknown>
+): { subject: string; html: string } {
+  const clientName = (payload.client_first_name as string) || "Bonjour";
+  const artisanName = (payload.artisan_name as string) || "Votre artisan";
+  const artisanPhone = payload.artisan_phone ? ` au ${payload.artisan_phone}` : "";
+  const artisanEmail = payload.artisan_email ? ` ou par email à ${payload.artisan_email}` : "";
+
+  switch (eventType) {
+    case "APPOINTMENT_REQUESTED":
+      return {
+        subject: `${artisanName} souhaite convenir d'un rendez-vous`,
+        html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <h2 style="color:#2563eb;">📅 Proposition de rendez-vous</h2>
+          <p>Bonjour ${clientName},</p>
+          <p>Suite à la validation de votre devis, <strong>${artisanName}</strong> souhaite convenir d'un rendez-vous pour l'intervention.</p>
+          <p>Merci de le contacter${artisanPhone}${artisanEmail} pour fixer une date.</p>
+          <br/>
+          <p>Cordialement,<br/>${artisanName}</p>
+        </div>`,
+      };
+
+    case "SLOTS_PROPOSED": {
+      const slotsHtml = (payload.slots_text as string) || "";
+      const link = payload.appointment_link as string;
+      return {
+        subject: `${artisanName} vous propose des créneaux`,
+        html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <h2 style="color:#2563eb;">📅 Choisissez votre créneau</h2>
+          <p>Bonjour ${clientName},</p>
+          <p><strong>${artisanName}</strong> vous propose les créneaux suivants :</p>
+          ${slotsHtml}
+          ${link ? `<p style="margin:24px 0;"><a href="${link}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Choisir mon créneau</a></p>` : ""}
+          <p>Si aucun créneau ne vous convient, contactez-nous${artisanPhone}.</p>
+          <br/>
+          <p>Cordialement,<br/>${artisanName}</p>
+        </div>`,
+      };
+    }
+
+    case "APPOINTMENT_CONFIRMED": {
+      const dateStr = (payload.appointment_date as string) || "";
+      const timeStr = (payload.appointment_time as string) || "";
+      return {
+        subject: `Rendez-vous confirmé avec ${artisanName}`,
+        html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <h2 style="color:#16a34a;">✅ Rendez-vous confirmé</h2>
+          <p>Bonjour ${clientName},</p>
+          <p>Votre rendez-vous avec <strong>${artisanName}</strong> est confirmé :</p>
+          <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${dateStr}${timeStr ? ` — 🕐 ${timeStr}` : ""}</p>
+          <p>En cas d'empêchement, merci de nous prévenir${artisanPhone}.</p>
+          <br/>
+          <p>Cordialement,<br/>${artisanName}</p>
+        </div>`,
+      };
+    }
+  }
+}
+
+// ── SMS templates ──
+function getSmsTemplate(
+  eventType: EventType,
+  payload: Record<string, unknown>
+): string {
+  const artisanName = (payload.artisan_name as string) || "Votre artisan";
+  const artisanPhone = (payload.artisan_phone as string) || "";
+
+  switch (eventType) {
+    case "APPOINTMENT_REQUESTED":
+      return `Bonjour, suite à la validation de votre devis, ${artisanName} souhaite convenir d'un RDV.${artisanPhone ? ` Contact : ${artisanPhone}` : ""}`;
+
+    case "SLOTS_PROPOSED": {
+      const link = payload.appointment_link as string;
+      return `Bonjour, ${artisanName} vous propose des créneaux de RDV.${link ? ` Choisissez ici : ${link}` : ""}${artisanPhone ? ` Contact : ${artisanPhone}` : ""}`;
+    }
+
+    case "APPOINTMENT_CONFIRMED": {
+      const dateStr = (payload.appointment_date as string) || "";
+      const timeStr = (payload.appointment_time as string) || "";
+      return `✅ RDV confirmé avec ${artisanName} : ${dateStr}${timeStr ? ` à ${timeStr}` : ""}.${artisanPhone ? ` Contact : ${artisanPhone}` : ""}`;
+    }
+  }
+}
+
+// ── Validation helpers ──
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normalizePhone(phone: string): string | null {
+  const cleaned = phone.replace(/[\s\-().]/g, "");
+  if (!/^\+?\d{10,15}$/.test(cleaned)) return null;
+  let p = cleaned;
+  if (p.startsWith("0") && p.length === 10) p = "+33" + p.slice(1);
+  if (!p.startsWith("+")) p = "+" + p;
+  return p;
+}
+
+// ── SMS sender ──
+async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+  if (!accountSid || !authToken || !fromPhone) {
+    return { success: false, error: "SMS_NOT_CONFIGURED" };
+  }
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      },
+      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Twilio error:", err);
+      return { success: false, error: `TWILIO_${resp.status}` };
+    }
+    await resp.json();
+    return { success: true };
+  } catch (e) {
+    console.error("SMS error:", e);
+    return { success: false, error: e instanceof Error ? e.message : "UNKNOWN" };
+  }
+}
+
+// ── Event label mapping for historique ──
+const EVENT_LABELS: Record<EventType, string> = {
+  APPOINTMENT_REQUESTED: "proposition de rendez-vous",
+  SLOTS_PROPOSED: "lien de choix de créneau",
+  APPOINTMENT_CONFIRMED: "confirmation de rendez-vous",
+};
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) throw new Error("Missing authorization header");
+
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    if (authError || !user) throw new Error("Unauthorized");
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { event_type, dossier_id, payload: extraPayload } = await req.json();
+
+    if (!event_type || !dossier_id) {
+      throw new Error("event_type et dossier_id requis");
+    }
+
+    const validEvents: EventType[] = ["APPOINTMENT_REQUESTED", "SLOTS_PROPOSED", "APPOINTMENT_CONFIRMED"];
+    if (!validEvents.includes(event_type)) {
+      throw new Error(`event_type invalide: ${event_type}`);
+    }
+
+    // Fetch dossier
+    const { data: dossier, error: dossierErr } = await supabase
+      .from("dossiers")
+      .select("*")
+      .eq("id", dossier_id)
+      .single();
+    if (dossierErr || !dossier) throw new Error("Dossier introuvable");
+
+    // Verify ownership
+    if (dossier.user_id !== user.id) throw new Error("Unauthorized: not your dossier");
+
+    // Fetch artisan profile
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const artisanName = profile?.company_name ||
+      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+
+    // Build payload
+    const notifPayload: Record<string, unknown> = {
+      client_first_name: dossier.client_first_name,
+      client_last_name: dossier.client_last_name,
+      artisan_name: artisanName,
+      artisan_phone: profile?.phone || "",
+      artisan_email: profile?.email || "",
+      ...extraPayload,
+    };
+
+    const label = EVENT_LABELS[event_type as EventType];
+    const result: NotifResult = { email_status: "SKIPPED", sms_status: "SKIPPED" };
+
+    // ── WRONG RECIPIENT PROTECTION ──
+    const artisanEmail = profile?.email;
+
+    // ── EMAIL ──
+    const clientEmail = dossier.client_email;
+    if (!clientEmail || !isValidEmail(clientEmail)) {
+      // Log SKIPPED
+      await supabase.from("notification_logs").insert({
+        dossier_id, event_type, channel: "email",
+        recipient: clientEmail || "MISSING",
+        status: "SKIPPED",
+        error_code: "INVALID_RECIPIENT",
+        error_message: clientEmail ? "Email invalide" : "Email manquant",
+      });
+      await supabase.from("historique").insert({
+        dossier_id, user_id: user.id,
+        action: "notification_skipped",
+        details: `Email non envoyé (${label}) : email client manquant ou invalide`,
+      });
+      result.email_status = "SKIPPED";
+    } else if (artisanEmail && clientEmail === artisanEmail) {
+      // Wrong recipient protection
+      await supabase.from("notification_logs").insert({
+        dossier_id, event_type, channel: "email",
+        recipient: clientEmail,
+        status: "FAILED",
+        error_code: "WRONG_RECIPIENT",
+        error_message: "L'email client est identique à l'email artisan",
+      });
+      await supabase.from("historique").insert({
+        dossier_id, user_id: user.id,
+        action: "notification_failed",
+        details: `Email non envoyé (${label}) : l'email client est identique à votre email`,
+      });
+      result.email_status = "FAILED";
+    } else {
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (!resendKey) {
+        await supabase.from("notification_logs").insert({
+          dossier_id, event_type, channel: "email",
+          recipient: clientEmail,
+          status: "FAILED",
+          error_code: "EMAIL_NOT_CONFIGURED",
+          error_message: "Service email non configuré",
+        });
+        await supabase.from("historique").insert({
+          dossier_id, user_id: user.id,
+          action: "notification_failed",
+          details: `Email non envoyé (${label}) : service email non configuré`,
+        });
+        result.email_status = "FAILED";
+      } else {
+        try {
+          const resend = new Resend(resendKey);
+          const template = getEmailTemplate(event_type as EventType, notifPayload);
+          await resend.emails.send({
+            from: `${artisanName} <onboarding@resend.dev>`,
+            to: [clientEmail],
+            subject: template.subject,
+            html: template.html,
+          });
+
+          await supabase.from("notification_logs").insert({
+            dossier_id, event_type, channel: "email",
+            recipient: clientEmail, status: "SENT",
+          });
+          await supabase.from("historique").insert({
+            dossier_id, user_id: user.id,
+            action: "notification_sent",
+            details: `Email envoyé : ${label} → ${clientEmail}`,
+          });
+          result.email_status = "SENT";
+        } catch (emailErr: any) {
+          console.error("Email send error:", emailErr);
+          await supabase.from("notification_logs").insert({
+            dossier_id, event_type, channel: "email",
+            recipient: clientEmail, status: "FAILED",
+            error_code: "SEND_ERROR",
+            error_message: emailErr.message?.slice(0, 500),
+          });
+          await supabase.from("historique").insert({
+            dossier_id, user_id: user.id,
+            action: "notification_failed",
+            details: `Email non envoyé (${label}) : erreur technique`,
+          });
+          result.email_status = "FAILED";
+          result.error_message = emailErr.message;
+        }
+      }
+    }
+
+    // ── SMS ──
+    const smsEnabled = profile?.sms_enabled !== false;
+    const clientPhone = dossier.client_phone;
+    if (!smsEnabled || !clientPhone) {
+      if (clientPhone) {
+        await supabase.from("notification_logs").insert({
+          dossier_id, event_type, channel: "sms",
+          recipient: clientPhone || "MISSING",
+          status: "SKIPPED",
+          error_code: smsEnabled ? "INVALID_PHONE" : "SMS_DISABLED",
+          error_message: smsEnabled ? "Téléphone manquant" : "SMS désactivé",
+        });
+      }
+      result.sms_status = "SKIPPED";
+    } else {
+      const normalized = normalizePhone(clientPhone);
+      if (!normalized) {
+        await supabase.from("notification_logs").insert({
+          dossier_id, event_type, channel: "sms",
+          recipient: clientPhone, status: "SKIPPED",
+          error_code: "INVALID_PHONE",
+          error_message: "Numéro invalide",
+        });
+        await supabase.from("historique").insert({
+          dossier_id, user_id: user.id,
+          action: "notification_skipped",
+          details: `SMS non envoyé (${label}) : numéro client invalide`,
+        });
+        result.sms_status = "SKIPPED";
+      } else {
+        // Wrong recipient protection for SMS
+        const artisanPhoneNorm = profile?.phone ? normalizePhone(String(profile.phone)) : null;
+        if (artisanPhoneNorm && normalized === artisanPhoneNorm) {
+          await supabase.from("notification_logs").insert({
+            dossier_id, event_type, channel: "sms",
+            recipient: normalized, status: "FAILED",
+            error_code: "WRONG_RECIPIENT",
+            error_message: "Le téléphone client est identique au téléphone artisan",
+          });
+          result.sms_status = "FAILED";
+        } else {
+          const smsBody = getSmsTemplate(event_type as EventType, notifPayload);
+          const smsResult = await sendSms(normalized, smsBody);
+
+          if (smsResult.success) {
+            await supabase.from("notification_logs").insert({
+              dossier_id, event_type, channel: "sms",
+              recipient: normalized, status: "SENT",
+            });
+            await supabase.from("historique").insert({
+              dossier_id, user_id: user.id,
+              action: "notification_sent",
+              details: `SMS envoyé : ${label} → ${normalized}`,
+            });
+            result.sms_status = "SENT";
+          } else {
+            const isNotConfigured = smsResult.error === "SMS_NOT_CONFIGURED";
+            await supabase.from("notification_logs").insert({
+              dossier_id, event_type, channel: "sms",
+              recipient: normalized, status: isNotConfigured ? "SKIPPED" : "FAILED",
+              error_code: smsResult.error,
+              error_message: smsResult.error,
+            });
+            if (!isNotConfigured) {
+              await supabase.from("historique").insert({
+                dossier_id, user_id: user.id,
+                action: "notification_failed",
+                details: `SMS non envoyé (${label}) : erreur technique`,
+              });
+            }
+            result.sms_status = isNotConfigured ? "SKIPPED" : "FAILED";
+          }
+        }
+      }
+    }
+
+    // Overall warning if both failed
+    if (result.email_status === "FAILED" && result.sms_status === "FAILED") {
+      result.error_message = "Email et SMS ont échoué. Vérifiez les coordonnées du client et la configuration.";
+    }
+
+    return new Response(JSON.stringify({ success: true, ...result }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error: unknown) {
+    console.error("Error in send-appointment-notification:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+});
