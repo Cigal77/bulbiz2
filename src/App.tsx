@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import DossierDetail from "./pages/DossierDetail";
 import CreateDossier from "./pages/CreateDossier";
 import Settings from "./pages/Settings";
+import ClientForm from "./pages/ClientForm";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/client" element={<ClientForm />} />
           <Route
             path="/"
             element={
