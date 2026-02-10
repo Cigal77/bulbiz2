@@ -88,6 +88,35 @@ function mapEntry(entry: Historique): DisplayEntry {
     };
   }
 
+  // Quote validated/refused by client
+  if (action === "quote_validated_by_client") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <FileCheck className="h-3.5 w-3.5" />,
+      iconColor: "bg-success/15 text-success",
+      title: "Devis validé par le client",
+      detail: details || null,
+    };
+  }
+  if (action === "quote_refused_by_client") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <FileX className="h-3.5 w-3.5" />,
+      iconColor: "bg-destructive/15 text-destructive",
+      title: "Devis refusé par le client",
+      detail: details || null,
+    };
+  }
+  if (action === "quote_link_viewed") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <FileText className="h-3.5 w-3.5" />,
+      iconColor: "bg-muted text-muted-foreground",
+      title: "Lien de validation consulté",
+      detail: details || null,
+    };
+  }
+
   // Relances
   if (action === "relance_sent" || action === "reminder_sent") {
     const isDevis = details.toLowerCase().includes("devis");

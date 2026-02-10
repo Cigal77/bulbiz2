@@ -66,9 +66,19 @@ Deno.serve(async (req: Request) => {
       "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
 
-    // Build email
+    // Generate signature token
+    const tokenBytes = new Uint8Array(32);
+    crypto.getRandomValues(tokenBytes);
+    const signatureToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+
+    // Build validation link
+    const appUrl = Deno.env.get("SUPABASE_URL")!.replace(".supabase.co", "").replace("https://", "");
+    // Use the app's frontend URL for the validation page
+    const validationUrl = `https://id-preview--2e27a371-0c34-4075-96a4-b8ddd74908dd.lovable.app/devis/validation?token=${signatureToken}`;
+
     const pdfLink = quote.pdf_url
-      ? `<p style="margin: 24px 0;"><a href="${quote.pdf_url}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">📄 Voir le devis</a></p>`
+      ? `<p style="margin: 16px 0;"><a href="${quote.pdf_url}" style="color: #2563eb; text-decoration: underline; font-weight: 500;">📄 Télécharger le devis (PDF)</a></p>`
       : "";
 
     const resend = new Resend(resendKey);
@@ -79,8 +89,14 @@ Deno.serve(async (req: Request) => {
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <p>Bonjour ${dossier.client_first_name || ""},</p>
-          <p>Veuillez trouver ci-joint votre devis <strong>${quote.quote_number}</strong>.</p>
+          <p>Veuillez trouver votre devis <strong>${quote.quote_number}</strong>.</p>
           ${pdfLink}
+          <p style="margin: 24px 0;">
+            <a href="${validationUrl}" style="background-color: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+              ✅ Voir et valider le devis
+            </a>
+          </p>
+          <p style="font-size: 13px; color: #6b7280;">Ce lien est valable 30 jours.</p>
           <p>N'hésitez pas à nous contacter pour toute question.</p>
           <br/>
           <p style="white-space: pre-line;">${signature}</p>
@@ -88,10 +104,12 @@ Deno.serve(async (req: Request) => {
       `,
     });
 
-    // Update quote status to sent
+    // Update quote status to sent + save signature token
     await supabase.from("quotes").update({
       status: "envoye",
       sent_at: new Date().toISOString(),
+      signature_token: signatureToken,
+      signature_token_expires_at: expiresAt,
     }).eq("id", quote_id);
 
     // Update dossier status
