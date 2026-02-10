@@ -80,7 +80,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build client link
-    const clientLink = `https://id-preview--2e27a371-0c34-4075-96a4-b8ddd74908dd.lovable.app/client?token=${token}`;
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || Deno.env.get("PUBLIC_URL") || "https://bulbiz.fr";
+    const clientLink = `${origin}/client?token=${token}`;
 
     // Try to send email
     let emailSent = false;
