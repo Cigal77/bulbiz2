@@ -1,3 +1,7 @@
+import { Wrench, Package, ShoppingBag, Truck, MoreHorizontal } from "lucide-react";
+
+export type QuoteItemType = "standard" | "main_oeuvre" | "deplacement" | "materiel" | "fourniture";
+
 export interface QuoteItem {
   id: string;
   label: string;
@@ -7,14 +11,24 @@ export interface QuoteItem {
   unit_price: number;
   vat_rate: number;
   discount: number;
-  type: "standard" | "main_oeuvre" | "deplacement";
+  type: QuoteItemType;
 }
 
-export function createEmptyItem(type: QuoteItem["type"] = "standard"): QuoteItem {
-  const defaults: Record<QuoteItem["type"], Partial<QuoteItem>> = {
+export const SECTIONS = [
+  { key: "main_oeuvre" as const, label: "Main d'œuvre", icon: Wrench },
+  { key: "materiel" as const, label: "Matériel", icon: Package },
+  { key: "fourniture" as const, label: "Fournitures", icon: ShoppingBag },
+  { key: "deplacement" as const, label: "Déplacement", icon: Truck },
+  { key: "standard" as const, label: "Divers", icon: MoreHorizontal },
+] as const;
+
+export function createEmptyItem(type: QuoteItemType = "standard"): QuoteItem {
+  const defaults: Record<QuoteItemType, Partial<QuoteItem>> = {
     standard: { label: "", unit: "u", unit_price: 0, vat_rate: 10 },
     main_oeuvre: { label: "Main d'œuvre", unit: "h", unit_price: 65, vat_rate: 10 },
     deplacement: { label: "Déplacement", unit: "forfait", unit_price: 35, vat_rate: 20 },
+    materiel: { label: "", unit: "u", unit_price: 0, vat_rate: 10 },
+    fourniture: { label: "", unit: "u", unit_price: 0, vat_rate: 10 },
   };
   return {
     id: crypto.randomUUID(),
@@ -53,15 +67,15 @@ export const QUOTE_TEMPLATES: Record<string, { label: string; items: Omit<QuoteI
     items: [
       { label: "Déplacement", description: "", qty: 1, unit: "forfait", unit_price: 35, vat_rate: 20, discount: 0, type: "deplacement" },
       { label: "Main d'œuvre", description: "Recherche et réparation de fuite", qty: 1, unit: "h", unit_price: 65, vat_rate: 10, discount: 0, type: "main_oeuvre" },
-      { label: "Fournitures plomberie", description: "", qty: 1, unit: "lot", unit_price: 25, vat_rate: 20, discount: 0, type: "standard" },
+      { label: "Fournitures plomberie", description: "", qty: 1, unit: "lot", unit_price: 25, vat_rate: 20, discount: 0, type: "fourniture" },
     ],
   },
   chauffe_eau: {
     label: "Remplacement chauffe-eau",
     items: [
       { label: "Déplacement", description: "", qty: 1, unit: "forfait", unit_price: 35, vat_rate: 20, discount: 0, type: "deplacement" },
-      { label: "Chauffe-eau 200L", description: "Fourniture et pose", qty: 1, unit: "u", unit_price: 650, vat_rate: 10, discount: 0, type: "standard" },
-      { label: "Raccordements", description: "Plomberie et électrique", qty: 1, unit: "forfait", unit_price: 120, vat_rate: 10, discount: 0, type: "standard" },
+      { label: "Chauffe-eau 200L", description: "Fourniture et pose", qty: 1, unit: "u", unit_price: 650, vat_rate: 10, discount: 0, type: "materiel" },
+      { label: "Raccordements", description: "Plomberie et électrique", qty: 1, unit: "forfait", unit_price: 120, vat_rate: 10, discount: 0, type: "fourniture" },
       { label: "Main d'œuvre", description: "Dépose ancien + pose", qty: 3, unit: "h", unit_price: 65, vat_rate: 10, discount: 0, type: "main_oeuvre" },
       { label: "Enlèvement ancien chauffe-eau", description: "", qty: 1, unit: "forfait", unit_price: 50, vat_rate: 20, discount: 0, type: "standard" },
     ],

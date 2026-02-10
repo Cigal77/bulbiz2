@@ -7,12 +7,21 @@ import { Search, Plus, ArrowLeft, Package } from "lucide-react";
 import { useMaterialCatalog, useMaterialCorrespondence, type CatalogMaterial } from "@/hooks/useMaterialCatalog";
 import { RecommendationTabs } from "./RecommendationTabs";
 import type { QuoteItem } from "@/lib/quote-types";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaterialPickerPanelProps {
   onAddItem: (item: Omit<QuoteItem, "id">) => void;
 }
 
+function catalogTypeToQuoteType(catalogType: string): QuoteItem["type"] {
+  if (catalogType === "GROSSE_FOURNITURE") return "materiel";
+  if (catalogType === "PETITE_FOURNITURE") return "fourniture";
+  if (catalogType === "CONSOMMABLE") return "fourniture";
+  return "standard";
+}
+
 export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const { data: materials = [], isLoading } = useMaterialCatalog(search);
@@ -29,8 +38,9 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
       unit_price: Number(mat.unit_price),
       vat_rate: Number(mat.vat_rate),
       discount: 0,
-      type: "standard",
+      type: catalogTypeToQuoteType(mat.type),
     });
+    toast({ title: "✅ Ajouté", description: mat.label });
   };
 
   const handleAddCorrespondence = (item: { label: string; description?: string; unit: string; default_qty: number; unit_price: number; vat_rate: number }) => {
@@ -42,11 +52,12 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
       unit_price: Number(item.unit_price),
       vat_rate: Number(item.vat_rate),
       discount: 0,
-      type: "standard",
+      type: "fourniture",
     });
+    toast({ title: "✅ Ajouté", description: item.label });
   };
 
-  // Detail view with correspondences
+  // Detail view
   if (selectedMaterial) {
     const corrItems = correspondences
       .filter((c) => c.target)
@@ -72,10 +83,17 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
           <h3 className="text-sm font-semibold text-foreground">{selectedMaterial.label}</h3>
           <p className="text-xs text-muted-foreground">{selectedMaterial.category_path}</p>
         </div>
+
+        {/* Add the main material */}
+        <Button size="sm" variant="outline" className="gap-1.5 mb-3" onClick={() => addMaterial(selectedMaterial)}>
+          <Plus className="h-3.5 w-3.5" />
+          Ajouter {selectedMaterial.label}
+        </Button>
+
         <ScrollArea className="flex-1">
           {corrItems.length > 0 ? (
             <>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Fournitures associées</p>
+              <p className="text-xs font-semibold text-primary mb-2">Fournitures indispensables</p>
               <RecommendationTabs items={corrItems} onAdd={handleAddCorrespondence} />
             </>
           ) : (
@@ -88,7 +106,7 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
     );
   }
 
-  // Catalog list
+  // Catalog
   const grosses = materials.filter((m) => m.type === "GROSSE_FOURNITURE");
   const petites = materials.filter((m) => m.type === "PETITE_FOURNITURE");
   const consommables = materials.filter((m) => m.type === "CONSOMMABLE");
@@ -97,9 +115,9 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
     if (items.length === 0) return null;
     return (
       <div className="mb-4">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{title}</p>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5">{title}</p>
         {items.map((mat) => (
-          <div key={mat.id} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 group">
+          <div key={mat.id} className="flex items-center justify-between gap-2 py-2 px-2.5 rounded-lg hover:bg-muted/50 group">
             <button
               className="min-w-0 flex-1 text-left"
               onClick={() => showCorr ? setSelectedMaterialId(mat.id) : addMaterial(mat)}
@@ -107,7 +125,7 @@ export function MaterialPickerPanel({ onAddItem }: MaterialPickerPanelProps) {
               <p className="text-sm font-medium truncate">{mat.label}</p>
               <div className="flex gap-1.5 mt-0.5">
                 <Badge variant="outline" className="text-[10px] px-1 py-0">{mat.default_qty} {mat.unit}</Badge>
-                <Badge variant="outline" className="text-[10px] px-1 py-0">{mat.unit_price}€</Badge>
+                <Badge variant="outline" className="text-[10px] px-1 py-0">{mat.unit_price} €</Badge>
               </div>
             </button>
             <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 opacity-60 group-hover:opacity-100" onClick={() => addMaterial(mat)}>

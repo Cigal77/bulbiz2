@@ -9,16 +9,19 @@ export function QuoteTotalsFooter({ items }: QuoteTotalsFooterProps) {
   const { total_ht, total_tva, total_ttc } = calcTotals(items);
 
   return (
-    <div className="sticky bottom-0 z-10 border-t bg-card/95 backdrop-blur px-4 py-3">
-      <div className="max-w-6xl mx-auto flex items-center justify-end gap-6 text-sm">
-        <div className="text-muted-foreground">
-          Total HT : <span className="font-medium text-foreground">{total_ht.toFixed(2)} €</span>
+    <div className="rounded-xl border bg-card p-4 mt-3">
+      <div className="flex flex-col items-end gap-1.5 text-sm">
+        <div className="flex items-center gap-6">
+          <span className="text-muted-foreground text-xs">Total HT</span>
+          <span className="font-medium w-24 text-right">{total_ht.toFixed(2)} €</span>
         </div>
-        <div className="text-muted-foreground">
-          TVA : <span className="font-medium text-foreground">{total_tva.toFixed(2)} €</span>
+        <div className="flex items-center gap-6">
+          <span className="text-muted-foreground text-xs">TVA</span>
+          <span className="font-medium w-24 text-right">{total_tva.toFixed(2)} €</span>
         </div>
-        <div className="text-base font-bold text-foreground">
-          TTC : {total_ttc.toFixed(2)} €
+        <div className="flex items-center gap-6 pt-2 mt-1 border-t">
+          <span className="font-bold text-base">Total TTC</span>
+          <span className="font-bold text-lg text-primary w-24 text-right">{total_ttc.toFixed(2)} €</span>
         </div>
       </div>
     </div>

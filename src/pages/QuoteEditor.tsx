@@ -2,21 +2,20 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useDossier } from "@/hooks/useDossier";
 import { useProfile } from "@/hooks/useProfile";
-import { useQuotes, useQuoteActions } from "@/hooks/useQuotes";
+import { useQuotes } from "@/hooks/useQuotes";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, User, ListOrdered, FileCheck } from "lucide-react";
-import { BulbizLogo } from "@/components/BulbizLogo";
+import { ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { StepClientInfo } from "@/components/quote-editor/StepClientInfo";
-import { StepItems } from "@/components/quote-editor/StepItems";
-import { StepSummary } from "@/components/quote-editor/StepSummary";
-import { QuoteTotalsFooter } from "@/components/quote-editor/QuoteTotalsFooter";
+import { QuoteHeaderBar } from "@/components/quote-editor/QuoteHeaderBar";
+import { QuoteSectionChecklist } from "@/components/quote-editor/QuoteSectionChecklist";
+import { AssistantSidebar } from "@/components/quote-editor/AssistantSidebar";
+import { QuoteSections } from "@/components/quote-editor/QuoteSections";
 import type { QuoteItem } from "@/lib/quote-types";
 import { calcTotals } from "@/lib/quote-types";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function QuoteEditor() {
   const { dossierId } = useParams<{ dossierId: string }>();
@@ -28,12 +27,12 @@ export default function QuoteEditor() {
   const { data: dossier, isLoading: dossierLoading } = useDossier(dossierId!);
   const { profile } = useProfile();
   const { data: quotes = [] } = useQuotes(dossierId!);
-  const { importPdf } = useQuoteActions(dossierId!);
+  const isMobile = useIsMobile();
 
-  const [tab, setTab] = useState("client");
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [notes, setNotes] = useState("");
   const [labourSummary, setLabourSummary] = useState("");
+  const [problemLabel, setProblemLabel] = useState<string | undefined>();
   const [validityDays, setValidityDays] = useState(30);
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
   const [quoteNumber, setQuoteNumber] = useState("");
@@ -42,7 +41,7 @@ export default function QuoteEditor() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load existing quote if editing
+  // Load existing quote
   useEffect(() => {
     if (quoteId && quotes.length > 0) {
       const existing = quotes.find((q) => q.id === quoteId);
@@ -57,32 +56,26 @@ export default function QuoteEditor() {
     }
   }, [quoteId, quotes]);
 
-  // Set default validity from profile
   useEffect(() => {
     if (!quoteId && profile?.default_validity_days) {
       setValidityDays(profile.default_validity_days);
     }
   }, [profile, quoteId]);
 
-  // Auto-save draft
+  // Auto-save
   const saveDraft = useCallback(async () => {
     if (!user || !dossierId) return;
     setIsSaving(true);
     try {
       const { total_ht, total_tva, total_ttc } = calcTotals(items);
-
       if (currentQuoteId) {
-        // Update existing
         await supabase.from("quotes").update({
           items: JSON.parse(JSON.stringify(items)),
           notes: notes || null,
           validity_days: validityDays,
-          total_ht,
-          total_tva,
-          total_ttc,
+          total_ht, total_tva, total_ttc,
         }).eq("id", currentQuoteId);
       } else {
-        // Create new quote
         const { data: numData, error: numError } = await supabase.rpc("generate_quote_number", {
           p_user_id: user.id,
         });
@@ -100,21 +93,15 @@ export default function QuoteEditor() {
             items: JSON.parse(JSON.stringify(items)),
             notes: notes || null,
             validity_days: validityDays,
-            total_ht,
-            total_tva,
-            total_ttc,
+            total_ht, total_tva, total_ttc,
           }])
-          .select()
-          .single();
+          .select().single();
         if (insertError) throw insertError;
         setCurrentQuoteId(newQuote.id);
 
-        // Log
         await supabase.from("historique").insert({
-          dossier_id: dossierId,
-          user_id: user.id,
-          action: "quote_created",
-          details: `Devis ${numData} créé`,
+          dossier_id: dossierId, user_id: user.id,
+          action: "quote_created", details: `Devis ${numData} créé`,
         });
       }
     } catch (err: unknown) {
@@ -124,7 +111,6 @@ export default function QuoteEditor() {
     }
   }, [user, dossierId, currentQuoteId, items, notes, validityDays]);
 
-  // Debounced auto-save
   useEffect(() => {
     if (items.length === 0 && !currentQuoteId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -133,7 +119,6 @@ export default function QuoteEditor() {
   }, [items, notes, validityDays, saveDraft]);
 
   const handleGeneratePdf = async () => {
-    // Save first
     await saveDraft();
     if (!currentQuoteId) {
       toast({ title: "Ajoutez au moins une ligne", variant: "destructive" });
@@ -160,17 +145,12 @@ export default function QuoteEditor() {
   const handleSend = async () => {
     await saveDraft();
     if (!currentQuoteId) return;
-
-    // Generate PDF first if needed
     setIsSending(true);
     try {
-      // Generate PDF
-      const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-quote-pdf", {
+      const { error: pdfError } = await supabase.functions.invoke("generate-quote-pdf", {
         body: { quote_id: currentQuoteId },
       });
       if (pdfError) throw pdfError;
-
-      // Send email
       const { error } = await supabase.functions.invoke("send-quote", {
         body: { quote_id: currentQuoteId },
       });
@@ -183,6 +163,20 @@ export default function QuoteEditor() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  // Assistant callbacks
+  const addItemFromAssistant = (item: Omit<QuoteItem, "id">) => {
+    setItems(prev => [...prev, { ...item, id: crypto.randomUUID() }]);
+  };
+
+  const addItemsFromAssistant = (newItems: Omit<QuoteItem, "id">[]) => {
+    const withIds = newItems.map(i => ({ ...i, id: crypto.randomUUID() }));
+    setItems(prev => [...prev, ...withIds]);
+  };
+
+  const handleSetLabourContext = (_tags: string[], label: string) => {
+    setProblemLabel(label);
   };
 
   if (dossierLoading) {
@@ -208,71 +202,56 @@ export default function QuoteEditor() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/dossier/${dossierId}`)}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <BulbizLogo size={20} />
-        <span className="font-semibold text-foreground truncate ml-2">
-          {quoteNumber || "Nouveau devis"}
-        </span>
-        {isSaving && (
-          <span className="text-xs text-muted-foreground ml-auto">Sauvegarde…</span>
+      <QuoteHeaderBar
+        dossier={dossier}
+        quoteNumber={quoteNumber}
+        isSaving={isSaving}
+        isSending={isSending}
+        isGeneratingPdf={isGeneratingPdf}
+        itemCount={items.length}
+        onBack={() => navigate(`/dossier/${dossierId}`)}
+        onGeneratePdf={handleGeneratePdf}
+        onSend={handleSend}
+      />
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop assistant sidebar — always visible */}
+        {!isMobile && (
+          <AssistantSidebar
+            onAddItem={addItemFromAssistant}
+            onAddItems={addItemsFromAssistant}
+            onSetLabourContext={handleSetLabourContext}
+          />
         )}
-      </header>
 
-      {/* Tabs */}
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full grid grid-cols-3 mb-6">
-            <TabsTrigger value="client" className="gap-2">
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Client</span>
-            </TabsTrigger>
-            <TabsTrigger value="lignes" className="gap-2">
-              <ListOrdered className="h-4 w-4" />
-              <span className="hidden sm:inline">Lignes</span>
-            </TabsTrigger>
-            <TabsTrigger value="resume" className="gap-2">
-              <FileCheck className="h-4 w-4" />
-              <span className="hidden sm:inline">Résumé</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+            <QuoteSectionChecklist items={items} />
 
-          <TabsContent value="client">
-            <StepClientInfo
-              dossier={dossier}
+            <QuoteSections
+              items={items}
+              setItems={setItems}
+              labourSummary={labourSummary}
+              onLabourSummaryChange={setLabourSummary}
+              problemLabel={problemLabel}
               notes={notes}
               validityDays={validityDays}
               onNotesChange={setNotes}
               onValidityChange={setValidityDays}
             />
-          </TabsContent>
+          </div>
+        </main>
+      </div>
 
-          <TabsContent value="lignes">
-            <StepItems items={items} setItems={setItems} labourSummary={labourSummary} onLabourSummaryChange={setLabourSummary} />
-          </TabsContent>
-
-          <TabsContent value="resume">
-            <StepSummary
-              dossier={dossier}
-              items={items}
-              notes={notes}
-              validityDays={validityDays}
-              quoteNumber={quoteNumber || "—"}
-              isSaving={isSaving}
-              isSending={isSending}
-              isGeneratingPdf={isGeneratingPdf}
-              onGeneratePdf={handleGeneratePdf}
-              onSend={handleSend}
-            />
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      {/* Sticky totals footer when on items tab */}
-      {tab === "lignes" && <QuoteTotalsFooter items={items} />}
+      {/* Mobile assistant (floating button + drawer) */}
+      {isMobile && (
+        <AssistantSidebar
+          onAddItem={addItemFromAssistant}
+          onAddItems={addItemsFromAssistant}
+          onSetLabourContext={handleSetLabourContext}
+        />
+      )}
     </div>
   );
 }
