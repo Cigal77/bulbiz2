@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
 import { StatusCounters } from "@/components/dashboard/StatusCounters";
@@ -18,6 +19,7 @@ const ALL_STATUSES: DossierStatus[] = ["nouveau", "a_qualifier", "devis_a_faire"
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { data: dossiers, isLoading } = useDossiers();
 
   const [search, setSearch] = useState("");
@@ -61,8 +63,7 @@ export default function Dashboard() {
   }, [dossiers, statusFilter, sourceFilter, search]);
 
   const handleSelect = (dossier: Dossier) => {
-    // Phase 3: navigate to dossier detail
-    console.log("Selected dossier:", dossier.id);
+    navigate(`/dossier/${dossier.id}`);
   };
 
   return (
