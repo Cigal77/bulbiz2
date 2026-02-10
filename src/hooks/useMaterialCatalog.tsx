@@ -19,7 +19,8 @@ export function useMaterialCatalog(search: string, category?: string) {
     queryFn: async () => {
       let query = supabase.from("catalog_material").select("*").order("category_path");
       if (search) {
-        query = query.ilike("label", `%${search}%`);
+        // Search across label, tags array, and synonyms array using OR
+        query = query.or(`label.ilike.%${search}%,tags.cs.{"${search.toLowerCase()}"},category_path.ilike.%${search}%`);
       }
       if (category) {
         query = query.ilike("category_path", `${category}%`);

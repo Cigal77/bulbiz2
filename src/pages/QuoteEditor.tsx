@@ -221,6 +221,8 @@ export default function QuoteEditor() {
             onAddItem={addItemFromAssistant}
             onAddItems={addItemsFromAssistant}
             onSetLabourContext={handleSetLabourContext}
+            dossierCategory={dossier.category}
+            dossierDescription={dossier.description ?? undefined}
           />
         )}
 
@@ -250,6 +252,8 @@ export default function QuoteEditor() {
           onAddItem={addItemFromAssistant}
           onAddItems={addItemsFromAssistant}
           onSetLabourContext={handleSetLabourContext}
+          dossierCategory={dossier.category}
+          dossierDescription={dossier.description ?? undefined}
         />
       )}
     </div>
