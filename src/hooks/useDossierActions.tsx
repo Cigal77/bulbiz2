@@ -57,5 +57,16 @@ export function useDossierActions(dossierId: string) {
     onSuccess: invalidate,
   });
 
-  return { changeStatus, addNote, toggleRelance };
+  const sendRelance = useMutation({
+    mutationFn: async (type: "info_manquante" | "devis_non_signe") => {
+      const { data, error } = await supabase.functions.invoke("send-relance", {
+        body: { dossier_id: dossierId, type },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: invalidate,
+  });
+
+  return { changeStatus, addNote, toggleRelance, sendRelance };
 }
