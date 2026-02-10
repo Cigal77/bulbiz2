@@ -52,6 +52,152 @@ export type Database = {
           },
         ]
       }
+      artisan_catalog_override: {
+        Row: {
+          created_at: string
+          custom_label: string | null
+          custom_price_ht: number | null
+          id: string
+          is_favorite: boolean
+          is_hidden: boolean
+          item_id: string
+          margin_percent: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_label?: string | null
+          custom_price_ht?: number | null
+          id?: string
+          is_favorite?: boolean
+          is_hidden?: boolean
+          item_id: string
+          margin_percent?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_label?: string | null
+          custom_price_ht?: number | null
+          id?: string
+          is_favorite?: boolean
+          is_hidden?: boolean
+          item_id?: string
+          margin_percent?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artisan_catalog_override_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bundle_template_items: {
+        Row: {
+          bundle_id: string
+          catalog_item_id: string | null
+          created_at: string
+          default_qty: number
+          description: string | null
+          id: string
+          is_optional: boolean
+          item_type: string
+          label: string
+          sort_order: number | null
+          unit: string
+          unit_price: number
+          vat_rate: number
+        }
+        Insert: {
+          bundle_id: string
+          catalog_item_id?: string | null
+          created_at?: string
+          default_qty?: number
+          description?: string | null
+          id?: string
+          is_optional?: boolean
+          item_type?: string
+          label: string
+          sort_order?: number | null
+          unit?: string
+          unit_price?: number
+          vat_rate?: number
+        }
+        Update: {
+          bundle_id?: string
+          catalog_item_id?: string | null
+          created_at?: string
+          default_qty?: number
+          description?: string | null
+          id?: string
+          is_optional?: boolean
+          item_type?: string
+          label?: string
+          sort_order?: number | null
+          unit?: string
+          unit_price?: number
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bundle_template_items_bundle_id_fkey"
+            columns: ["bundle_id"]
+            isOneToOne: false
+            referencedRelation: "bundle_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bundle_template_items_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bundle_templates: {
+        Row: {
+          bundle_name: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          sort_order: number | null
+          trigger_category: string
+          trigger_keywords: string[] | null
+          user_id: string | null
+        }
+        Insert: {
+          bundle_name: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          sort_order?: number | null
+          trigger_category: string
+          trigger_keywords?: string[] | null
+          user_id?: string | null
+        }
+        Update: {
+          bundle_name?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          sort_order?: number | null
+          trigger_category?: string
+          trigger_keywords?: string[] | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       catalog_material: {
         Row: {
           category_path: string
@@ -60,6 +206,7 @@ export type Database = {
           id: string
           label: string
           slug: string | null
+          synonyms: string[] | null
           tags: string[] | null
           type: string
           unit: string | null
@@ -74,6 +221,7 @@ export type Database = {
           id?: string
           label: string
           slug?: string | null
+          synonyms?: string[] | null
           tags?: string[] | null
           type?: string
           unit?: string | null
@@ -88,6 +236,7 @@ export type Database = {
           id?: string
           label?: string
           slug?: string | null
+          synonyms?: string[] | null
           tags?: string[] | null
           type?: string
           unit?: string | null
