@@ -33,6 +33,7 @@ export default function QuoteEditor() {
   const [tab, setTab] = useState("client");
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [notes, setNotes] = useState("");
+  const [labourSummary, setLabourSummary] = useState("");
   const [validityDays, setValidityDays] = useState(30);
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
   const [quoteNumber, setQuoteNumber] = useState("");
@@ -250,7 +251,7 @@ export default function QuoteEditor() {
           </TabsContent>
 
           <TabsContent value="lignes">
-            <StepItems items={items} setItems={setItems} />
+            <StepItems items={items} setItems={setItems} labourSummary={labourSummary} onLabourSummaryChange={setLabourSummary} />
           </TabsContent>
 
           <TabsContent value="resume">
