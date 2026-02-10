@@ -1,0 +1,36 @@
+import { describe, it, expect } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { StatusCounters } from "@/components/dashboard/StatusCounters";
+
+describe("StatusCounters", () => {
+  const counts = {
+    nouveau: 3,
+    a_qualifier: 1,
+    devis_a_faire: 2,
+    devis_envoye: 0,
+    clos_signe: 5,
+    clos_perdu: 1,
+  } as const;
+
+  it("renders all status counts", () => {
+    render(<StatusCounters counts={counts} activeFilter={null} onFilterChange={() => {}} />);
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Nouveau")).toBeInTheDocument();
+    expect(screen.getByText("À qualifier")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("calls onFilterChange when clicked", () => {
+    const onChange = vi.fn();
+    render(<StatusCounters counts={counts} activeFilter={null} onFilterChange={onChange} />);
+    fireEvent.click(screen.getByText("Nouveau"));
+    expect(onChange).toHaveBeenCalledWith("nouveau");
+  });
+
+  it("toggles off when clicking active filter", () => {
+    const onChange = vi.fn();
+    render(<StatusCounters counts={counts} activeFilter="nouveau" onFilterChange={onChange} />);
+    fireEvent.click(screen.getByText("Nouveau"));
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+});
