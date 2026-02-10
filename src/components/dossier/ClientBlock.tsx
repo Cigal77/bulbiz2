@@ -15,18 +15,24 @@ export function ClientBlock({ dossier }: ClientBlockProps) {
         </div>
         <div>
           <p className="font-semibold text-foreground">
-            {dossier.client_first_name} {dossier.client_last_name}
+            {dossier.client_first_name || dossier.client_last_name
+              ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
+              : <span className="text-muted-foreground italic">Non renseigné</span>}
           </p>
         </div>
       </div>
       <div className="space-y-2">
-        <a
-          href={`tel:${dossier.client_phone}`}
-          className="flex items-center gap-2 text-sm text-primary hover:underline font-medium"
-        >
-          <Phone className="h-4 w-4" />
-          {dossier.client_phone}
-        </a>
+        {dossier.client_phone ? (
+          <a href={`tel:${dossier.client_phone}`} className="flex items-center gap-2 text-sm text-primary hover:underline font-medium">
+            <Phone className="h-4 w-4" />
+            {dossier.client_phone}
+          </a>
+        ) : (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground italic">
+            <Phone className="h-4 w-4" />
+            Téléphone non renseigné
+          </p>
+        )}
         {dossier.client_email && (
           <a
             href={`mailto:${dossier.client_email}`}

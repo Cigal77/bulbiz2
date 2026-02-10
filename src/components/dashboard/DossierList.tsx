@@ -36,32 +36,39 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0 space-y-2">
               {/* Client name + urgency */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-foreground truncate">
-                  {dossier.client_first_name} {dossier.client_last_name}
-                </span>
-                <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium", URGENCY_COLORS[dossier.urgency])}>
-                  {URGENCY_LABELS[dossier.urgency]}
-                </span>
-              </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-foreground truncate">
+                    {dossier.client_first_name || dossier.client_last_name
+                      ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
+                      : "Client sans nom"}
+                  </span>
+                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium", URGENCY_COLORS[dossier.urgency])}>
+                    {URGENCY_LABELS[dossier.urgency]}
+                  </span>
+                </div>
 
-              {/* Category + address */}
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground/80">
-                  {CATEGORY_LABELS[dossier.category]}
-                </span>
-                <span className="flex items-center gap-1 truncate">
-                  <MapPin className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{dossier.address}</span>
-                </span>
-              </div>
+                {/* Category + address */}
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground/80">
+                    {CATEGORY_LABELS[dossier.category]}
+                  </span>
+                  {dossier.address && (
+                    <span className="flex items-center gap-1 truncate">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{dossier.address}</span>
+                    </span>
+                  )}
+                </div>
 
               {/* Phone + source + date */}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Phone className="h-3 w-3" />
-                  {dossier.client_phone}
-                </span>
+                {dossier.client_phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    {dossier.client_phone}
+                  </span>
+                )}
+                {dossier.client_phone && <span>·</span>}
                 <span>·</span>
                 <span>{SOURCE_LABELS[dossier.source]}</span>
                 <span>·</span>

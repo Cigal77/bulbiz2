@@ -16,12 +16,12 @@ export type Database = {
     Tables: {
       dossiers: {
         Row: {
-          address: string
+          address: string | null
           category: Database["public"]["Enums"]["problem_category"]
           client_email: string | null
-          client_first_name: string
-          client_last_name: string
-          client_phone: string
+          client_first_name: string | null
+          client_last_name: string | null
+          client_phone: string | null
           client_token: string | null
           client_token_expires_at: string | null
           created_at: string
@@ -38,12 +38,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          address: string
+          address?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           client_email?: string | null
-          client_first_name: string
-          client_last_name: string
-          client_phone: string
+          client_first_name?: string | null
+          client_last_name?: string | null
+          client_phone?: string | null
           client_token?: string | null
           client_token_expires_at?: string | null
           created_at?: string
@@ -60,12 +60,12 @@ export type Database = {
           user_id: string
         }
         Update: {
-          address?: string
+          address?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           client_email?: string | null
-          client_first_name?: string
-          client_last_name?: string
-          client_phone?: string
+          client_first_name?: string | null
+          client_last_name?: string | null
+          client_phone?: string | null
           client_token?: string | null
           client_token_expires_at?: string | null
           created_at?: string
