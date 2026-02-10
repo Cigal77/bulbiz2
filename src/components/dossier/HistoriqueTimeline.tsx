@@ -4,7 +4,7 @@ import { formatDistanceToNow, format, differenceInMinutes } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   FolderPlus, Send, FileText, Bell, ArrowRightLeft,
-  FilePenLine, FileCheck, FileX, Download, Trash2, UserCheck, Link2
+  FilePenLine, FileCheck, FileX, Download, Trash2, UserCheck, Link2, Smartphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -128,6 +128,16 @@ function mapEntry(entry: Historique): DisplayEntry {
       detail: emailMatch ? `Envoyé à ${emailMatch[0]}` : details || null,
     };
   }
+  if (action === "client_link_sent_sms") {
+    const phoneMatch = details.match(/[\d\s+]+/);
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Smartphone className="h-3.5 w-3.5" />,
+      iconColor: "bg-primary/15 text-primary",
+      title: "Lien client envoyé par SMS",
+      detail: phoneMatch ? `Envoyé au ${phoneMatch[0].trim()}` : details || null,
+    };
+  }
   if (action === "client_link_not_sent") {
     return {
       id: entry.id, timestamp: ts,
@@ -142,14 +152,42 @@ function mapEntry(entry: Historique): DisplayEntry {
   if (action === "relance_sent" || action === "reminder_sent") {
     const isDevis = details.toLowerCase().includes("devis");
     const relanceType = isDevis ? "Devis non signé" : "Informations manquantes";
-    // Try to extract email from details
     const emailMatch = details.match(/[\w.-]+@[\w.-]+/);
     return {
       id: entry.id, timestamp: ts,
       icon: <Bell className="h-3.5 w-3.5" />,
       iconColor: "bg-warning/15 text-warning",
       title: `Relance envoyée – ${relanceType}`,
-      detail: emailMatch ? `Envoyée à ${emailMatch[0]}` : details || null,
+      detail: emailMatch ? `Envoyée par email à ${emailMatch[0]}` : details || null,
+    };
+  }
+  if (action === "relance_sent_sms") {
+    const isDevis = details.toLowerCase().includes("devis");
+    const relanceType = isDevis ? "Devis non signé" : "Informations manquantes";
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Smartphone className="h-3.5 w-3.5" />,
+      iconColor: "bg-warning/15 text-warning",
+      title: `Relance envoyée par SMS – ${relanceType}`,
+      detail: details || null,
+    };
+  }
+  if (action === "quote_sent_sms") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Smartphone className="h-3.5 w-3.5" />,
+      iconColor: "bg-success/15 text-success",
+      title: "Devis envoyé par SMS",
+      detail: details || null,
+    };
+  }
+  if (action === "sms_error") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Smartphone className="h-3.5 w-3.5" />,
+      iconColor: "bg-destructive/15 text-destructive",
+      title: "SMS non envoyé (erreur)",
+      detail: details || null,
     };
   }
 

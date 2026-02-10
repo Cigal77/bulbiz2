@@ -103,8 +103,10 @@ export default function CreateDossier() {
           const parts: string[] = ["Dossier créé ✅"];
           if (data?.token_generated) parts.push("Lien client généré ✅");
           if (data?.email_sent) parts.push("Lien envoyé par email ✅");
+          if (data?.sms_sent) parts.push("Lien envoyé par SMS ✅");
           if (data?.no_contact) parts.push("Coordonnées manquantes ⚠️");
           if (data?.email_error) parts.push("Erreur envoi email");
+          if (data?.sms_error) parts.push("Erreur envoi SMS");
 
           toast({ title: "Dossier créé", description: parts.join(" • ") });
         } catch {

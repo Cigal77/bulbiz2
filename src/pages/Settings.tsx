@@ -30,6 +30,7 @@ interface SettingsForm {
   email_signature: string;
   auto_send_client_link: boolean;
   client_link_validity_days: number;
+  sms_enabled: boolean;
 }
 
 export default function Settings() {
@@ -40,6 +41,7 @@ export default function Settings() {
 
   const autoRelance = watch("auto_relance_enabled");
   const autoSendLink = watch("auto_send_client_link");
+  const smsEnabled = watch("sms_enabled");
 
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function Settings() {
         email_signature: profile.email_signature ?? "",
         auto_send_client_link: (profile as any).auto_send_client_link ?? true,
         client_link_validity_days: (profile as any).client_link_validity_days ?? 7,
+        sms_enabled: (profile as any).sms_enabled ?? true,
       });
     }
   }, [profile, reset]);
@@ -84,6 +87,7 @@ export default function Settings() {
         email_signature: data.email_signature || null,
         auto_send_client_link: data.auto_send_client_link,
         client_link_validity_days: data.client_link_validity_days,
+        sms_enabled: data.sms_enabled,
       });
       toast.success("Paramètres sauvegardés");
     } catch {
@@ -188,6 +192,29 @@ export default function Settings() {
                   {...register("client_link_validity_days", { valueAsNumber: true })}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* SMS */}
+          <Card>
+            <CardHeader>
+              <CardTitle>SMS</CardTitle>
+              <CardDescription>Envoi de SMS au client en complément des emails</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Envoyer aussi par SMS</Label>
+                  <p className="text-sm text-muted-foreground">Quand un numéro de téléphone client est disponible</p>
+                </div>
+                <Switch
+                  checked={smsEnabled}
+                  onCheckedChange={(v) => setValue("sms_enabled", v)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                💡 Pour activer l'envoi réel de SMS, configurez les clés Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) dans les secrets du projet.
+              </p>
             </CardContent>
           </Card>
 

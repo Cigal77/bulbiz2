@@ -394,6 +394,7 @@ export type Database = {
           relance_delay_devis_2: number
           relance_delay_info: number
           siret: string | null
+          sms_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -417,6 +418,7 @@ export type Database = {
           relance_delay_devis_2?: number
           relance_delay_info?: number
           siret?: string | null
+          sms_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -440,6 +442,7 @@ export type Database = {
           relance_delay_devis_2?: number
           relance_delay_info?: number
           siret?: string | null
+          sms_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
