@@ -6,6 +6,7 @@ import { MediaGallery } from "@/components/dossier/MediaGallery";
 import { SummaryBlock } from "@/components/dossier/SummaryBlock";
 import { HistoriqueTimeline } from "@/components/dossier/HistoriqueTimeline";
 import { DossierActions } from "@/components/dossier/DossierActions";
+import { ClientLinkBlock } from "@/components/dossier/ClientLinkBlock";
 import { QuoteBlock } from "@/components/dossier/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -83,6 +84,7 @@ export default function DossierDetail() {
           {/* Right column - actions */}
           <div className="space-y-4">
             <DossierActions dossier={dossier} />
+            <ClientLinkBlock dossier={dossier} />
           </div>
         </div>
       </main>

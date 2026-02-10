@@ -117,6 +117,27 @@ function mapEntry(entry: Historique): DisplayEntry {
     };
   }
 
+  // Client link sent
+  if (action === "client_link_sent_email") {
+    const emailMatch = details.match(/[\w.-]+@[\w.-]+/);
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Send className="h-3.5 w-3.5" />,
+      iconColor: "bg-primary/15 text-primary",
+      title: "Lien client envoyé par email",
+      detail: emailMatch ? `Envoyé à ${emailMatch[0]}` : details || null,
+    };
+  }
+  if (action === "client_link_not_sent") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Bell className="h-3.5 w-3.5" />,
+      iconColor: "bg-warning/15 text-warning",
+      title: "Coordonnées manquantes",
+      detail: "Lien client non envoyé",
+    };
+  }
+
   // Relances
   if (action === "relance_sent" || action === "reminder_sent") {
     const isDevis = details.toLowerCase().includes("devis");

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
 import { useToast } from "@/hooks/use-toast";
 import { dossierSchema, defaultDossierValues, type DossierFormData } from "@/lib/dossier-schema";
 import { parseEmailContent } from "@/lib/email-parser";
@@ -43,6 +44,7 @@ const URGENCIES: UrgencyLevel[] = ["aujourdhui", "48h", "semaine"];
 export default function CreateDossier() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>("manuel");
@@ -87,9 +89,31 @@ export default function CreateDossier() {
 
       return dossier;
     },
-    onSuccess: (dossier) => {
+    onSuccess: async (dossier) => {
       queryClient.invalidateQueries({ queryKey: ["dossiers"] });
-      toast({ title: "Dossier créé !" });
+
+      // Auto-generate and send client link
+      const autoSend = (profile as any)?.auto_send_client_link !== false; // default true
+      if (autoSend) {
+        try {
+          const { data, error } = await supabase.functions.invoke("send-client-link", {
+            body: { dossier_id: dossier.id },
+          });
+
+          const parts: string[] = ["Dossier créé ✅"];
+          if (data?.token_generated) parts.push("Lien client généré ✅");
+          if (data?.email_sent) parts.push("Lien envoyé par email ✅");
+          if (data?.no_contact) parts.push("Coordonnées manquantes ⚠️");
+          if (data?.email_error) parts.push("Erreur envoi email");
+
+          toast({ title: "Dossier créé", description: parts.join(" • ") });
+        } catch {
+          toast({ title: "Dossier créé !", description: "Erreur lors de l'envoi automatique du lien client." });
+        }
+      } else {
+        toast({ title: "Dossier créé !" });
+      }
+
       navigate(`/dossier/${dossier.id}`);
     },
     onError: (e: Error) => {

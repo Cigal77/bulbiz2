@@ -12,10 +12,9 @@ import { STATUS_LABELS, SOURCE_LABELS } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
 import type { Database } from "@/integrations/supabase/types";
 import { useDossierActions } from "@/hooks/useDossierActions";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Phone, Send, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar, RefreshCw, Loader2, Link, Copy, Check
+  Phone, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar, RefreshCw, Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -36,9 +35,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
-  const [generatingLink, setGeneratingLink] = useState(false);
-  const [clientLink, setClientLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const handleStatusChange = (status: string) => {
     changeStatus.mutate(status as DossierStatus, {
@@ -150,81 +146,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           </div>
         )}
 
-        {/* Client link */}
-        {clientLink ? (
-          <div className="space-y-2">
-            <div className="flex gap-1">
-              <input
-                readOnly
-                value={clientLink}
-                className="flex-1 text-xs bg-muted rounded px-2 py-1.5 border border-border truncate"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                className="shrink-0"
-                onClick={() => {
-                  navigator.clipboard.writeText(clientLink);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-              </Button>
-            </div>
-            {dossier.client_email && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full gap-2 text-xs"
-                onClick={async () => {
-                  try {
-                    await supabase.functions.invoke("send-relance", {
-                      body: { dossier_id: dossier.id, type: "info_manquante", client_link: clientLink },
-                    });
-                    toast({ title: "Lien envoyé par email au client !" });
-                  } catch (e: any) {
-                    toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" });
-                  }
-                }}
-              >
-                <Send className="h-3.5 w-3.5" />
-                Envoyer par email
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-2"
-            disabled={generatingLink}
-            onClick={async () => {
-              setGeneratingLink(true);
-              try {
-                const { data, error } = await supabase.functions.invoke("generate-client-token", {
-                  body: { dossier_id: dossier.id },
-                });
-                if (error) throw error;
-                if (data?.error) throw new Error(data.error);
-                const link = `${window.location.origin}/client?token=${data.token}`;
-                setClientLink(link);
-                navigator.clipboard.writeText(link);
-                toast({ title: "Lien copié !" });
-              } catch (e: any) {
-                toast({ title: "Erreur", description: e.message, variant: "destructive" });
-              } finally {
-                setGeneratingLink(false);
-              }
-            }}
-          >
-            {generatingLink ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Link className="h-4 w-4 text-primary" />
-            )}
-            Générer lien client
-          </Button>
-        )}
 
         <Button
           variant="outline"
