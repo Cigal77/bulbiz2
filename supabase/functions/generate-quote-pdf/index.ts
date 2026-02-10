@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,115 +22,192 @@ function calcLineTotal(item: QuoteItem): number {
   return base - (base * (item.discount || 0)) / 100;
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function fmt(n: number): string {
+  return n.toFixed(2).replace(".", ",") + " €";
 }
 
-function buildHtml(
+function truncate(str: string, max: number): string {
+  return str.length > max ? str.slice(0, max - 1) + "…" : str;
+}
+
+async function buildPdf(
   profile: Record<string, unknown>,
   dossier: Record<string, unknown>,
   quote: Record<string, unknown>,
   items: QuoteItem[]
-): string {
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  const pageWidth = 595; // A4
+  const pageHeight = 842;
+  const margin = 50;
+  const contentWidth = pageWidth - margin * 2;
+
+  let page = doc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const blue = rgb(0.11, 0.31, 0.85);
+  const gray = rgb(0.42, 0.45, 0.49);
+  const lightGray = rgb(0.93, 0.94, 0.95);
+  const black = rgb(0, 0, 0);
+  const white = rgb(1, 1, 1);
+
+  const drawText = (text: string, x: number, yPos: number, size: number, f = font, color = black) => {
+    page.drawText(text, { x, y: yPos, size, font: f, color });
+  };
+
+  const addNewPageIfNeeded = (needed: number) => {
+    if (y - needed < margin + 40) {
+      page = doc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  };
+
+  // === HEADER ===
   const artisanName = (profile.company_name as string) ||
     [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Artisan";
+
+  drawText(artisanName, margin, y, 16, fontBold, blue);
+  y -= 16;
+
+  if (profile.address) { drawText(String(profile.address), margin, y, 9, font, gray); y -= 12; }
+  if (profile.phone) { drawText("Tél : " + String(profile.phone), margin, y, 9, font, gray); y -= 12; }
+  if (profile.email) { drawText(String(profile.email), margin, y, 9, font, gray); y -= 12; }
+  if (profile.siret) { drawText("SIRET : " + String(profile.siret), margin, y, 9, font, gray); y -= 12; }
+
+  // Client box (right side)
   const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Client";
+  const clientBoxX = pageWidth - margin - 200;
+  const clientBoxY = pageHeight - margin - 5;
+
+  page.drawRectangle({ x: clientBoxX - 10, y: clientBoxY - 65, width: 210, height: 80, color: lightGray, borderWidth: 0 });
+  drawText("CLIENT", clientBoxX, clientBoxY, 8, fontBold, gray);
+  drawText(clientName, clientBoxX, clientBoxY - 14, 10, fontBold, black);
+  let cY = clientBoxY - 28;
+  if (dossier.address) { drawText(truncate(String(dossier.address), 35), clientBoxX, cY, 9, font, gray); cY -= 12; }
+  if (dossier.client_email) { drawText(String(dossier.client_email), clientBoxX, cY, 9, font, gray); cY -= 12; }
+  if (dossier.client_phone) { drawText(String(dossier.client_phone), clientBoxX, cY, 9, font, gray); cY -= 12; }
+
+  // === QUOTE META ===
+  y -= 24;
+  drawText("Devis " + String(quote.quote_number), margin, y, 14, fontBold, black);
+  y -= 16;
+  const dateStr = new Date().toLocaleDateString("fr-FR");
+  drawText("Date : " + dateStr, margin, y, 9, font, gray);
+  y -= 12;
+  drawText("Validité : " + String(quote.validity_days || 30) + " jours", margin, y, 9, font, gray);
+  y -= 12;
+  if (dossier.address) {
+    drawText("Adresse d'intervention : " + truncate(String(dossier.address), 60), margin, y, 9, font, gray);
+    y -= 12;
+  }
+
+  // === TABLE ===
+  y -= 16;
+  const colWidths = [contentWidth * 0.40, contentWidth * 0.12, contentWidth * 0.15, contentWidth * 0.13, contentWidth * 0.20];
+  const colX = [margin];
+  for (let i = 1; i < 5; i++) colX.push(colX[i - 1] + colWidths[i - 1]);
+
+  // Header row
+  const headerH = 22;
+  page.drawRectangle({ x: margin, y: y - headerH + 4, width: contentWidth, height: headerH, color: lightGray });
+  const headers = ["Désignation", "Quantité", "PU HT", "TVA", "Total HT"];
+  headers.forEach((h, i) => {
+    const xOff = i === 0 ? 4 : colWidths[i] - font.widthOfTextAtSize(h, 8) - 4;
+    drawText(h, colX[i] + xOff, y - 12, 8, fontBold, gray);
+  });
+  y -= headerH + 2;
 
   let totalHt = 0;
   let totalTva = 0;
-  const rows = items.map((item) => {
+
+  for (const item of items) {
     const lt = calcLineTotal(item);
     const tva = (lt * item.vat_rate) / 100;
     totalHt += lt;
     totalTva += tva;
-    return `<tr>
-      <td style="padding:8px;border-bottom:1px solid #e5e7eb;">
-        <div style="font-weight:500;">${escapeHtml(item.label)}</div>
-        ${item.description ? `<div style="font-size:11px;color:#6b7280;">${escapeHtml(item.description)}</div>` : ""}
-      </td>
-      <td style="padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;">${item.qty} ${escapeHtml(item.unit)}</td>
-      <td style="padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;">${item.unit_price.toFixed(2)} €</td>
-      <td style="padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;">${item.vat_rate}%</td>
-      <td style="padding:8px;text-align:right;border-bottom:1px solid #e5e7eb;font-weight:500;">${lt.toFixed(2)} €</td>
-    </tr>`;
-  }).join("");
 
+    const rowH = item.description ? 28 : 18;
+    addNewPageIfNeeded(rowH + 4);
+
+    // Label
+    drawText(truncate(item.label, 40), colX[0] + 4, y - 4, 9, fontBold, black);
+    if (item.description) {
+      drawText(truncate(item.description, 50), colX[0] + 4, y - 15, 8, font, gray);
+    }
+
+    // Qty
+    const qtyStr = item.qty + " " + item.unit;
+    drawText(qtyStr, colX[1] + colWidths[1] - font.widthOfTextAtSize(qtyStr, 9) - 4, y - 4, 9, font, black);
+
+    // PU
+    const puStr = fmt(item.unit_price);
+    drawText(puStr, colX[2] + colWidths[2] - font.widthOfTextAtSize(puStr, 9) - 4, y - 4, 9, font, black);
+
+    // TVA
+    const tvaStr = item.vat_rate + "%";
+    drawText(tvaStr, colX[3] + colWidths[3] - font.widthOfTextAtSize(tvaStr, 9) - 4, y - 4, 9, font, black);
+
+    // Total
+    const totalStr = fmt(lt);
+    drawText(totalStr, colX[4] + colWidths[4] - fontBold.widthOfTextAtSize(totalStr, 9) - 4, y - 4, 9, fontBold, black);
+
+    y -= rowH;
+
+    // Row separator
+    page.drawLine({ start: { x: margin, y }, end: { x: margin + contentWidth, y }, thickness: 0.5, color: lightGray });
+    y -= 2;
+  }
+
+  // === TOTALS ===
+  y -= 16;
+  addNewPageIfNeeded(60);
   const totalTtc = totalHt + totalTva;
-  const date = new Date().toLocaleDateString("fr-FR");
-  const validityDays = (quote.validity_days as number) || 30;
+  const totalsX = pageWidth - margin - 180;
+  const totalsW = 180;
 
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="UTF-8"><style>
-  body { font-family: -apple-system, 'Segoe UI', sans-serif; margin: 0; padding: 40px; color: #111827; font-size: 13px; }
-  .header { display: flex; justify-content: space-between; margin-bottom: 40px; }
-  .artisan { max-width: 50%; }
-  .artisan h1 { font-size: 20px; margin: 0 0 8px; color: #1d4ed8; }
-  .artisan p { margin: 2px 0; color: #6b7280; font-size: 12px; }
-  .client-box { background: #f9fafb; border-radius: 8px; padding: 16px; max-width: 250px; }
-  .client-box h3 { margin: 0 0 8px; font-size: 13px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
-  .client-box p { margin: 2px 0; }
-  .quote-meta { margin-bottom: 24px; }
-  .quote-meta h2 { font-size: 18px; margin: 0 0 4px; }
-  .quote-meta p { color: #6b7280; margin: 2px 0; font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; margin: 24px 0; }
-  th { background: #f3f4f6; padding: 10px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; border-bottom: 2px solid #e5e7eb; }
-  th:not(:first-child) { text-align: right; }
-  .totals { display: flex; justify-content: flex-end; margin-top: 16px; }
-  .totals table { width: 250px; }
-  .totals td { padding: 6px 8px; }
-  .totals tr:last-child { font-size: 16px; font-weight: 700; border-top: 2px solid #111827; }
-  .notes { margin-top: 32px; padding: 16px; background: #f9fafb; border-radius: 8px; font-size: 12px; color: #6b7280; }
-  .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 16px; }
-</style></head>
-<body>
-  <div class="header">
-    <div class="artisan">
-      ${(profile.logo_url as string) ? `<img src="${profile.logo_url}" alt="Logo" style="max-height:60px;margin-bottom:12px;" />` : ""}
-      <h1>${escapeHtml(artisanName)}</h1>
-      ${(profile.address as string) ? `<p>${escapeHtml(profile.address as string)}</p>` : ""}
-      ${(profile.phone as string) ? `<p>Tél : ${escapeHtml(profile.phone as string)}</p>` : ""}
-      ${(profile.email as string) ? `<p>${escapeHtml(profile.email as string)}</p>` : ""}
-      ${(profile.siret as string) ? `<p>SIRET : ${escapeHtml(profile.siret as string)}</p>` : ""}
-    </div>
-    <div class="client-box">
-      <h3>Client</h3>
-      <p style="font-weight:600;">${escapeHtml(clientName)}</p>
-      ${(dossier.address as string) ? `<p>${escapeHtml(dossier.address as string)}</p>` : ""}
-      ${(dossier.client_email as string) ? `<p>${escapeHtml(dossier.client_email as string)}</p>` : ""}
-      ${(dossier.client_phone as string) ? `<p>${escapeHtml(dossier.client_phone as string)}</p>` : ""}
-    </div>
-  </div>
+  const drawTotalRow = (label: string, value: string, bold = false, topBorder = false) => {
+    if (topBorder) {
+      page.drawLine({ start: { x: totalsX, y: y + 4 }, end: { x: totalsX + totalsW, y: y + 4 }, thickness: 1.5, color: black });
+    }
+    const f = bold ? fontBold : font;
+    const size = bold ? 12 : 10;
+    drawText(label, totalsX, y - 6, size, f, black);
+    const valStr = value;
+    drawText(valStr, totalsX + totalsW - f.widthOfTextAtSize(valStr, size), y - 6, size, f, black);
+    y -= 20;
+  };
 
-  <div class="quote-meta">
-    <h2>Devis ${escapeHtml(quote.quote_number as string)}</h2>
-    <p>Date : ${date}</p>
-    <p>Validité : ${validityDays} jours</p>
-    ${(dossier.address as string) ? `<p>Adresse d'intervention : ${escapeHtml(dossier.address as string)}</p>` : ""}
-  </div>
+  drawTotalRow("Total HT", fmt(totalHt));
+  drawTotalRow("TVA", fmt(totalTva));
+  drawTotalRow("Total TTC", fmt(totalTtc), true, true);
 
-  <table>
-    <thead>
-      <tr><th>Désignation</th><th>Quantité</th><th>PU HT</th><th>TVA</th><th>Total HT</th></tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
+  // === NOTES ===
+  if (quote.notes) {
+    y -= 12;
+    addNewPageIfNeeded(60);
+    page.drawRectangle({ x: margin, y: y - 50, width: contentWidth, height: 56, color: lightGray });
+    drawText("Conditions :", margin + 8, y - 4, 9, fontBold, gray);
+    const noteLines = String(quote.notes).split("\n").slice(0, 4);
+    let nY = y - 16;
+    for (const line of noteLines) {
+      drawText(truncate(line, 80), margin + 8, nY, 8, font, gray);
+      nY -= 11;
+    }
+  }
 
-  <div class="totals">
-    <table>
-      <tr><td>Total HT</td><td style="text-align:right;">${totalHt.toFixed(2)} €</td></tr>
-      <tr><td>TVA</td><td style="text-align:right;">${totalTva.toFixed(2)} €</td></tr>
-      <tr><td>Total TTC</td><td style="text-align:right;">${totalTtc.toFixed(2)} €</td></tr>
-    </table>
-  </div>
+  // === FOOTER ===
+  const footerText = artisanName + (profile.siret ? " — SIRET " + String(profile.siret) : "");
+  const footerWidth = font.widthOfTextAtSize(footerText, 8);
+  // Draw on all pages
+  for (const p of doc.getPages()) {
+    p.drawLine({ start: { x: margin, y: 40 }, end: { x: pageWidth - margin, y: 40 }, thickness: 0.5, color: lightGray });
+    p.drawText(footerText, { x: (pageWidth - footerWidth) / 2, y: 28, size: 8, font, color: gray });
+  }
 
-  ${(quote.notes as string) ? `<div class="notes"><strong>Conditions :</strong><br/>${escapeHtml(quote.notes as string).replace(/\n/g, "<br/>")}</div>` : ""}
-
-  <div class="footer">
-    ${escapeHtml(artisanName)}${(profile.siret as string) ? ` — SIRET ${escapeHtml(profile.siret as string)}` : ""}
-  </div>
-</body>
-</html>`;
+  return await doc.save();
 }
 
 Deno.serve(async (req: Request) => {
@@ -172,18 +250,14 @@ Deno.serve(async (req: Request) => {
     if (!dossier) throw new Error("Dossier introuvable");
 
     const items = (quote.items as QuoteItem[]) || [];
-    const html = buildHtml(profile || {}, dossier, quote, items);
+    const pdfBytes = await buildPdf(profile || {}, dossier, quote, items);
 
-    // Use Lovable AI to convert HTML to PDF via a simple approach:
-    // Store HTML as a file and return a link, or use a PDF service
-    // For now, store the HTML and use it as a viewable document
-    const htmlBlob = new Blob([html], { type: "text/html" });
-    const filePath = `${quote.dossier_id}/devis_${quote.quote_number.replace(/[^a-zA-Z0-9-]/g, "_")}.html`;
+    const filePath = `${quote.dossier_id}/devis_${quote.quote_number.replace(/[^a-zA-Z0-9-]/g, "_")}.pdf`;
 
-    // Upload HTML
+    // Upload PDF
     const { error: uploadError } = await supabase.storage
       .from("dossier-medias")
-      .upload(filePath, htmlBlob, { contentType: "text/html", upsert: true });
+      .upload(filePath, pdfBytes, { contentType: "application/pdf", upsert: true });
     if (uploadError) throw uploadError;
 
     const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
