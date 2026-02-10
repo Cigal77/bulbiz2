@@ -58,7 +58,7 @@ export const URGENCY_ORDER: Record<UrgencyLevel, number> = {
 };
 
 // Appointment status labels & colors
-export type AppointmentStatus = "none" | "rdv_pending" | "slots_proposed" | "client_selected" | "rdv_confirmed" | "cancelled";
+export type AppointmentStatus = "none" | "rdv_pending" | "slots_proposed" | "client_selected" | "rdv_confirmed" | "cancelled" | "done";
 
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   none: "Aucun",
@@ -66,6 +66,7 @@ export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   slots_proposed: "Créneaux proposés",
   client_selected: "Client a choisi",
   rdv_confirmed: "Rendez-vous pris",
+  done: "Intervention réalisée",
   cancelled: "Annulé",
 };
 
@@ -75,6 +76,7 @@ export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
   slots_proposed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   client_selected: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   rdv_confirmed: "bg-success/15 text-success",
+  done: "bg-primary/15 text-primary",
   cancelled: "bg-destructive/15 text-destructive",
 };
 

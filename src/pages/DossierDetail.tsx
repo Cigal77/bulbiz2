@@ -9,6 +9,7 @@ import { DossierActions } from "@/components/dossier/DossierActions";
 import { ClientLinkBlock } from "@/components/dossier/ClientLinkBlock";
 import { QuoteBlock } from "@/components/dossier/QuoteBlock";
 import { AppointmentBlock } from "@/components/dossier/AppointmentBlock";
+import { InvoiceBlock } from "@/components/dossier/InvoiceBlock";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
@@ -86,6 +87,7 @@ export default function DossierDetail() {
           <div className="space-y-4">
             <DossierActions dossier={dossier} />
             <AppointmentBlock dossier={dossier} />
+            <InvoiceBlock dossier={dossier} />
             <ClientLinkBlock dossier={dossier} />
           </div>
         </div>

@@ -31,6 +31,9 @@ interface SettingsForm {
   auto_send_client_link: boolean;
   client_link_validity_days: number;
   sms_enabled: boolean;
+  tva_intracom: string;
+  vat_applicable: boolean;
+  payment_terms_default: string;
 }
 
 export default function Settings() {
@@ -64,6 +67,9 @@ export default function Settings() {
         auto_send_client_link: (profile as any).auto_send_client_link ?? true,
         client_link_validity_days: (profile as any).client_link_validity_days ?? 7,
         sms_enabled: (profile as any).sms_enabled ?? true,
+        tva_intracom: (profile as any).tva_intracom ?? "",
+        vat_applicable: (profile as any).vat_applicable ?? true,
+        payment_terms_default: (profile as any).payment_terms_default ?? "Paiement à réception de facture. Chèque, virement ou espèces.",
       });
     }
   }, [profile, reset]);
@@ -88,6 +94,9 @@ export default function Settings() {
         auto_send_client_link: data.auto_send_client_link,
         client_link_validity_days: data.client_link_validity_days,
         sms_enabled: data.sms_enabled,
+        tva_intracom: data.tva_intracom || null,
+        vat_applicable: data.vat_applicable,
+        payment_terms_default: data.payment_terms_default || null,
       });
       toast.success("Paramètres sauvegardés");
     } catch {
@@ -161,6 +170,39 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
                 <Input id="default_validity_days" type="number" min={1} {...register("default_validity_days", { valueAsNumber: true })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Facturation settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Facturation</CardTitle>
+              <CardDescription>Paramètres par défaut pour les factures</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>TVA applicable</Label>
+                  <p className="text-sm text-muted-foreground">Décochez si vous êtes en franchise de base (art. 293 B du CGI)</p>
+                </div>
+                <Switch
+                  checked={watch("vat_applicable")}
+                  onCheckedChange={(v) => setValue("vat_applicable", v)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tva_intracom">N° TVA intracommunautaire</Label>
+                <Input id="tva_intracom" {...register("tva_intracom")} placeholder="FR XX XXXXXXXXX" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment_terms_default">Conditions de paiement par défaut</Label>
+                <Textarea
+                  id="payment_terms_default"
+                  rows={2}
+                  {...register("payment_terms_default")}
+                  placeholder="Paiement à réception de facture. Chèque, virement ou espèces."
+                />
               </div>
             </CardContent>
           </Card>

@@ -249,6 +249,175 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount: number
+          id: string
+          invoice_id: string
+          label: string
+          qty: number
+          sort_order: number
+          tva_rate: number
+          unit: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount?: number
+          id?: string
+          invoice_id: string
+          label: string
+          qty?: number
+          sort_order?: number
+          tva_rate?: number
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount?: number
+          id?: string
+          invoice_id?: string
+          label?: string
+          qty?: number
+          sort_order?: number
+          tva_rate?: number
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          artisan_address: string | null
+          artisan_company: string | null
+          artisan_email: string | null
+          artisan_name: string | null
+          artisan_phone: string | null
+          artisan_siret: string | null
+          artisan_tva_intracom: string | null
+          client_address: string | null
+          client_company: string | null
+          client_email: string | null
+          client_first_name: string | null
+          client_last_name: string | null
+          client_phone: string | null
+          client_type: Database["public"]["Enums"]["client_type"]
+          created_at: string
+          dossier_id: string
+          id: string
+          invoice_number: string
+          issue_date: string
+          late_fees_text: string | null
+          notes: string | null
+          paid_at: string | null
+          payment_terms: string | null
+          pdf_url: string | null
+          sent_at: string | null
+          service_date: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          total_ht: number | null
+          total_ttc: number | null
+          total_tva: number | null
+          updated_at: string
+          user_id: string
+          vat_mode: Database["public"]["Enums"]["vat_mode"]
+        }
+        Insert: {
+          artisan_address?: string | null
+          artisan_company?: string | null
+          artisan_email?: string | null
+          artisan_name?: string | null
+          artisan_phone?: string | null
+          artisan_siret?: string | null
+          artisan_tva_intracom?: string | null
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_first_name?: string | null
+          client_last_name?: string | null
+          client_phone?: string | null
+          client_type?: Database["public"]["Enums"]["client_type"]
+          created_at?: string
+          dossier_id: string
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          late_fees_text?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_terms?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
+          service_date?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          total_ht?: number | null
+          total_ttc?: number | null
+          total_tva?: number | null
+          updated_at?: string
+          user_id: string
+          vat_mode?: Database["public"]["Enums"]["vat_mode"]
+        }
+        Update: {
+          artisan_address?: string | null
+          artisan_company?: string | null
+          artisan_email?: string | null
+          artisan_name?: string | null
+          artisan_phone?: string | null
+          artisan_siret?: string | null
+          artisan_tva_intracom?: string | null
+          client_address?: string | null
+          client_company?: string | null
+          client_email?: string | null
+          client_first_name?: string | null
+          client_last_name?: string | null
+          client_phone?: string | null
+          client_type?: Database["public"]["Enums"]["client_type"]
+          created_at?: string
+          dossier_id?: string
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          late_fees_text?: string | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_terms?: string | null
+          pdf_url?: string | null
+          sent_at?: string | null
+          service_date?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          total_ht?: number | null
+          total_ttc?: number | null
+          total_tva?: number | null
+          updated_at?: string
+          user_id?: string
+          vat_mode?: Database["public"]["Enums"]["vat_mode"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       labour_templates: {
         Row: {
           context_tags: string[] | null
@@ -478,14 +647,17 @@ export type Database = {
           id: string
           last_name: string | null
           logo_url: string | null
+          payment_terms_default: string | null
           phone: string | null
           relance_delay_devis_1: number
           relance_delay_devis_2: number
           relance_delay_info: number
           siret: string | null
           sms_enabled: boolean
+          tva_intracom: string | null
           updated_at: string
           user_id: string
+          vat_applicable: boolean
         }
         Insert: {
           address?: string | null
@@ -502,14 +674,17 @@ export type Database = {
           id?: string
           last_name?: string | null
           logo_url?: string | null
+          payment_terms_default?: string | null
           phone?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
           siret?: string | null
           sms_enabled?: boolean
+          tva_intracom?: string | null
           updated_at?: string
           user_id: string
+          vat_applicable?: boolean
         }
         Update: {
           address?: string | null
@@ -526,14 +701,17 @@ export type Database = {
           id?: string
           last_name?: string | null
           logo_url?: string | null
+          payment_terms_default?: string | null
           phone?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
           siret?: string | null
           sms_enabled?: boolean
+          tva_intracom?: string | null
           updated_at?: string
           user_id?: string
+          vat_applicable?: boolean
         }
         Relationships: []
       }
@@ -825,6 +1003,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invoice_number: { Args: { p_user_id: string }; Returns: string }
       generate_quote_number: { Args: { p_user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -844,6 +1023,8 @@ export type Database = {
         | "client_selected"
         | "rdv_confirmed"
         | "cancelled"
+        | "done"
+      client_type: "individual" | "business"
       dossier_source: "lien_client" | "manuel" | "email"
       dossier_status:
         | "nouveau"
@@ -852,6 +1033,7 @@ export type Database = {
         | "devis_envoye"
         | "clos_signe"
         | "clos_perdu"
+      invoice_status: "draft" | "sent" | "paid"
       problem_category:
         | "wc"
         | "fuite"
@@ -861,6 +1043,7 @@ export type Database = {
         | "autre"
       quote_status: "brouillon" | "envoye" | "signe" | "refuse"
       urgency_level: "aujourdhui" | "48h" | "semaine"
+      vat_mode: "normal" | "no_vat_293b"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -997,7 +1180,9 @@ export const Constants = {
         "client_selected",
         "rdv_confirmed",
         "cancelled",
+        "done",
       ],
+      client_type: ["individual", "business"],
       dossier_source: ["lien_client", "manuel", "email"],
       dossier_status: [
         "nouveau",
@@ -1007,6 +1192,7 @@ export const Constants = {
         "clos_signe",
         "clos_perdu",
       ],
+      invoice_status: ["draft", "sent", "paid"],
       problem_category: [
         "wc",
         "fuite",
@@ -1017,6 +1203,7 @@ export const Constants = {
       ],
       quote_status: ["brouillon", "envoye", "signe", "refuse"],
       urgency_level: ["aujourdhui", "48h", "semaine"],
+      vat_mode: ["normal", "no_vat_293b"],
     },
   },
 } as const
