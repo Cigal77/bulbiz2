@@ -65,6 +65,26 @@ Deno.serve(async (req: Request) => {
       "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
 
+    // Generate or reuse client token for the link
+    let clientToken = dossier.client_token;
+    const tokenExpiry = dossier.client_token_expires_at ? new Date(dossier.client_token_expires_at) : null;
+    
+    if (!clientToken || !tokenExpiry || tokenExpiry < new Date()) {
+      const tokenBytes = new Uint8Array(32);
+      crypto.getRandomValues(tokenBytes);
+      clientToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      
+      await supabase.from("dossiers").update({
+        client_token: clientToken,
+        client_token_expires_at: expiresAt,
+      }).eq("id", dossier_id);
+    }
+
+    // Build client link using the request origin or fallback
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
+    const clientLink = `${origin}/client?token=${clientToken}`;
+
     // Build email content based on type
     let subject: string;
     let htmlBody: string;
@@ -73,15 +93,15 @@ Deno.serve(async (req: Request) => {
       subject = `${artisanName} – Informations complémentaires nécessaires`;
       htmlBody = `
         <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p>Bonjour ${dossier.client_first_name},</p>
+          <p>Bonjour ${dossier.client_first_name || ""},</p>
           <p>Nous avons bien reçu votre demande d'intervention mais il nous manque quelques informations pour pouvoir vous établir un devis.</p>
-          <p>Pourriez-vous nous préciser :</p>
-          <ul>
-            <li>La nature exacte du problème</li>
-            <li>Des photos si possible</li>
-            <li>Vos disponibilités</li>
-          </ul>
-          <p>N'hésitez pas à répondre directement à cet email.</p>
+          <p>Pourriez-vous compléter votre dossier en cliquant sur le lien ci-dessous ?</p>
+          <p style="margin: 24px 0;">
+            <a href="${clientLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Compléter mon dossier
+            </a>
+          </p>
+          <p style="font-size: 13px; color: #6b7280;">Vous pourrez ajouter des photos, vidéos et préciser votre demande.</p>
           <br/>
           <p style="white-space: pre-line;">${signature}</p>
         </div>
@@ -90,7 +110,7 @@ Deno.serve(async (req: Request) => {
       subject = `${artisanName} – Suivi de votre devis`;
       htmlBody = `
         <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <p>Bonjour ${dossier.client_first_name},</p>
+          <p>Bonjour ${dossier.client_first_name || ""},</p>
           <p>Nous vous avons récemment envoyé un devis pour votre demande d'intervention.</p>
           <p>Souhaitez-vous que nous en discutions ? Nous restons à votre disposition pour toute question.</p>
           <br/>
