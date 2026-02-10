@@ -75,7 +75,7 @@ export default function Dashboard() {
           <span className="text-lg font-bold text-foreground hidden sm:inline">Bulbiz</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => navigate("/parametres")}>
             <Settings className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground hidden md:inline">{user?.email}</span>
