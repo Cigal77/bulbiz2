@@ -9,11 +9,13 @@ import { DossierActions } from "@/components/dossier/DossierActions";
 import { ClientLinkBlock } from "@/components/dossier/ClientLinkBlock";
 import { QuoteBlock } from "@/components/dossier/QuoteBlock";
 import { AppointmentBlock } from "@/components/dossier/AppointmentBlock";
+import { AppointmentBanner } from "@/components/dossier/AppointmentBanner";
 import { InvoiceBlock } from "@/components/dossier/InvoiceBlock";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
+import { useRef } from "react";
 
 export default function DossierDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,7 @@ export default function DossierDetail() {
   const { data: dossier, isLoading } = useDossier(id!);
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
   const { data: medias = [], isLoading: mediasLoading } = useDossierMedias(id!);
+  const appointmentRef = useRef<HTMLDivElement>(null);
 
   if (isLoading) {
     return (
@@ -75,6 +78,10 @@ export default function DossierDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column - main info */}
           <div className="lg:col-span-2 space-y-4">
+            <AppointmentBanner
+              dossier={dossier}
+              onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
+            />
             <SummaryBlock dossier={dossier} />
             <ClientBlock dossier={dossier} />
             <InterventionBlock dossier={dossier} />
@@ -86,7 +93,9 @@ export default function DossierDetail() {
           {/* Right column - actions */}
           <div className="space-y-4">
             <DossierActions dossier={dossier} />
-            <AppointmentBlock dossier={dossier} />
+            <div ref={appointmentRef}>
+              <AppointmentBlock dossier={dossier} />
+            </div>
             <InvoiceBlock dossier={dossier} />
             <ClientLinkBlock dossier={dossier} />
           </div>
