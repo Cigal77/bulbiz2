@@ -8,14 +8,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Lock } from "lucide-react";
+import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Lock, Calendar, Clock } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
+import { cn } from "@/lib/utils";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"];
+
+interface SlotData {
+  id: string;
+  slot_date: string;
+  time_start: string;
+  time_end: string;
+  selected_at: string | null;
+}
 
 interface DossierData {
   dossier_id: string;
@@ -28,6 +37,8 @@ interface DossierData {
   urgency: string;
   description: string | null;
   status: string;
+  appointment_status?: string;
+  appointment_slots?: SlotData[];
 }
 
 export default function ClientForm() {
@@ -39,9 +50,9 @@ export default function ClientForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [slotSuccess, setSlotSuccess] = useState(false);
 
   const [dossier, setDossier] = useState<DossierData | null>(null);
-  // Editable fields (only for fields that are missing)
   const [form, setForm] = useState({
     client_first_name: "",
     client_last_name: "",
@@ -53,6 +64,13 @@ export default function ClientForm() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [selectingSlot, setSelectingSlot] = useState(false);
+
+  // Determine mode: slot selection vs form completion
+  const hasSlots = (dossier?.appointment_slots?.length ?? 0) > 0;
+  const isSlotMode = hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
+  const alreadySelected = dossier?.appointment_slots?.find(s => s.selected_at);
 
   useEffect(() => {
     if (!token) {
@@ -71,10 +89,31 @@ export default function ClientForm() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
       setDossier(data);
+      // Pre-select already selected slot
+      const existing = data?.appointment_slots?.find((s: SlotData) => s.selected_at);
+      if (existing) setSelectedSlotId(existing.id);
     } catch (e: any) {
       setError(e.message || "Lien invalide ou expiré");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSlotSelect = async () => {
+    if (!selectedSlotId || selectingSlot) return;
+    setSelectingSlot(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("submit-client-form", {
+        body: { token, action: "select_slot", slot_id: selectedSlotId },
+      });
+      if (fnError) throw fnError;
+      if (data?.error) throw new Error(data.error);
+      setSlotSuccess(true);
+    } catch (e: any) {
+      setError(e.message || "Erreur lors de la sélection");
+    } finally {
+      setSelectingSlot(false);
     }
   };
 
@@ -100,7 +139,7 @@ export default function ClientForm() {
   const hasMissingInfo = Object.values(missingFields).some(Boolean);
 
   const handleSubmit = async () => {
-    if (!rgpdConsent || !dossier) return;
+    if (!rgpdConsent || !dossier || submitting) return;
     setSubmitting(true);
     setUploadProgress(0);
     setError(null);
@@ -151,6 +190,14 @@ export default function ClientForm() {
     }
   };
 
+  // Format slot date for display
+  const formatSlotDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+    const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -173,6 +220,34 @@ export default function ClientForm() {
     );
   }
 
+  // Slot selection success
+  if (slotSuccess) {
+    const chosen = dossier?.appointment_slots?.find(s => s.id === selectedSlotId);
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center space-y-4">
+            <CheckCircle2 className="h-12 w-12 text-success mx-auto" />
+            <h2 className="text-xl font-bold text-foreground">Créneau confirmé !</h2>
+            {chosen && (
+              <div className="rounded-lg bg-success/10 border border-success/20 p-4">
+                <p className="text-sm font-semibold text-foreground flex items-center justify-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  {formatSlotDate(chosen.slot_date)}
+                </p>
+                <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  {chosen.time_start.slice(0, 5)} – {chosen.time_end.slice(0, 5)}
+                </p>
+              </div>
+            )}
+            <p className="text-muted-foreground text-sm">Votre artisan va confirmer le rendez-vous. Vous recevrez une notification.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -187,6 +262,96 @@ export default function ClientForm() {
     );
   }
 
+  // ── Slot selection mode ──
+  if (isSlotMode) {
+    const slots = dossier?.appointment_slots ?? [];
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
+          <div className="max-w-lg mx-auto">
+            <BulbizLogo size={20} />
+          </div>
+        </header>
+
+        <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Choisissez votre créneau
+              </CardTitle>
+              <CardDescription>
+                Sélectionnez le créneau qui vous convient le mieux pour l'intervention.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {slots.map((slot) => {
+                const isSelected = selectedSlotId === slot.id;
+                const wasAlreadyChosen = !!slot.selected_at;
+                return (
+                  <button
+                    key={slot.id}
+                    onClick={() => setSelectedSlotId(slot.id)}
+                    className={cn(
+                      "w-full text-left rounded-xl border-2 p-4 transition-all",
+                      isSelected
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border hover:border-primary/40 bg-card"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                        isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+                      )}>
+                        {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatSlotDate(slot.slot_date)}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {slot.time_start.slice(0, 5)} – {slot.time_end.slice(0, 5)}
+                        </p>
+                      </div>
+                      {wasAlreadyChosen && (
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          Choisi
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <Button
+                onClick={handleSlotSelect}
+                disabled={!selectedSlotId || selectingSlot}
+                className="w-full mt-4 gap-2"
+              >
+                {selectingSlot ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>
+                ) : (
+                  "Confirmer ce créneau"
+                )}
+              </Button>
+
+              {alreadySelected && selectedSlotId === alreadySelected.id && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre si vous le souhaitez.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Standard form completion mode ──
   const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
 
@@ -220,7 +385,7 @@ export default function ClientForm() {
           Bonjour{dossier?.client_first_name ? ` ${dossier.client_first_name}` : ""}, complétez les informations manquantes pour que votre artisan puisse intervenir au mieux.
         </p>
 
-        {/* Step 1: Info — show existing read-only + fill missing */}
+        {/* Step 1: Info */}
         {step === 1 && (
           <Card>
             <CardHeader>
@@ -228,7 +393,6 @@ export default function ClientForm() {
               <CardDescription>Les champs verrouillés ont déjà été renseignés. Complétez les autres.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Name */}
               <div className="grid grid-cols-2 gap-3">
                 {dossier?.client_first_name ? (
                   <ReadOnlyField label="Prénom" value={dossier.client_first_name} />
@@ -248,7 +412,6 @@ export default function ClientForm() {
                 )}
               </div>
 
-              {/* Phone */}
               {dossier?.client_phone ? (
                 <ReadOnlyField label="Téléphone" value={dossier.client_phone} />
               ) : (
@@ -258,7 +421,6 @@ export default function ClientForm() {
                 </div>
               )}
 
-              {/* Email */}
               {dossier?.client_email ? (
                 <ReadOnlyField label="Email" value={dossier.client_email} />
               ) : (
@@ -268,7 +430,6 @@ export default function ClientForm() {
                 </div>
               )}
 
-              {/* Address */}
               {dossier?.address ? (
                 <ReadOnlyField label="Adresse" value={dossier.address} />
               ) : (
@@ -283,7 +444,6 @@ export default function ClientForm() {
                 </div>
               )}
 
-              {/* Category + urgency (read-only if set by artisan) */}
               {dossier?.category && dossier.category !== "autre" && (
                 <ReadOnlyField label="Catégorie" value={CATEGORY_LABELS[dossier.category as keyof typeof CATEGORY_LABELS] || dossier.category} />
               )}
@@ -291,7 +451,6 @@ export default function ClientForm() {
                 <ReadOnlyField label="Urgence" value={URGENCY_LABELS[dossier.urgency as keyof typeof URGENCY_LABELS] || dossier.urgency} />
               )}
 
-              {/* Description */}
               {dossier?.description ? (
                 <ReadOnlyField label="Description" value={dossier.description} />
               ) : (

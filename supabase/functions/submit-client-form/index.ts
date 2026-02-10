@@ -46,6 +46,13 @@ Deno.serve(async (req) => {
 
     // ACTION: get dossier info (initial load)
     if (!action || action === "get") {
+      // Also fetch appointment slots if any
+      const { data: slots } = await supabase
+        .from("appointment_slots")
+        .select("id, slot_date, time_start, time_end, selected_at")
+        .eq("dossier_id", dossier.id)
+        .order("slot_date", { ascending: true });
+
       return new Response(JSON.stringify({
         dossier_id: dossier.id,
         client_first_name: dossier.client_first_name,
@@ -57,6 +64,8 @@ Deno.serve(async (req) => {
         urgency: dossier.urgency,
         description: dossier.description,
         status: dossier.status,
+        appointment_status: dossier.appointment_status,
+        appointment_slots: slots || [],
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -150,6 +159,61 @@ Deno.serve(async (req) => {
       }
 
       // Don't invalidate token — allow multiple visits
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ACTION: select an appointment slot
+    if (action === "select_slot") {
+      const { slot_id } = body;
+      if (!slot_id) {
+        return new Response(JSON.stringify({ error: "slot_id requis" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Verify slot belongs to this dossier
+      const { data: slot, error: slotErr } = await supabase
+        .from("appointment_slots")
+        .select("*")
+        .eq("id", slot_id)
+        .eq("dossier_id", dossier.id)
+        .single();
+      if (slotErr || !slot) {
+        return new Response(JSON.stringify({ error: "Créneau introuvable" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Mark this slot as selected
+      await supabase
+        .from("appointment_slots")
+        .update({ selected_at: new Date().toISOString() })
+        .eq("id", slot_id);
+
+      // Clear other selections for this dossier
+      await supabase
+        .from("appointment_slots")
+        .update({ selected_at: null })
+        .eq("dossier_id", dossier.id)
+        .neq("id", slot_id);
+
+      // Update dossier appointment status
+      await supabase
+        .from("dossiers")
+        .update({ appointment_status: "client_selected" })
+        .eq("id", dossier.id);
+
+      // Log
+      const slotDate = new Date(slot.slot_date).toLocaleDateString("fr-FR");
+      await supabase.from("historique").insert({
+        dossier_id: dossier.id,
+        user_id: null,
+        action: "client_slot_selected",
+        details: `Le client a choisi le créneau du ${slotDate} ${slot.time_start.slice(0,5)}–${slot.time_end.slice(0,5)}`,
+      });
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

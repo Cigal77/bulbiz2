@@ -118,7 +118,7 @@ export function ClientLinkBlock({ dossier }: ClientLinkBlockProps) {
             variant="default"
             size="sm"
             className="w-full gap-1.5"
-            onClick={() => handleGenerateAndSend(false)}
+            onClick={() => { if (!loading) handleGenerateAndSend(false); }}
             disabled={loading}
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
