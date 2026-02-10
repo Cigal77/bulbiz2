@@ -29,7 +29,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Zap, PenLine, Mail, Loader2 } from "lucide-react";
+import { ArrowLeft, PenLine, Mail, Loader2 } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
 import type { Database } from "@/integrations/supabase/types";
 
 type DossierSource = Database["public"]["Enums"]["dossier_source"];
@@ -141,10 +142,8 @@ export default function CreateDossier() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-foreground">Nouveau dossier</span>
-        </div>
+        <BulbizLogo size={20} />
+        <span className="font-semibold text-foreground ml-2">Nouveau dossier</span>
       </header>
 
       <main className="flex-1 p-4 sm:p-6 max-w-2xl mx-auto w-full">

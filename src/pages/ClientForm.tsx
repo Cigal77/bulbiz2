@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Zap, Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield } from "lucide-react";
+import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -191,9 +192,8 @@ export default function ClientForm() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
-        <div className="max-w-lg mx-auto flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <span className="font-bold text-foreground">Bulbiz</span>
+        <div className="max-w-lg mx-auto">
+          <BulbizLogo size={20} />
         </div>
       </header>
 
