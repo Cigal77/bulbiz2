@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      catalog_material: {
+        Row: {
+          category_path: string
+          created_at: string
+          default_qty: number | null
+          id: string
+          label: string
+          tags: string[] | null
+          type: string
+          unit: string | null
+          unit_price: number | null
+          user_id: string | null
+          vat_rate: number | null
+        }
+        Insert: {
+          category_path: string
+          created_at?: string
+          default_qty?: number | null
+          id?: string
+          label: string
+          tags?: string[] | null
+          type?: string
+          unit?: string | null
+          unit_price?: number | null
+          user_id?: string | null
+          vat_rate?: number | null
+        }
+        Update: {
+          category_path?: string
+          created_at?: string
+          default_qty?: number | null
+          id?: string
+          label?: string
+          tags?: string[] | null
+          type?: string
+          unit?: string | null
+          unit_price?: number | null
+          user_id?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
       dossiers: {
         Row: {
           address: string | null
@@ -118,6 +160,84 @@ export type Database = {
           },
         ]
       }
+      labour_templates: {
+        Row: {
+          context_tags: string[] | null
+          created_at: string
+          duration_default_min: number | null
+          id: string
+          text_reassuring: string
+          text_short: string
+          text_standard: string
+        }
+        Insert: {
+          context_tags?: string[] | null
+          created_at?: string
+          duration_default_min?: number | null
+          id?: string
+          text_reassuring: string
+          text_short: string
+          text_standard: string
+        }
+        Update: {
+          context_tags?: string[] | null
+          created_at?: string
+          duration_default_min?: number | null
+          id?: string
+          text_reassuring?: string
+          text_short?: string
+          text_standard?: string
+        }
+        Relationships: []
+      }
+      material_correspondence: {
+        Row: {
+          conditions_json: Json | null
+          created_at: string
+          default_qty: number | null
+          group_label: string | null
+          id: string
+          source_material_id: string
+          target_material_id: string
+          weight: number | null
+        }
+        Insert: {
+          conditions_json?: Json | null
+          created_at?: string
+          default_qty?: number | null
+          group_label?: string | null
+          id?: string
+          source_material_id: string
+          target_material_id: string
+          weight?: number | null
+        }
+        Update: {
+          conditions_json?: Json | null
+          created_at?: string
+          default_qty?: number | null
+          group_label?: string | null
+          id?: string
+          source_material_id?: string
+          target_material_id?: string
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_correspondence_source_material_id_fkey"
+            columns: ["source_material_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_correspondence_target_material_id_fkey"
+            columns: ["target_material_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       medias: {
         Row: {
           created_at: string
@@ -155,6 +275,100 @@ export type Database = {
             columns: ["dossier_id"]
             isOneToOne: false
             referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      problem_taxonomy: {
+        Row: {
+          created_at: string
+          default_context: Json | null
+          id: string
+          keywords: string[] | null
+          label: string
+          parent_id: string | null
+          sort_order: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          default_context?: Json | null
+          id?: string
+          keywords?: string[] | null
+          label: string
+          parent_id?: string | null
+          sort_order?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          default_context?: Json | null
+          id?: string
+          keywords?: string[] | null
+          label?: string
+          parent_id?: string | null
+          sort_order?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problem_taxonomy_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "problem_taxonomy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      problem_to_manoeuvre: {
+        Row: {
+          conditions_json: Json | null
+          created_at: string
+          default_qty: number | null
+          description: string | null
+          id: string
+          label: string
+          problem_id: string
+          type: string | null
+          unit: string | null
+          unit_price: number | null
+          vat_rate: number | null
+          weight: number | null
+        }
+        Insert: {
+          conditions_json?: Json | null
+          created_at?: string
+          default_qty?: number | null
+          description?: string | null
+          id?: string
+          label: string
+          problem_id: string
+          type?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          vat_rate?: number | null
+          weight?: number | null
+        }
+        Update: {
+          conditions_json?: Json | null
+          created_at?: string
+          default_qty?: number | null
+          description?: string | null
+          id?: string
+          label?: string
+          problem_id?: string
+          type?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          vat_rate?: number | null
+          weight?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "problem_to_manoeuvre_problem_id_fkey"
+            columns: ["problem_id"]
+            isOneToOne: false
+            referencedRelation: "problem_taxonomy"
             referencedColumns: ["id"]
           },
         ]
