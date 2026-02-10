@@ -89,12 +89,19 @@ Deno.serve(async (req) => {
 
       await supabase.from("dossiers").update({
         status: "clos_signe", status_changed_at: now, relance_active: false,
+        appointment_status: "rdv_pending",
       }).eq("id", dossier.id);
 
       await supabase.from("historique").insert({
         dossier_id: dossier.id, user_id: dossier.user_id,
         action: "quote_validated_by_client",
         details: `Devis ${quote.quote_number} validé par ${acceptedBy} (IP: ${ip})`,
+      });
+
+      await supabase.from("historique").insert({
+        dossier_id: dossier.id, user_id: dossier.user_id,
+        action: "appointment_status_change",
+        details: "Prise de rendez-vous en attente",
       });
     } else {
       await supabase.from("quotes").update({

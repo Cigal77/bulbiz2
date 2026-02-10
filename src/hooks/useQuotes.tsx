@@ -136,8 +136,19 @@ export function useQuoteActions(dossierId: string) {
       if (status === "signe") {
         await supabase
           .from("dossiers")
-          .update({ status: "clos_signe", status_changed_at: new Date().toISOString() })
+          .update({
+            status: "clos_signe",
+            status_changed_at: new Date().toISOString(),
+            appointment_status: "rdv_pending" as const,
+          })
           .eq("id", dossierId);
+
+        await supabase.from("historique").insert({
+          dossier_id: dossierId,
+          user_id: user!.id,
+          action: "appointment_status_change",
+          details: "Prise de rendez-vous en attente",
+        });
       }
       if (status === "refuse") {
         await supabase
