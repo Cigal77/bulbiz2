@@ -21,6 +21,7 @@ export type Database = {
           default_qty: number | null
           id: string
           label: string
+          slug: string | null
           tags: string[] | null
           type: string
           unit: string | null
@@ -34,6 +35,7 @@ export type Database = {
           default_qty?: number | null
           id?: string
           label: string
+          slug?: string | null
           tags?: string[] | null
           type?: string
           unit?: string | null
@@ -47,6 +49,7 @@ export type Database = {
           default_qty?: number | null
           id?: string
           label?: string
+          slug?: string | null
           tags?: string[] | null
           type?: string
           unit?: string | null
@@ -468,6 +471,144 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      quote_context: {
+        Row: {
+          access: string | null
+          evacuation_type: string | null
+          include_tests: boolean | null
+          include_travel: boolean | null
+          network_type: string | null
+          quote_id: string
+          updated_at: string
+          urgency: boolean | null
+          wc_type: string | null
+        }
+        Insert: {
+          access?: string | null
+          evacuation_type?: string | null
+          include_tests?: boolean | null
+          include_travel?: boolean | null
+          network_type?: string | null
+          quote_id: string
+          updated_at?: string
+          urgency?: boolean | null
+          wc_type?: string | null
+        }
+        Update: {
+          access?: string | null
+          evacuation_type?: string | null
+          include_tests?: boolean | null
+          include_travel?: boolean | null
+          network_type?: string | null
+          quote_id?: string
+          updated_at?: string
+          urgency?: boolean | null
+          wc_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_context_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: true
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_labour_summary: {
+        Row: {
+          is_locked: boolean
+          quote_id: string
+          summary_text: string
+          updated_at: string
+          variant: string
+        }
+        Insert: {
+          is_locked?: boolean
+          quote_id: string
+          summary_text?: string
+          updated_at?: string
+          variant?: string
+        }
+        Update: {
+          is_locked?: boolean
+          quote_id?: string
+          summary_text?: string
+          updated_at?: string
+          variant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_labour_summary_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: true
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_lines: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount: number
+          id: string
+          label: string
+          line_type: string
+          qty: number
+          quote_id: string
+          sort_order: number
+          source: string
+          source_ref_id: string | null
+          tva_rate: number
+          unit: string
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount?: number
+          id?: string
+          label: string
+          line_type?: string
+          qty?: number
+          quote_id: string
+          sort_order?: number
+          source?: string
+          source_ref_id?: string | null
+          tva_rate?: number
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount?: number
+          id?: string
+          label?: string
+          line_type?: string
+          qty?: number
+          quote_id?: string
+          sort_order?: number
+          source?: string
+          source_ref_id?: string | null
+          tva_rate?: number
+          unit?: string
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_lines_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotes: {
         Row: {
