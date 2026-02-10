@@ -39,6 +39,25 @@ Deno.serve(async (req: Request) => {
       .single();
     if (invErr || !invoice) throw new Error("Facture introuvable");
 
+    // Auto-generate PDF if not yet done
+    let pdfUrl = invoice.pdf_url;
+    if (!pdfUrl) {
+      try {
+        const pdfRes = await fetch(`${supabaseUrl}/functions/v1/generate-invoice-pdf`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({ invoice_id }),
+        });
+        const pdfData = await pdfRes.json();
+        if (pdfData?.pdf_url) pdfUrl = pdfData.pdf_url;
+      } catch (e) {
+        console.error("PDF generation before send failed:", e);
+      }
+    }
+
     // Update status to sent
     await supabase
       .from("invoices")
@@ -68,6 +87,7 @@ Deno.serve(async (req: Request) => {
                   <strong>Montant total : ${Number(invoice.total_ttc || 0).toFixed(2)} € TTC</strong>
                 </p>
                 ${invoice.payment_terms ? `<p style="font-size: 13px; color: #6b7280;">${invoice.payment_terms}</p>` : ""}
+                ${pdfUrl ? `<p style="margin: 16px 0;"><a href="${pdfUrl}" style="color: #2563eb; text-decoration: underline;">Télécharger le PDF de votre facture</a></p>` : ""}
                 <br/>
                 <p>Cordialement,<br/>${artisanName}${invoice.artisan_phone ? ` — ${invoice.artisan_phone}` : ""}</p>
               </div>

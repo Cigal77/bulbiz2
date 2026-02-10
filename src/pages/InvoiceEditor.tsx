@@ -34,6 +34,7 @@ export default function InvoiceEditor() {
   const [localLines, setLocalLines] = useState<InvoiceLine[]>([]);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     if (invoice) {
@@ -126,20 +127,38 @@ export default function InvoiceEditor() {
     }
   };
 
+  const handleGeneratePdf = async () => {
+    if (!invoice) return;
+    setGeneratingPdf(true);
+    try {
+      await handleSave();
+      const { data, error } = await supabase.functions.invoke("generate-invoice-pdf", {
+        body: { invoice_id: invoiceId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.pdf_url) {
+        window.open(data.pdf_url, "_blank");
+      }
+      invalidate();
+      toast({ title: "PDF généré ✅" });
+    } catch (e: any) {
+      toast({ title: "Erreur PDF", description: e.message, variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!invoice) return;
     setSending(true);
     try {
-      // Save first
       await handleSave();
-
-      // Call send edge function
       const { data, error } = await supabase.functions.invoke("send-invoice", {
         body: { invoice_id: invoiceId },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-
       invalidate();
       toast({ title: "Facture envoyée ✅", description: data?.email_sent ? "Email envoyé" : "Envoi effectué" });
     } catch (e: any) {
@@ -232,6 +251,10 @@ export default function InvoiceEditor() {
           </Badge>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generatingPdf} className="gap-1.5">
+            {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+            Télécharger PDF
+          </Button>
           {!isLocked && (
             <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
