@@ -14,7 +14,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Phone, Send, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar
+  Phone, Send, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar, RefreshCw, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -31,7 +31,7 @@ interface DossierActionsProps {
 }
 
 export function DossierActions({ dossier }: DossierActionsProps) {
-  const { changeStatus, addNote, toggleRelance } = useDossierActions(dossier.id);
+  const { changeStatus, addNote, toggleRelance, sendRelance } = useDossierActions(dossier.id);
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -58,6 +58,14 @@ export function DossierActions({ dossier }: DossierActionsProps) {
     toggleRelance.mutate(!dossier.relance_active, {
       onSuccess: () =>
         toast({ title: dossier.relance_active ? "Relances désactivées" : "Relances activées" }),
+    });
+  };
+
+  const handleSendRelance = () => {
+    const type = dossier.status === "devis_envoye" ? "devis_non_signe" as const : "info_manquante" as const;
+    sendRelance.mutate(type, {
+      onSuccess: () => toast({ title: "Relance envoyée !" }),
+      onError: (e) => toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" }),
     });
   };
 
@@ -134,6 +142,20 @@ export function DossierActions({ dossier }: DossierActionsProps) {
         <Button variant="outline" className="w-full justify-start gap-2" disabled>
           <Send className="h-4 w-4 text-primary" />
           Envoyer lien client
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2"
+          onClick={handleSendRelance}
+          disabled={sendRelance.isPending || !dossier.client_email}
+        >
+          {sendRelance.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 text-primary" />
+          )}
+          Relancer maintenant
         </Button>
 
         <Button variant="outline" className="w-full justify-start gap-2" disabled>
