@@ -17,7 +17,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
-  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle,
+  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 
 interface AppointmentBlockProps {
@@ -194,6 +194,22 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     },
   });
 
+  // Mark intervention as done
+  const markDone = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({ appointment_status: "done" } as any)
+        .eq("id", dossier.id);
+      if (error) throw error;
+      await addHistorique("intervention_done", "Intervention marquée comme réalisée");
+    },
+    onSuccess: () => {
+      toast({ title: "Intervention réalisée ✅" });
+      invalidate();
+    },
+  });
+
   const addSlotRow = () => {
     if (newSlots.length >= 5) return;
     setNewSlots([...newSlots, { date: "", start: "09:00", end: "11:00" }]);
@@ -330,6 +346,16 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         {status === "rdv_confirmed" && (
           <>
             <Button
+              variant="default"
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={() => markDone.mutate()}
+              disabled={markDone.isPending}
+            >
+              {markDone.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Marquer intervention réalisée
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="w-full gap-1.5"
@@ -349,6 +375,12 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
               Annuler le RDV
             </Button>
           </>
+        )}
+
+        {status === "done" && (
+          <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
+            <p className="text-sm font-medium text-primary">✅ Intervention réalisée</p>
+          </div>
         )}
 
         {status === "cancelled" && (

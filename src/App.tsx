@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import ClientForm from "./pages/ClientForm";
 import QuoteEditor from "./pages/QuoteEditor";
 import QuoteValidation from "./pages/QuoteValidation";
+import InvoiceEditor from "./pages/InvoiceEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <QuoteEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dossier/:id/facture/:invoiceId"
+            element={
+              <ProtectedRoute>
+                <InvoiceEditor />
               </ProtectedRoute>
             }
           />
