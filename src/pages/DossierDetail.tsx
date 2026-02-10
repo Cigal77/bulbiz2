@@ -6,6 +6,7 @@ import { MediaGallery } from "@/components/dossier/MediaGallery";
 import { SummaryBlock } from "@/components/dossier/SummaryBlock";
 import { HistoriqueTimeline } from "@/components/dossier/HistoriqueTimeline";
 import { DossierActions } from "@/components/dossier/DossierActions";
+import { QuoteBlock } from "@/components/dossier/QuoteBlock";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
@@ -74,6 +75,7 @@ export default function DossierDetail() {
             <SummaryBlock dossier={dossier} />
             <ClientBlock dossier={dossier} />
             <InterventionBlock dossier={dossier} />
+            <QuoteBlock dossier={dossier} />
             <MediaGallery medias={medias} isLoading={mediasLoading} />
             <HistoriqueTimeline historique={historique} isLoading={histLoading} />
           </div>

@@ -161,54 +161,137 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
           auto_relance_enabled: boolean
           company_name: string | null
           created_at: string
+          default_validity_days: number | null
+          default_vat_rate: number | null
           email: string | null
           email_signature: string | null
           first_name: string | null
           id: string
           last_name: string | null
+          logo_url: string | null
           phone: string | null
           relance_delay_devis_1: number
           relance_delay_devis_2: number
           relance_delay_info: number
+          siret: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string | null
           auto_relance_enabled?: boolean
           company_name?: string | null
           created_at?: string
+          default_validity_days?: number | null
+          default_vat_rate?: number | null
           email?: string | null
           email_signature?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
+          logo_url?: string | null
           phone?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
+          siret?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string | null
           auto_relance_enabled?: boolean
           company_name?: string | null
           created_at?: string
+          default_validity_days?: number | null
+          default_vat_rate?: number | null
           email?: string | null
           email_signature?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
+          logo_url?: string | null
           phone?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
+          siret?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      quotes: {
+        Row: {
+          created_at: string
+          dossier_id: string
+          id: string
+          is_imported: boolean
+          items: Json | null
+          notes: string | null
+          pdf_url: string | null
+          quote_number: string
+          sent_at: string | null
+          signed_at: string | null
+          status: Database["public"]["Enums"]["quote_status"]
+          total_ht: number | null
+          total_ttc: number | null
+          total_tva: number | null
+          updated_at: string
+          user_id: string
+          validity_days: number | null
+        }
+        Insert: {
+          created_at?: string
+          dossier_id: string
+          id?: string
+          is_imported?: boolean
+          items?: Json | null
+          notes?: string | null
+          pdf_url?: string | null
+          quote_number: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          total_ht?: number | null
+          total_ttc?: number | null
+          total_tva?: number | null
+          updated_at?: string
+          user_id: string
+          validity_days?: number | null
+        }
+        Update: {
+          created_at?: string
+          dossier_id?: string
+          id?: string
+          is_imported?: boolean
+          items?: Json | null
+          notes?: string | null
+          pdf_url?: string | null
+          quote_number?: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["quote_status"]
+          total_ht?: number | null
+          total_ttc?: number | null
+          total_tva?: number | null
+          updated_at?: string
+          user_id?: string
+          validity_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       relances: {
         Row: {
@@ -271,6 +354,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_quote_number: { Args: { p_user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -296,6 +380,7 @@ export type Database = {
         | "evier"
         | "douche"
         | "autre"
+      quote_status: "brouillon" | "envoye" | "signe" | "refuse"
       urgency_level: "aujourdhui" | "48h" | "semaine"
     }
     CompositeTypes: {
@@ -442,6 +527,7 @@ export const Constants = {
         "douche",
         "autre",
       ],
+      quote_status: ["brouillon", "envoye", "signe", "refuse"],
       urgency_level: ["aujourdhui", "48h", "semaine"],
     },
   },
