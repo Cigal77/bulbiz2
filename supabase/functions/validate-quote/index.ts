@@ -6,6 +6,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+  if (!accountSid || !authToken || !fromPhone) {
+    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
+    return { success: false, error: "SMS provider not configured" };
+  }
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(`${accountSid}:${authToken}`) },
+      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
+    });
+    if (!resp.ok) { const err = await resp.text(); console.error("Twilio error:", err); return { success: false, error: `Twilio ${resp.status}` }; }
+    await resp.json();
+    return { success: true };
+  } catch (e) { console.error("SMS error:", e); return { success: false, error: e instanceof Error ? e.message : "Unknown" }; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,19 +42,16 @@ Deno.serve(async (req) => {
 
     if (!token || !action) {
       return new Response(JSON.stringify({ error: "Token et action requis" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (!["accept", "refuse"].includes(action)) {
       return new Response(JSON.stringify({ error: "Action invalide" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Find quote by token
     const { data: quote, error: qErr } = await supabase
       .from("quotes")
       .select("*, dossiers!inner(id, client_email, client_phone, client_first_name, client_last_name, user_id)")
@@ -42,24 +60,19 @@ Deno.serve(async (req) => {
 
     if (qErr || !quote) {
       return new Response(JSON.stringify({ error: "Lien invalide ou expiré" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check expiration
     if (quote.signature_token_expires_at && new Date(quote.signature_token_expires_at) < new Date()) {
       return new Response(JSON.stringify({ error: "Ce lien a expiré" }), {
-        status: 410,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check if already acted upon
     if (quote.status === "signe" || quote.status === "refuse") {
       return new Response(JSON.stringify({ error: "Ce devis a déjà été traité", status: quote.status }), {
-        status: 409,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -70,71 +83,47 @@ Deno.serve(async (req) => {
     const acceptedBy = dossier.client_email || dossier.client_phone || "client";
 
     if (action === "accept") {
-      // Update quote
       await supabase.from("quotes").update({
-        status: "signe",
-        signed_at: now,
-        accepted_at: now,
-        accepted_ip: ip,
-        accepted_user_agent: userAgent,
+        status: "signe", signed_at: now, accepted_at: now, accepted_ip: ip, accepted_user_agent: userAgent,
       }).eq("id", quote.id);
 
-      // Update dossier → clos_signe
       await supabase.from("dossiers").update({
-        status: "clos_signe",
-        status_changed_at: now,
-        relance_active: false,
+        status: "clos_signe", status_changed_at: now, relance_active: false,
       }).eq("id", dossier.id);
 
-      // Historique
       await supabase.from("historique").insert({
-        dossier_id: dossier.id,
-        user_id: dossier.user_id,
+        dossier_id: dossier.id, user_id: dossier.user_id,
         action: "quote_validated_by_client",
         details: `Devis ${quote.quote_number} validé par ${acceptedBy} (IP: ${ip})`,
       });
     } else {
-      // Refuse
       await supabase.from("quotes").update({
-        status: "refuse",
-        refused_at: now,
-        refused_reason: reason || null,
-        accepted_ip: ip,
-        accepted_user_agent: userAgent,
+        status: "refuse", refused_at: now, refused_reason: reason || null, accepted_ip: ip, accepted_user_agent: userAgent,
       }).eq("id", quote.id);
 
-      // Update dossier → clos_perdu
       await supabase.from("dossiers").update({
-        status: "clos_perdu",
-        status_changed_at: now,
-        relance_active: false,
+        status: "clos_perdu", status_changed_at: now, relance_active: false,
       }).eq("id", dossier.id);
 
-      // Historique
       await supabase.from("historique").insert({
-        dossier_id: dossier.id,
-        user_id: dossier.user_id,
+        dossier_id: dossier.id, user_id: dossier.user_id,
         action: "quote_refused_by_client",
         details: `Devis ${quote.quote_number} refusé par ${acceptedBy}${reason ? ` – Motif : ${reason}` : ""}`,
       });
     }
 
-    // Send email notification to artisan
+    // ── Notify artisan (email) ──
     try {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (resendKey) {
-        // Get artisan profile for email
         const { data: profile } = await supabase
-          .from("profiles")
-          .select("email, first_name, last_name, company_name")
-          .eq("user_id", dossier.user_id)
-          .maybeSingle();
+          .from("profiles").select("email, first_name, last_name, company_name, phone, sms_enabled")
+          .eq("user_id", dossier.user_id).maybeSingle();
 
         if (profile?.email) {
-          const resend = new Resend(resendKey);
+          const resendClient = new Resend(resendKey);
           const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
           const artisanName = profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Artisan";
-
           const isAccepted = action === "accept";
           const subject = isAccepted
             ? `✅ Devis ${quote.quote_number} validé par ${clientName}`
@@ -145,30 +134,49 @@ Deno.serve(async (req) => {
                 <h2 style="color:#16a34a;">✅ Bonne nouvelle !</h2>
                 <p>Bonjour ${artisanName},</p>
                 <p><strong>${clientName}</strong> a validé votre devis <strong>${quote.quote_number}</strong>.</p>
-                <p>Le dossier a été automatiquement passé en <strong>Clos – Signé</strong> et les relances ont été désactivées.</p>
-                <p style="margin-top:24px;"><a href="https://id-preview--2e27a371-0c34-4075-96a4-b8ddd74908dd.lovable.app/dossier/${dossier.id}" style="background-color:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Voir le dossier</a></p>
+                <p>Le dossier a été automatiquement passé en <strong>Clos – Signé</strong>.</p>
               </div>`
             : `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
                 <h2 style="color:#dc2626;">❌ Devis refusé</h2>
                 <p>Bonjour ${artisanName},</p>
                 <p><strong>${clientName}</strong> a refusé votre devis <strong>${quote.quote_number}</strong>.</p>
-                ${reason ? `<p>Motif indiqué : <em>${reason}</em></p>` : ""}
+                ${reason ? `<p>Motif : <em>${reason}</em></p>` : ""}
                 <p>Le dossier a été passé en <strong>Clos – Perdu</strong>.</p>
-                <p style="margin-top:24px;"><a href="https://id-preview--2e27a371-0c34-4075-96a4-b8ddd74908dd.lovable.app/dossier/${dossier.id}" style="background-color:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Voir le dossier</a></p>
               </div>`;
 
-          await resend.emails.send({
-            from: `Bulbiz <onboarding@resend.dev>`,
-            to: [profile.email],
-            subject,
-            html: body,
+          await resendClient.emails.send({
+            from: `Bulbiz <onboarding@resend.dev>`, to: [profile.email], subject, html: body,
           });
-          console.log("Notification email sent to artisan:", profile.email);
         }
       }
     } catch (emailErr) {
-      // Don't fail the whole request if email fails
       console.error("Failed to send artisan notification email:", emailErr);
+    }
+
+    // ── Send confirmation SMS to client after validation ──
+    if (action === "accept" && dossier.client_phone) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles").select("company_name, first_name, last_name, phone, email, sms_enabled")
+          .eq("user_id", dossier.user_id).maybeSingle();
+
+        const smsEnabled = profile?.sms_enabled !== false;
+        if (smsEnabled) {
+          const cleaned = dossier.client_phone.replace(/[\s\-().]/g, "");
+          if (/^\+?\d{10,15}$/.test(cleaned)) {
+            let phone = cleaned;
+            if (phone.startsWith("0") && phone.length === 10) phone = "+33" + phone.slice(1);
+            if (!phone.startsWith("+")) phone = "+" + phone;
+
+            const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+            const contactInfo = profile?.phone ? profile.phone : (profile?.email || "");
+            const smsBody = `Merci, devis ${quote.quote_number} validé ✅ Pour fixer le RDV : ${contactInfo} — ${artisanName}`;
+            await sendSms(phone, smsBody);
+          }
+        }
+      } catch (smsErr) {
+        console.error("Failed to send client confirmation SMS:", smsErr);
+      }
     }
 
     return new Response(JSON.stringify({ success: true, action }), {
