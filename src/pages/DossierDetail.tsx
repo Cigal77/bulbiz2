@@ -60,7 +60,9 @@ export default function DossierDetail() {
         </Button>
         <BulbizLogo size={20} />
         <span className="font-semibold text-foreground truncate ml-2">
-          {dossier.client_first_name} {dossier.client_last_name}
+          {dossier.client_first_name || dossier.client_last_name
+            ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
+            : "Dossier sans nom"}
         </span>
       </header>
 

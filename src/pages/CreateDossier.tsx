@@ -55,30 +55,34 @@ export default function CreateDossier() {
 
   const createMutation = useMutation({
     mutationFn: async ({ data, source }: { data: DossierFormData; source: DossierSource }) => {
+      // Determine if dossier has enough info or is partial
+      const hasMinimalInfo = !!(data.client_first_name && data.client_phone && data.address);
+      const initialStatus = hasMinimalInfo ? "nouveau" : "a_qualifier";
+
       const { data: dossier, error } = await supabase
         .from("dossiers")
         .insert({
           user_id: user!.id,
-          client_first_name: data.client_first_name,
-          client_last_name: data.client_last_name,
-          client_phone: data.client_phone,
+          client_first_name: data.client_first_name || null,
+          client_last_name: data.client_last_name || null,
+          client_phone: data.client_phone || null,
           client_email: data.client_email || null,
-          address: data.address,
+          address: data.address || null,
           category: data.category,
           urgency: data.urgency,
           description: data.description || null,
           source,
+          status: initialStatus,
         })
         .select("id")
         .single();
       if (error) throw error;
 
-      // Add historique entry
       await supabase.from("historique").insert({
         dossier_id: dossier.id,
         user_id: user!.id,
         action: "created",
-        details: `Dossier créé (${source === "email" ? "import email" : "création manuelle"})`,
+        details: `Dossier créé (${source === "email" ? "import email" : "création manuelle"})${!hasMinimalInfo ? " – informations partielles" : ""}`,
       });
 
       return dossier;
@@ -207,7 +211,7 @@ export default function CreateDossier() {
                     name="client_first_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Prénom</FormLabel>
+                        <FormLabel>Prénom <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                         <FormControl>
                           <Input placeholder="Jean" {...field} />
                         </FormControl>
@@ -220,7 +224,7 @@ export default function CreateDossier() {
                     name="client_last_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nom</FormLabel>
+                        <FormLabel>Nom <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                         <FormControl>
                           <Input placeholder="Dupont" {...field} />
                         </FormControl>
@@ -234,7 +238,7 @@ export default function CreateDossier() {
                   name="client_phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Téléphone</FormLabel>
+                      <FormLabel>Téléphone <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                       <FormControl>
                         <Input placeholder="06 12 34 56 78" type="tel" {...field} />
                       </FormControl>
@@ -265,7 +269,7 @@ export default function CreateDossier() {
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Adresse</FormLabel>
+                      <FormLabel>Adresse <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                       <FormControl>
                         <Input placeholder="12 rue de la Paix, 75002 Paris" {...field} />
                       </FormControl>

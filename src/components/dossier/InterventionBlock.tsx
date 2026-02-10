@@ -8,22 +8,29 @@ interface InterventionBlockProps {
 }
 
 export function InterventionBlock({ dossier }: InterventionBlockProps) {
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dossier.address)}`;
+  const mapsUrl = dossier.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dossier.address)}` : null;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-3">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intervention</h3>
       
       <div className="space-y-3">
-        <a
-          href={mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-start gap-2 text-sm text-primary hover:underline font-medium"
-        >
-          <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{dossier.address}</span>
-        </a>
+        {dossier.address ? (
+          <a
+            href={mapsUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-2 text-sm text-primary hover:underline font-medium"
+          >
+            <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{dossier.address}</span>
+          </a>
+        ) : (
+          <p className="flex items-start gap-2 text-sm text-muted-foreground italic">
+            <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+            Adresse non renseignée
+          </p>
+        )}
 
         <div className="flex items-center gap-3 flex-wrap">
           <span className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">

@@ -108,11 +108,18 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
-        <Button variant="outline" className="w-full justify-start gap-2" asChild>
-          <a href={`tel:${dossier.client_phone}`}>
-            <Phone className="h-4 w-4 text-primary" />
-            Appeler le client
-          </a>
+        <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
+          {dossier.client_phone ? (
+            <a href={`tel:${dossier.client_phone}`}>
+              <Phone className="h-4 w-4 text-primary" />
+              Appeler le client
+            </a>
+          ) : (
+            <span>
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              Téléphone non renseigné
+            </span>
+          )}
         </Button>
 
         <Button
@@ -165,6 +172,26 @@ export function DossierActions({ dossier }: DossierActionsProps) {
                 {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
+            {dossier.client_email && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2 text-xs"
+                onClick={async () => {
+                  try {
+                    await supabase.functions.invoke("send-relance", {
+                      body: { dossier_id: dossier.id, type: "info_manquante", client_link: clientLink },
+                    });
+                    toast({ title: "Lien envoyé par email au client !" });
+                  } catch (e: any) {
+                    toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" });
+                  }
+                }}
+              >
+                <Send className="h-3.5 w-3.5" />
+                Envoyer par email
+              </Button>
+            )}
           </div>
         ) : (
           <Button

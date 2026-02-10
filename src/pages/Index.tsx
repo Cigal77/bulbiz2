@@ -45,10 +45,10 @@ export default function Dashboard() {
       const q = search.toLowerCase();
       list = list.filter(
         (d) =>
-          d.client_first_name.toLowerCase().includes(q) ||
-          d.client_last_name.toLowerCase().includes(q) ||
-          d.client_phone.includes(q) ||
-          d.address.toLowerCase().includes(q)
+          (d.client_first_name ?? "").toLowerCase().includes(q) ||
+          (d.client_last_name ?? "").toLowerCase().includes(q) ||
+          (d.client_phone ?? "").includes(q) ||
+          (d.address ?? "").toLowerCase().includes(q)
       );
     }
 
