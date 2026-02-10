@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
@@ -11,6 +11,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, Plus, Settings } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
 import { URGENCY_ORDER } from "@/lib/constants";
 
@@ -23,10 +26,47 @@ export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { data: dossiers, isLoading } = useDossiers();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<DossierStatus | null>(null);
   const [sourceFilter, setSourceFilter] = useState<DossierSource | null>(null);
+
+  // Realtime: listen for quote status changes (client validation/refusal)
+  useEffect(() => {
+    const channel = supabase
+      .channel("quote-notifications")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "quotes" },
+        (payload) => {
+          const newStatus = payload.new?.status;
+          const oldStatus = payload.old?.status;
+          if (newStatus === oldStatus) return;
+
+          const quoteNumber = payload.new?.quote_number || "Devis";
+
+          if (newStatus === "signe" && oldStatus !== "signe") {
+            toast({
+              title: "✅ Devis validé !",
+              description: `${quoteNumber} a été validé par le client.`,
+            });
+            queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+          } else if (newStatus === "refuse" && oldStatus !== "refuse") {
+            toast({
+              title: "❌ Devis refusé",
+              description: `${quoteNumber} a été refusé par le client.`,
+              variant: "destructive",
+            });
+            queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [toast, queryClient]);
 
   const counts = useMemo(() => {
     const c = Object.fromEntries(ALL_STATUSES.map((s) => [s, 0])) as Record<DossierStatus, number>;
