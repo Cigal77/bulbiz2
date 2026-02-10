@@ -57,6 +57,27 @@ export const URGENCY_ORDER: Record<UrgencyLevel, number> = {
   semaine: 1,
 };
 
+// Appointment status labels & colors
+export type AppointmentStatus = "none" | "rdv_pending" | "slots_proposed" | "client_selected" | "rdv_confirmed" | "cancelled";
+
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
+  none: "Aucun",
+  rdv_pending: "Prise de RDV en attente",
+  slots_proposed: "Créneaux proposés",
+  client_selected: "Client a choisi",
+  rdv_confirmed: "Rendez-vous pris",
+  cancelled: "Annulé",
+};
+
+export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
+  none: "bg-muted text-muted-foreground",
+  rdv_pending: "bg-warning/15 text-warning",
+  slots_proposed: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  client_selected: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  rdv_confirmed: "bg-success/15 text-success",
+  cancelled: "bg-destructive/15 text-destructive",
+};
+
 // Google Maps API Key (publishable, restricted by HTTP referrer)
 // Replace with your actual key from Google Cloud Console
 export const GOOGLE_MAPS_API_KEY = "";
