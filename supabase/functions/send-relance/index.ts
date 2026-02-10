@@ -1,5 +1,4 @@
 import { Resend } from "npm:resend@2.0.0";
-import { Resend } from "npm:resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -29,7 +28,7 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error("Missing authorization header");
 
     // Verify the user
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
