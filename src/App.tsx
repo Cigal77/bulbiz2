@@ -11,6 +11,7 @@ import DossierDetail from "./pages/DossierDetail";
 import CreateDossier from "./pages/CreateDossier";
 import Settings from "./pages/Settings";
 import ClientForm from "./pages/ClientForm";
+import QuoteEditor from "./pages/QuoteEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <CreateDossier />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dossier/:dossierId/devis"
+            element={
+              <ProtectedRoute>
+                <QuoteEditor />
               </ProtectedRoute>
             }
           />
