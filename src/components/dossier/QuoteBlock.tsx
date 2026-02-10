@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuotes, useQuoteActions, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/hooks/useQuotes";
 import type { Quote, QuoteStatus } from "@/hooks/useQuotes";
 import type { Dossier } from "@/hooks/useDossier";
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus,
+  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, PenLine,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -40,6 +41,7 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
   const { data: quotes = [], isLoading } = useQuotes(dossier.id);
   const { importPdf, updateStatus, deleteQuote } = useQuoteActions(dossier.id);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -112,6 +114,15 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
           Devis
         </CardTitle>
         <div className="flex gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate(`/dossier/${dossier.id}/devis`)}
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            Créer un devis
+          </Button>
           <input
             ref={fileInputRef}
             type="file"

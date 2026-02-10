@@ -19,6 +19,10 @@ interface SettingsForm {
   company_name: string;
   phone: string;
   email: string;
+  siret: string;
+  address: string;
+  default_vat_rate: number;
+  default_validity_days: number;
   auto_relance_enabled: boolean;
   relance_delay_info: number;
   relance_delay_devis_1: number;
@@ -42,6 +46,10 @@ export default function Settings() {
         company_name: profile.company_name ?? "",
         phone: profile.phone ?? "",
         email: profile.email ?? "",
+        siret: profile.siret ?? "",
+        address: profile.address ?? "",
+        default_vat_rate: profile.default_vat_rate ?? 10,
+        default_validity_days: profile.default_validity_days ?? 30,
         auto_relance_enabled: profile.auto_relance_enabled,
         relance_delay_info: profile.relance_delay_info,
         relance_delay_devis_1: profile.relance_delay_devis_1,
@@ -59,6 +67,10 @@ export default function Settings() {
         company_name: data.company_name || null,
         phone: data.phone || null,
         email: data.email || null,
+        siret: data.siret || null,
+        address: data.address || null,
+        default_vat_rate: data.default_vat_rate,
+        default_validity_days: data.default_validity_days,
         auto_relance_enabled: data.auto_relance_enabled,
         relance_delay_info: data.relance_delay_info,
         relance_delay_devis_1: data.relance_delay_devis_1,
@@ -121,6 +133,22 @@ export default function Settings() {
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="email">Email professionnel</Label>
                 <Input id="email" type="email" {...register("email")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="siret">SIRET</Label>
+                <Input id="siret" {...register("siret")} placeholder="123 456 789 00012" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Adresse</Label>
+                <Input id="address" {...register("address")} placeholder="12 rue des Artisans, 75001 Paris" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="default_vat_rate">TVA par défaut (%)</Label>
+                <Input id="default_vat_rate" type="number" step="0.1" {...register("default_vat_rate", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
+                <Input id="default_validity_days" type="number" min={1} {...register("default_validity_days", { valueAsNumber: true })} />
               </div>
             </CardContent>
           </Card>
