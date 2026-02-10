@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, Zap } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
 import { toast } from "sonner";
 
 interface SettingsForm {
@@ -83,10 +84,7 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
-        <div className="flex items-center gap-2">
-          <Zap className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold text-foreground hidden sm:inline">Bulbiz</span>
-        </div>
+        <BulbizLogo />
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           Retour

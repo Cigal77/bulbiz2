@@ -8,7 +8,8 @@ import { HistoriqueTimeline } from "@/components/dossier/HistoriqueTimeline";
 import { DossierActions } from "@/components/dossier/DossierActions";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Zap } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
 
 export default function DossierDetail() {
   const { id } = useParams<{ id: string }>();
@@ -57,12 +58,10 @@ export default function DossierDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-foreground truncate">
-            {dossier.client_first_name} {dossier.client_last_name}
-          </span>
-        </div>
+        <BulbizLogo size={20} />
+        <span className="font-semibold text-foreground truncate ml-2">
+          {dossier.client_first_name} {dossier.client_last_name}
+        </span>
       </header>
 
       {/* Content */}

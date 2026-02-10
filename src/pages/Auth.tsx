@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Mail, Lock, ArrowRight, Zap } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
 
 type AuthMode = "login" | "signup" | "magic";
 
@@ -100,8 +101,7 @@ export default function Auth() {
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between bg-primary p-12">
         <div>
           <div className="flex items-center gap-2">
-            <Zap className="h-8 w-8 text-primary-foreground" />
-            <span className="text-2xl font-bold text-primary-foreground">Bulbiz</span>
+            <BulbizLogo size={32} />
           </div>
         </div>
         <div className="space-y-4">
@@ -120,9 +120,8 @@ export default function Auth() {
       {/* Right panel - form */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-sm space-y-8">
-          <div className="lg:hidden flex items-center gap-2 justify-center mb-4">
-            <Zap className="h-7 w-7 text-primary" />
-            <span className="text-xl font-bold text-foreground">Bulbiz</span>
+          <div className="lg:hidden flex items-center justify-center mb-4">
+            <BulbizLogo size={28} />
           </div>
 
           <div className="space-y-2 text-center lg:text-left">

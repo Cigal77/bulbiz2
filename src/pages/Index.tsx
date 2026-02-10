@@ -8,7 +8,9 @@ import { SearchBar } from "@/components/dashboard/SearchBar";
 import { SourceFilter } from "@/components/dashboard/SourceFilter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LogOut, Plus, Zap, Settings } from "lucide-react";
+import { LogOut, Plus, Settings } from "lucide-react";
+import { BulbizLogo } from "@/components/BulbizLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Database } from "@/integrations/supabase/types";
 import { URGENCY_ORDER } from "@/lib/constants";
 
@@ -70,11 +72,9 @@ export default function Dashboard() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 py-3">
+        <BulbizLogo />
         <div className="flex items-center gap-2">
-          <Zap className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold text-foreground hidden sm:inline">Bulbiz</span>
-        </div>
-        <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => navigate("/parametres")}>
             <Settings className="h-4 w-4" />
           </Button>
