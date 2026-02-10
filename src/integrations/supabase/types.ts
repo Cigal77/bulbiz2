@@ -59,17 +59,24 @@ export type Database = {
       dossiers: {
         Row: {
           address: string | null
+          address_line: string | null
           category: Database["public"]["Enums"]["problem_category"]
+          city: string | null
           client_email: string | null
           client_first_name: string | null
           client_last_name: string | null
           client_phone: string | null
           client_token: string | null
           client_token_expires_at: string | null
+          country: string | null
           created_at: string
           description: string | null
+          google_place_id: string | null
           id: string
           last_relance_at: string | null
+          lat: number | null
+          lng: number | null
+          postal_code: string | null
           relance_active: boolean
           relance_count: number
           source: Database["public"]["Enums"]["dossier_source"]
@@ -81,17 +88,24 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_line?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
+          city?: string | null
           client_email?: string | null
           client_first_name?: string | null
           client_last_name?: string | null
           client_phone?: string | null
           client_token?: string | null
           client_token_expires_at?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
+          google_place_id?: string | null
           id?: string
           last_relance_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          postal_code?: string | null
           relance_active?: boolean
           relance_count?: number
           source?: Database["public"]["Enums"]["dossier_source"]
@@ -103,17 +117,24 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_line?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
+          city?: string | null
           client_email?: string | null
           client_first_name?: string | null
           client_last_name?: string | null
           client_phone?: string | null
           client_token?: string | null
           client_token_expires_at?: string | null
+          country?: string | null
           created_at?: string
           description?: string | null
+          google_place_id?: string | null
           id?: string
           last_relance_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          postal_code?: string | null
           relance_active?: boolean
           relance_count?: number
           source?: Database["public"]["Enums"]["dossier_source"]
