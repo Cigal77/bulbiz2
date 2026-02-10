@@ -28,6 +28,8 @@ interface SettingsForm {
   relance_delay_devis_1: number;
   relance_delay_devis_2: number;
   email_signature: string;
+  auto_send_client_link: boolean;
+  client_link_validity_days: number;
 }
 
 export default function Settings() {
@@ -37,6 +39,8 @@ export default function Settings() {
   const { register, handleSubmit, reset, watch, setValue } = useForm<SettingsForm>();
 
   const autoRelance = watch("auto_relance_enabled");
+  const autoSendLink = watch("auto_send_client_link");
+
 
   useEffect(() => {
     if (profile) {
@@ -55,6 +59,8 @@ export default function Settings() {
         relance_delay_devis_1: profile.relance_delay_devis_1,
         relance_delay_devis_2: profile.relance_delay_devis_2,
         email_signature: profile.email_signature ?? "",
+        auto_send_client_link: (profile as any).auto_send_client_link ?? true,
+        client_link_validity_days: (profile as any).client_link_validity_days ?? 7,
       });
     }
   }, [profile, reset]);
@@ -76,6 +82,8 @@ export default function Settings() {
         relance_delay_devis_1: data.relance_delay_devis_1,
         relance_delay_devis_2: data.relance_delay_devis_2,
         email_signature: data.email_signature || null,
+        auto_send_client_link: data.auto_send_client_link,
+        client_link_validity_days: data.client_link_validity_days,
       });
       toast.success("Paramètres sauvegardés");
     } catch {
@@ -149,6 +157,36 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
                 <Input id="default_validity_days" type="number" min={1} {...register("default_validity_days", { valueAsNumber: true })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client link settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Lien client</CardTitle>
+              <CardDescription>Envoi automatique du lien de collecte d'informations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Envoi auto à la création du dossier</Label>
+                  <p className="text-sm text-muted-foreground">Envoyer automatiquement le lien client par email</p>
+                </div>
+                <Switch
+                  checked={autoSendLink}
+                  onCheckedChange={(v) => setValue("auto_send_client_link", v)}
+                />
+              </div>
+              <div className="space-y-2 max-w-[200px]">
+                <Label htmlFor="client_link_validity_days">Durée de validité du lien (jours)</Label>
+                <Input
+                  id="client_link_validity_days"
+                  type="number"
+                  min={1}
+                  max={90}
+                  {...register("client_link_validity_days", { valueAsNumber: true })}
+                />
               </div>
             </CardContent>
           </Card>

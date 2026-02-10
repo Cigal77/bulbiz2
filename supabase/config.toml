@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.validate-quote]
 verify_jwt = false
+
+[functions.send-client-link]
+verify_jwt = false

@@ -377,6 +377,8 @@ export type Database = {
         Row: {
           address: string | null
           auto_relance_enabled: boolean
+          auto_send_client_link: boolean
+          client_link_validity_days: number
           company_name: string | null
           created_at: string
           default_validity_days: number | null
@@ -398,6 +400,8 @@ export type Database = {
         Insert: {
           address?: string | null
           auto_relance_enabled?: boolean
+          auto_send_client_link?: boolean
+          client_link_validity_days?: number
           company_name?: string | null
           created_at?: string
           default_validity_days?: number | null
@@ -419,6 +423,8 @@ export type Database = {
         Update: {
           address?: string | null
           auto_relance_enabled?: boolean
+          auto_send_client_link?: boolean
+          client_link_validity_days?: number
           company_name?: string | null
           created_at?: string
           default_validity_days?: number | null
