@@ -317,6 +317,8 @@ export type Database = {
           client_first_name: string | null
           client_last_name: string | null
           client_phone: string | null
+          client_token: string | null
+          client_token_expires_at: string | null
           client_type: Database["public"]["Enums"]["client_type"]
           created_at: string
           dossier_id: string
@@ -352,6 +354,8 @@ export type Database = {
           client_first_name?: string | null
           client_last_name?: string | null
           client_phone?: string | null
+          client_token?: string | null
+          client_token_expires_at?: string | null
           client_type?: Database["public"]["Enums"]["client_type"]
           created_at?: string
           dossier_id: string
@@ -387,6 +391,8 @@ export type Database = {
           client_first_name?: string | null
           client_last_name?: string | null
           client_phone?: string | null
+          client_token?: string | null
+          client_token_expires_at?: string | null
           client_type?: Database["public"]["Enums"]["client_type"]
           created_at?: string
           dossier_id?: string

@@ -58,6 +58,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Generate client token if not already present
+    let clientToken = invoice.client_token;
+    if (!clientToken) {
+      clientToken = crypto.randomUUID() + "-" + crypto.randomUUID();
+      const tokenExpires = new Date();
+      tokenExpires.setDate(tokenExpires.getDate() + 90);
+      await supabase
+        .from("invoices")
+        .update({
+          client_token: clientToken,
+          client_token_expires_at: tokenExpires.toISOString(),
+        })
+        .eq("id", invoice_id);
+    }
+
     // Update status to sent
     await supabase
       .from("invoices")

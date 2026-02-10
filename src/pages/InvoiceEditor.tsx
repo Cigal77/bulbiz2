@@ -16,7 +16,7 @@ import { BulbizLogo } from "@/components/BulbizLogo";
 import { INVOICE_STATUS_LABELS, INVOICE_STATUS_COLORS } from "@/hooks/useInvoices";
 import { cn } from "@/lib/utils";
 import {
-  ArrowLeft, Save, Trash2, Plus, Send, FileDown, Loader2, CheckCircle2,
+  ArrowLeft, Save, Trash2, Plus, Send, FileDown, Loader2, CheckCircle2, Link2,
 } from "lucide-react";
 
 export default function InvoiceEditor() {
@@ -35,6 +35,7 @@ export default function InvoiceEditor() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   useEffect(() => {
     if (invoice) {
@@ -251,6 +252,33 @@ export default function InvoiceEditor() {
           </Badge>
         </div>
         <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              setGeneratingLink(true);
+              try {
+                const { data, error } = await supabase.functions.invoke("generate-invoice-token", {
+                  body: { invoice_id: invoiceId },
+                });
+                if (error) throw error;
+                if (data?.token) {
+                  const url = `${window.location.origin}/facture/view?token=${data.token}`;
+                  await navigator.clipboard.writeText(url);
+                  toast({ title: "Lien copié ✅", description: "Le lien client a été copié dans le presse-papiers." });
+                }
+              } catch (e: any) {
+                toast({ title: "Erreur", description: e.message, variant: "destructive" });
+              } finally {
+                setGeneratingLink(false);
+              }
+            }}
+            disabled={generatingLink}
+            className="gap-1.5"
+          >
+            {generatingLink ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+            Lien client
+          </Button>
           <Button size="sm" variant="outline" onClick={handleGeneratePdf} disabled={generatingPdf} className="gap-1.5">
             {generatingPdf ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
             Télécharger PDF
