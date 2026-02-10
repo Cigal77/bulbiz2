@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_slots: {
+        Row: {
+          created_at: string
+          dossier_id: string
+          id: string
+          selected_at: string | null
+          slot_date: string
+          time_end: string
+          time_start: string
+        }
+        Insert: {
+          created_at?: string
+          dossier_id: string
+          id?: string
+          selected_at?: string | null
+          slot_date: string
+          time_end: string
+          time_start: string
+        }
+        Update: {
+          created_at?: string
+          dossier_id?: string
+          id?: string
+          selected_at?: string | null
+          slot_date?: string
+          time_end?: string
+          time_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_slots_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catalog_material: {
         Row: {
           category_path: string
@@ -63,6 +101,15 @@ export type Database = {
         Row: {
           address: string | null
           address_line: string | null
+          appointment_confirmed_at: string | null
+          appointment_date: string | null
+          appointment_notes: string | null
+          appointment_source:
+            | Database["public"]["Enums"]["appointment_source"]
+            | null
+          appointment_status: Database["public"]["Enums"]["appointment_status"]
+          appointment_time_end: string | null
+          appointment_time_start: string | null
           category: Database["public"]["Enums"]["problem_category"]
           city: string | null
           client_email: string | null
@@ -92,6 +139,15 @@ export type Database = {
         Insert: {
           address?: string | null
           address_line?: string | null
+          appointment_confirmed_at?: string | null
+          appointment_date?: string | null
+          appointment_notes?: string | null
+          appointment_source?:
+            | Database["public"]["Enums"]["appointment_source"]
+            | null
+          appointment_status?: Database["public"]["Enums"]["appointment_status"]
+          appointment_time_end?: string | null
+          appointment_time_start?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           city?: string | null
           client_email?: string | null
@@ -121,6 +177,15 @@ export type Database = {
         Update: {
           address?: string | null
           address_line?: string | null
+          appointment_confirmed_at?: string | null
+          appointment_date?: string | null
+          appointment_notes?: string | null
+          appointment_source?:
+            | Database["public"]["Enums"]["appointment_source"]
+            | null
+          appointment_status?: Database["public"]["Enums"]["appointment_status"]
+          appointment_time_end?: string | null
+          appointment_time_start?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           city?: string | null
           client_email?: string | null
@@ -771,6 +836,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "artisan"
+      appointment_source: "client_selected" | "manual" | "phone" | "email"
+      appointment_status:
+        | "none"
+        | "rdv_pending"
+        | "slots_proposed"
+        | "client_selected"
+        | "rdv_confirmed"
+        | "cancelled"
       dossier_source: "lien_client" | "manuel" | "email"
       dossier_status:
         | "nouveau"
@@ -916,6 +989,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "artisan"],
+      appointment_source: ["client_selected", "manual", "phone", "email"],
+      appointment_status: [
+        "none",
+        "rdv_pending",
+        "slots_proposed",
+        "client_selected",
+        "rdv_confirmed",
+        "cancelled",
+      ],
       dossier_source: ["lien_client", "manuel", "email"],
       dossier_status: [
         "nouveau",
