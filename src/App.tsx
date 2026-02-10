@@ -14,6 +14,7 @@ import ClientForm from "./pages/ClientForm";
 import QuoteEditor from "./pages/QuoteEditor";
 import QuoteValidation from "./pages/QuoteValidation";
 import InvoiceEditor from "./pages/InvoiceEditor";
+import InvoiceView from "./pages/InvoiceView";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/client" element={<ClientForm />} />
           <Route path="/devis/validation" element={<QuoteValidation />} />
+          <Route path="/facture/view" element={<InvoiceView />} />
           <Route
             path="/"
             element={
