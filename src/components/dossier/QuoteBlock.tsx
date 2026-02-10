@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuotes, useQuoteActions, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from "@/hooks/useQuotes";
 import type { Quote, QuoteStatus } from "@/hooks/useQuotes";
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, PenLine,
+  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, PenLine, Copy, CheckCircle2, ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -190,6 +191,18 @@ function QuoteRow({
   onDelete: (id: string) => void;
   isSending: boolean;
 }) {
+  const { toast } = useToast();
+
+  const copySignatureLink = () => {
+    const url = `${window.location.origin}/devis/validation?token=${(quote as any).signature_token}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: "Lien copié !" });
+  };
+
+  const hasSignatureToken = !!(quote as any).signature_token;
+  const isValidated = quote.status === "signe" && !!(quote as any).accepted_at;
+  const isRefused = quote.status === "refuse" && !!(quote as any).refused_at;
+
   return (
     <div className="rounded-lg border border-border p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -205,6 +218,43 @@ function QuoteRow({
         </span>
       </div>
 
+      {/* Validation proof */}
+      {isValidated && (
+        <div className="flex items-start gap-2 rounded-md bg-success/10 border border-success/20 p-2.5">
+          <ShieldCheck className="h-4 w-4 text-success shrink-0 mt-0.5" />
+          <div className="text-xs space-y-0.5">
+            <p className="font-medium text-success">Validé par le client</p>
+            <p className="text-muted-foreground">
+              {format(new Date((quote as any).accepted_at), "d MMM yyyy 'à' HH:mm", { locale: fr })}
+              {(quote as any).accepted_ip && ` (IP: ${(quote as any).accepted_ip})`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isRefused && (
+        <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-2.5">
+          <XCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+          <div className="text-xs space-y-0.5">
+            <p className="font-medium text-destructive">Refusé par le client</p>
+            <p className="text-muted-foreground">
+              {format(new Date((quote as any).refused_at), "d MMM yyyy 'à' HH:mm", { locale: fr })}
+            </p>
+            {(quote as any).refused_reason && (
+              <p className="text-muted-foreground">Motif : {(quote as any).refused_reason}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Signature link */}
+      {hasSignatureToken && quote.status === "envoye" && (
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs w-full" onClick={copySignatureLink}>
+          <Copy className="h-3 w-3" />
+          Copier le lien de validation client
+        </Button>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {quote.pdf_url && (
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
@@ -216,18 +266,29 @@ function QuoteRow({
         )}
 
         {quote.status === "brouillon" && (
-          <>
-            <Button
-              variant="default"
-              size="sm"
-              className="gap-1.5 text-xs"
-              onClick={() => onSend(quote)}
-              disabled={isSending || !dossier.client_email}
-            >
-              {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-              Envoyer au client
-            </Button>
-          </>
+          <Button
+            variant="default"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => onSend(quote)}
+            disabled={isSending || !dossier.client_email}
+          >
+            {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Envoyer au client
+          </Button>
+        )}
+
+        {quote.status === "envoye" && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => onSend(quote)}
+            disabled={isSending}
+          >
+            {isSending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            Renvoyer
+          </Button>
         )}
 
         <Select

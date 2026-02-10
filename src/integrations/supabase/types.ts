@@ -441,6 +441,9 @@ export type Database = {
       }
       quotes: {
         Row: {
+          accepted_at: string | null
+          accepted_ip: string | null
+          accepted_user_agent: string | null
           created_at: string
           dossier_id: string
           id: string
@@ -449,7 +452,11 @@ export type Database = {
           notes: string | null
           pdf_url: string | null
           quote_number: string
+          refused_at: string | null
+          refused_reason: string | null
           sent_at: string | null
+          signature_token: string | null
+          signature_token_expires_at: string | null
           signed_at: string | null
           status: Database["public"]["Enums"]["quote_status"]
           total_ht: number | null
@@ -460,6 +467,9 @@ export type Database = {
           validity_days: number | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_ip?: string | null
+          accepted_user_agent?: string | null
           created_at?: string
           dossier_id: string
           id?: string
@@ -468,7 +478,11 @@ export type Database = {
           notes?: string | null
           pdf_url?: string | null
           quote_number: string
+          refused_at?: string | null
+          refused_reason?: string | null
           sent_at?: string | null
+          signature_token?: string | null
+          signature_token_expires_at?: string | null
           signed_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           total_ht?: number | null
@@ -479,6 +493,9 @@ export type Database = {
           validity_days?: number | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_ip?: string | null
+          accepted_user_agent?: string | null
           created_at?: string
           dossier_id?: string
           id?: string
@@ -487,7 +504,11 @@ export type Database = {
           notes?: string | null
           pdf_url?: string | null
           quote_number?: string
+          refused_at?: string | null
+          refused_reason?: string | null
           sent_at?: string | null
+          signature_token?: string | null
+          signature_token_expires_at?: string | null
           signed_at?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           total_ht?: number | null
