@@ -1,114 +1,157 @@
 
 
-# Bulbiz – Plan d'implémentation PMF
+# Editeur de devis avance -- Tout-en-un
 
-## Vision
-Application SaaS B2B pour artisans du BTP : centraliser toutes les demandes clients en un point unique, clair et actionnable. Inspiration design : Linear / Notion / Stripe.
-
----
-
-## Phase 1 – Fondations & Authentification
-
-### Backend Supabase (Lovable Cloud)
-- Base de données avec tables : `profiles` (artisans), `dossiers`, `clients`, `medias`, `historique`, `relances`, `user_roles`
-- Row-Level Security : chaque artisan ne voit que ses propres dossiers (multi-tenant)
-- Storage bucket pour les médias (photos, vidéos, fichiers)
-
-### Authentification artisan
-- Inscription / Connexion par email + mot de passe
-- Option Magic Link (connexion sans mot de passe)
-- Création automatique du profil artisan à l'inscription
+Ce plan couvre les 3 modules demandes : Resume main d'oeuvre assiste par IA, Arbre Probleme vers Gestes, et Catalogue materiel avec suggestions automatiques. C'est un chantier consequent qui sera implemente en une seule iteration.
 
 ---
 
-## Phase 2 – Écran central : Dashboard
+## Vue d'ensemble
 
-### Dashboard minimaliste (écran d'entrée)
-- Compteurs visuels par statut (Nouveau, À qualifier, Devis à faire, Devis envoyé, Clos)
-- Liste des dossiers priorisée (nouveaux en premier, puis par urgence)
-- Recherche instantanée par nom, téléphone ou adresse
-- Filtres par statut et par source
-- Design épuré, espaces respirants, hiérarchie visuelle forte
+L'editeur de devis actuel (3 onglets : Client / Lignes / Resume) sera enrichi avec :
+- Un **panneau lateral droit** (drawer sur mobile) contenant l'arbre des problemes et le catalogue materiel
+- Un **bloc "Resume main d'oeuvre"** integre dans l'onglet Lignes, au-dessus des lignes de type main d'oeuvre
+- Une **edge function IA** pour generer les 3 variantes de resume
 
 ---
 
-## Phase 3 – Fiche Dossier (écran le plus important)
+## Phase 1 -- Base de donnees (5 nouvelles tables + seed)
 
-### Vue dossier complète en 1 écran
-- **Bloc client** : prénom, nom, téléphone cliquable (appel direct), email
-- **Intervention** : adresse avec lien Google Maps, catégorie (WC, fuite, chauffe-eau, évier, douche, autre), urgence (Aujourd'hui / 48h / Semaine), description libre
-- **Médias** : galerie photos/vidéos visible immédiatement
-- **Résumé structuré auto** : 1 ligne de synthèse + 3 à 5 bullet points, généré automatiquement à partir des champs du dossier
-- **Historique chronologique** : log automatique de chaque action (création, modification statut, relance envoyée, média ajouté, etc.)
-- **Métadonnées** : source, date de création, statut actuel
+### Tables a creer
 
-### Actions 1 clic
-- Appeler le client
-- Changer le statut
-- Envoyer le lien client
-- Relancer
-- Ajouter une note
-- Créer un devis (marquage uniquement, pas de module devis)
+**problem_taxonomy** -- Arbre des problemes plomberie
+- id, parent_id (auto-reference), label, keywords (text[]), default_context (jsonb), sort_order, user_id (null = global)
 
----
+**problem_to_manoeuvre** -- Mapping probleme vers lignes de devis
+- id, problem_id (FK), label, description, unit, default_qty, unit_price, vat_rate, weight (100/60/30), type (standard/main_oeuvre/deplacement), conditions_json
 
-## Phase 4 – Création de dossier (3 sources)
+**labour_templates** -- Templates de resume main d'oeuvre
+- id, context_tags (text[]), text_short, text_standard, text_reassuring, duration_default_min
 
-### Création manuelle
-- Formulaire rapide (objectif < 45 secondes)
-- Champs pré-remplis intelligemment, catégories en sélection rapide
+**catalog_material** -- Catalogue de fournitures
+- id, category_path, label, type (GROSSE_FOURNITURE/PETITE_FOURNITURE/CONSOMMABLE), unit, default_qty, unit_price, vat_rate, tags (text[]), user_id (null = global)
 
-### Import email manuel
-- Zone de copier-coller du contenu d'un email
-- Glisser-déposer de fichier .eml / .msg avec extraction automatique des infos
-- Aucune synchronisation Gmail/Outlook
+**material_correspondence** -- Correspondances materiel
+- id, source_material_id (FK), target_material_id (FK), weight (100/60/30), conditions_json, default_qty, group_label
 
-### Lien client (formulaire public)
-- Génération d'un lien unique avec token sécurisé + expiration
-- Interface publique mobile-first, 3 étapes max avec barre de progression
-- Champs simples : identité, adresse, problème, urgence, upload photos/vidéos
-- Message rassurant + confirmation finale claire
-- Sans création de compte côté client
-- Consentement RGPD intégré
+Toutes ces tables auront RLS active avec des policies permettant la lecture pour les utilisateurs authentifies (donnees globales + donnees perso).
+
+### Donnees initiales (seed)
+
+Insertion de l'arbre complet des problemes plomberie (10 categories, ~80 noeuds) tel que specifie dans la demande.
+
+Insertion des templates de resume main d'oeuvre (4 templates : Depannage, Remplacement, Recherche de fuite, Debouchage) avec les 3 variantes chacun.
+
+Insertion du catalogue materiel initial (~50 articles de base couvrant sanitaire, alimentation, evacuation, consommables universels).
+
+Insertion des correspondances materiel pour les cas courants (WC pose, WC suspendu, mitigeur douche, chauffe-eau, evier).
 
 ---
 
-## Phase 5 – Relances automatiques par email
+## Phase 2 -- Edge function IA "generate-labour-summary"
 
-### Configuration Resend
-- Mise en place du service d'envoi d'emails (Resend.com)
-- Edge function Supabase pour l'envoi
+Nouvelle edge function qui utilise Lovable AI (google/gemini-3-flash-preview) pour generer des resumes main d'oeuvre personnalises.
 
-### Relances "Info manquante"
-- Déclenchement auto quand statut = "À qualifier" depuis J+1
-- Message simple avec lien vers le formulaire client
-- Arrêt si le client complète le formulaire ou si statut change
+**Entree** : context_tags (chips selectionnees), toggles (deplacement, diagnostic, tests, acces difficile, urgence), problem_label (optionnel)
 
-### Relances "Devis non signé"
-- Statut = "Devis envoyé"
-- Relance 1 à J+2, Relance 2 à J+5
-- Arrêt automatique après 2 relances ou changement de statut
+**Sortie** : 3 variantes (courte, standard, rassurante)
 
-### Interface de gestion
-- Templates email simples et éditables
-- Boutons "Relancer maintenant" et "Stop relances" sur chaque dossier
+L'IA recoit un prompt systeme avec les templates de base et les adapte selon le contexte. Si aucun contexte specifique, elle utilise les templates pre-enregistres directement (sans appel IA).
 
 ---
 
-## Phase 6 – Paramètres artisan
+## Phase 3 -- Composants UI
 
-- Activer / désactiver les relances automatiques
-- Modifier les délais par défaut (J+1, J+2, J+5)
-- Signature email personnalisable
-- Informations du profil artisan
+### A. Bloc "Resume main d'oeuvre assiste"
+
+Nouveau composant `LabourSummaryBlock` integre dans l'onglet "Lignes" (StepItems), au-dessus des lignes :
+
+- **Chips de selection** : Depannage, Remplacement, Installation, Renovation, Recherche de fuite, Debouchage, Urgence (selection multiple)
+- **Toggles** : Inclure deplacement, Inclure diagnostic, Inclure tests/remise en service, Acces difficile, Intervention urgence
+- **Bouton "Proposer un resume"** : appelle l'edge function ou les templates statiques
+- **3 onglets de variantes** : Courte / Standard pro / Rassurante
+- **Textarea editable** : le resume choisi s'insere dans le champ, modifiable par l'artisan
+- Le resume est sauvegarde dans le champ `notes` du devis (ou un nouveau champ `labour_summary`)
+
+### B. Panneau "Arbre Probleme vers Solutions"
+
+Nouveau composant `ProblemTreePanel` affiche dans un Sheet (drawer) accessible depuis l'onglet Lignes :
+
+- **Barre de recherche** avec autocomplete sur les keywords de problem_taxonomy
+- **Navigation par categories** : arbre cliquable avec les 10 familles
+- **Quand un probleme est selectionne** :
+  - Affichage des gestes recommandes tries par weight (3 onglets : Indispensable / Frequent / Options)
+  - Bouton "Ajouter au devis" en un clic par ligne
+  - Resume main d'oeuvre pre-rempli automatiquement
+
+### C. Panneau "Catalogue Materiel"
+
+Nouveau composant `MaterialPickerPanel` dans le meme Sheet ou un second onglet :
+
+- **Recherche** dans catalog_material avec filtres par categorie
+- **Quand un materiel "grosse fourniture" est ajoute** :
+  - Fetch des correspondances depuis material_correspondence
+  - Affichage en 3 onglets : Indispensable / Frequent / Options
+  - Groupe par : Raccords, Fixations, Joints, Consommables, Finition, Securite
+  - Ajout au devis en un clic avec quantites par defaut
+
+### D. Modifications de l'editeur existant
+
+- Ajout d'un bouton "Aide" ou icone dans la barre du haut de l'onglet Lignes pour ouvrir le panneau lateral
+- Le panneau lateral contient 2 onglets : "Problemes" et "Materiel"
+- Sur mobile : Sheet en mode bottom-drawer
+- Sur desktop : panneau lateral droit (resizable ou fixe 400px)
 
 ---
 
-## Design & UX transversal
+## Phase 4 -- Hooks et logique
 
-- **Mobile-first** sur tous les écrans
-- **Design ultra moderne et minimaliste** inspiré Linear/Notion/Stripe
-- Typographie lisible, espaces généreux, icônes claires
-- Couleurs sobres avec accent couleur pour les actions
-- Aucun écran surchargé : 1 écran = 1 objectif clair
+### Nouveaux hooks
+
+- `useProblemTaxonomy()` : fetch de l'arbre des problemes avec cache React Query
+- `useProblemManoeuvres(problemId)` : fetch des gestes mappes a un probleme
+- `useMaterialCatalog(search, category)` : recherche dans le catalogue
+- `useMaterialCorrespondence(materialId)` : fetch des correspondances
+
+### Modifications existantes
+
+- `QuoteEditor.tsx` : ajout du state pour le panneau lateral et le resume main d'oeuvre
+- `StepItems.tsx` : integration du LabourSummaryBlock et du bouton d'ouverture du panneau
+- Ajout d'un champ `labour_summary` dans les donnees du devis (sauvegarde dans le JSONB `items` ou dans `notes`)
+
+---
+
+## Arborescence des fichiers
+
+```text
+src/
+  components/
+    quote-editor/
+      LabourSummaryBlock.tsx      -- Bloc resume main d'oeuvre
+      ProblemTreePanel.tsx         -- Panneau arbre problemes
+      MaterialPickerPanel.tsx      -- Panneau catalogue materiel
+      AssistantDrawer.tsx          -- Drawer/Sheet conteneur
+      RecommendationTabs.tsx       -- Composant onglets Indispensable/Frequent/Options
+  hooks/
+    useProblemTaxonomy.tsx
+    useMaterialCatalog.tsx
+  lib/
+    quote-types.ts                -- Mise a jour avec labour_summary
+supabase/
+  functions/
+    generate-labour-summary/
+      index.ts                    -- Edge function IA
+  migrations/
+    xxx_problem_taxonomy.sql      -- Tables + seed
+```
+
+---
+
+## Details techniques importants
+
+- Les tables globales (seed) auront `user_id IS NULL` pour les donnees de base. Les artisans pourront ajouter leurs propres entrees avec leur `user_id`. Les policies RLS permettront de lire les donnees globales ET ses propres donnees.
+- L'edge function IA utilise `LOVABLE_API_KEY` deja configure, pas besoin de cle supplementaire.
+- Le seed des ~80 problemes et ~50 materiels sera fait via des migrations SQL (INSERT statements).
+- La recherche autocomplete utilise un simple `ilike` sur les keywords et labels (pas besoin de full-text search pour le MVP).
+- Les correspondances materiel sont bidirectionnelles : on peut partir d'un probleme (qui recommande des gestes + materiel) ou d'un materiel (qui recommande ses accessoires).
 
