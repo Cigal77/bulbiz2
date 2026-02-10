@@ -543,6 +543,53 @@ export type Database = {
           },
         ]
       }
+      notification_logs: {
+        Row: {
+          channel: string
+          created_at: string
+          dossier_id: string
+          error_code: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          recipient: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          dossier_id: string
+          error_code?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          recipient: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          dossier_id?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          recipient?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       problem_taxonomy: {
         Row: {
           created_at: string
