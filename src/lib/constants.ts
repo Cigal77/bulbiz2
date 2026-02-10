@@ -56,3 +56,7 @@ export const URGENCY_ORDER: Record<UrgencyLevel, number> = {
   "48h": 2,
   semaine: 1,
 };
+
+// Google Maps API Key (publishable, restricted by HTTP referrer)
+// Replace with your actual key from Google Cloud Console
+export const GOOGLE_MAPS_API_KEY = "";

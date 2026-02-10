@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { dossierSchema, defaultDossierValues, type DossierFormData } from "@/lib/dossier-schema";
 import { parseEmailContent } from "@/lib/email-parser";
 import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
+import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,6 +56,17 @@ export default function CreateDossier() {
     defaultValues: defaultDossierValues,
   });
 
+  const handleAddressSelect = useCallback((data: AddressData) => {
+    form.setValue("address", data.address);
+    form.setValue("address_line", data.address_line || "");
+    form.setValue("postal_code", data.postal_code || "");
+    form.setValue("city", data.city || "");
+    form.setValue("country", data.country || "");
+    form.setValue("google_place_id", data.google_place_id || "");
+    if (data.lat) form.setValue("lat", data.lat);
+    if (data.lng) form.setValue("lng", data.lng);
+  }, [form]);
+
   const createMutation = useMutation({
     mutationFn: async ({ data, source }: { data: DossierFormData; source: DossierSource }) => {
       // Determine if dossier has enough info or is partial
@@ -70,6 +82,13 @@ export default function CreateDossier() {
           client_phone: data.client_phone || null,
           client_email: data.client_email || null,
           address: data.address || null,
+          address_line: data.address_line || null,
+          postal_code: data.postal_code || null,
+          city: data.city || null,
+          country: data.country || null,
+          google_place_id: data.google_place_id || null,
+          lat: data.lat || null,
+          lng: data.lng || null,
           category: data.category,
           urgency: data.urgency,
           description: data.description || null,
@@ -297,7 +316,11 @@ export default function CreateDossier() {
                     <FormItem>
                       <FormLabel>Adresse <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="12 rue de la Paix, 75002 Paris" {...field} />
+                        <AddressAutocomplete
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          onAddressSelect={handleAddressSelect}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

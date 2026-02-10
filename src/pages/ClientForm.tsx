@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Lock } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
+import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -273,7 +274,12 @@ export default function ClientForm() {
               ) : (
                 <div className="space-y-1">
                   <Label className="text-xs">Adresse d'intervention</Label>
-                  <Input placeholder="12 rue de la Paix, 75002 Paris" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(val) => setForm({ ...form, address: val })}
+                    onAddressSelect={(data) => setForm({ ...form, address: data.address })}
+                  />
+                  <p className="text-xs text-muted-foreground">L'adresse est assistée par Google Maps pour éviter les erreurs de saisie.</p>
                 </div>
               )}
 
