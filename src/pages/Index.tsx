@@ -95,7 +95,7 @@ export default function Dashboard() {
               {dossiers?.length ?? 0} dossier{(dossiers?.length ?? 0) !== 1 ? "s" : ""} au total
             </p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => navigate("/nouveau")}>
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Nouveau dossier</span>
           </Button>

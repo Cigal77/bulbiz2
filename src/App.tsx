@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import DossierDetail from "./pages/DossierDetail";
+import CreateDossier from "./pages/CreateDossier";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <DossierDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/nouveau"
+            element={
+              <ProtectedRoute>
+                <CreateDossier />
               </ProtectedRoute>
             }
           />
