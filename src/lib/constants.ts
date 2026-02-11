@@ -7,21 +7,47 @@ type UrgencyLevel = Database["public"]["Enums"]["urgency_level"];
 
 export const STATUS_LABELS: Record<DossierStatus, string> = {
   nouveau: "Nouveau",
-  a_qualifier: "À qualifier",
+  a_qualifier: "Nouveau", // merged into nouveau
   devis_a_faire: "Devis à faire",
   devis_envoye: "Devis envoyé",
-  clos_signe: "Clos (signé)",
+  clos_signe: "Devis signé",
   clos_perdu: "Clos (perdu)",
+  invoice_pending: "Facture en attente",
+  invoice_paid: "Facture payée",
 };
 
 export const STATUS_COLORS: Record<DossierStatus, string> = {
   nouveau: "bg-primary/15 text-primary",
-  a_qualifier: "bg-warning/15 text-warning",
+  a_qualifier: "bg-primary/15 text-primary",
   devis_a_faire: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   devis_envoye: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   clos_signe: "bg-success/15 text-success",
   clos_perdu: "bg-muted text-muted-foreground",
+  invoice_pending: "bg-warning/15 text-warning",
+  invoice_paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
 };
+
+/** Statuses displayed on the dashboard (ordered) */
+export const DASHBOARD_STATUSES: DossierStatus[] = [
+  "nouveau",
+  "devis_a_faire",
+  "devis_envoye",
+  "clos_signe",
+  "invoice_pending",
+  "invoice_paid",
+  "clos_perdu",
+];
+
+/** All valid statuses for the status select dropdown */
+export const ALL_STATUSES: DossierStatus[] = [
+  "nouveau",
+  "devis_a_faire",
+  "devis_envoye",
+  "clos_signe",
+  "invoice_pending",
+  "invoice_paid",
+  "clos_perdu",
+];
 
 export const SOURCE_LABELS: Record<DossierSource, string> = {
   lien_client: "Lien client",
@@ -60,13 +86,35 @@ export const URGENCY_ORDER: Record<UrgencyLevel, number> = {
 // Appointment status labels & colors
 export type AppointmentStatus = "none" | "rdv_pending" | "slots_proposed" | "client_selected" | "rdv_confirmed" | "cancelled" | "done";
 
+/** Simplified appointment tile keys for dashboard */
+export type AppointmentTileKey = "slots_needed" | "waiting_client" | "rdv_confirmed" | "rdv_done";
+
+/** Map DB appointment_status values to dashboard tile keys */
+export function toAppointmentTileKey(status: AppointmentStatus): AppointmentTileKey | null {
+  switch (status) {
+    case "rdv_pending": return "slots_needed";
+    case "slots_proposed":
+    case "client_selected": return "waiting_client";
+    case "rdv_confirmed": return "rdv_confirmed";
+    case "done": return "rdv_done";
+    default: return null;
+  }
+}
+
+export const APPOINTMENT_TILE_LABELS: Record<AppointmentTileKey, string> = {
+  slots_needed: "Créneaux à proposer",
+  waiting_client: "En attente client",
+  rdv_confirmed: "RDV pris",
+  rdv_done: "RDV terminé",
+};
+
 export const APPOINTMENT_STATUS_LABELS: Record<AppointmentStatus, string> = {
   none: "Aucun",
-  rdv_pending: "Prise de RDV en attente",
-  slots_proposed: "Créneaux proposés",
-  client_selected: "Client a choisi",
-  rdv_confirmed: "Rendez-vous pris",
-  done: "Intervention réalisée",
+  rdv_pending: "Créneaux à proposer",
+  slots_proposed: "En attente client",
+  client_selected: "En attente client",
+  rdv_confirmed: "RDV pris",
+  done: "RDV terminé",
   cancelled: "Annulé",
 };
 
@@ -81,5 +129,4 @@ export const APPOINTMENT_STATUS_COLORS: Record<AppointmentStatus, string> = {
 };
 
 // Google Maps API Key (publishable, restricted by HTTP referrer)
-// Replace with your actual key from Google Cloud Console
 export const GOOGLE_MAPS_API_KEY = "";

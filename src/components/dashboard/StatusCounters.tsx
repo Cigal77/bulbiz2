@@ -1,17 +1,18 @@
-import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
+import { STATUS_LABELS, STATUS_COLORS, DASHBOARD_STATUSES } from "@/lib/constants";
 import type { Database } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
-import { FileText, HelpCircle, ClipboardList, Send, CheckCircle, XCircle } from "lucide-react";
+import { FileText, ClipboardList, Send, CheckCircle, XCircle, Receipt, CreditCard } from "lucide-react";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
 
-const STATUS_ICONS: Record<DossierStatus, React.ReactNode> = {
+const STATUS_ICONS: Partial<Record<DossierStatus, React.ReactNode>> = {
   nouveau: <FileText className="h-4 w-4" />,
-  a_qualifier: <HelpCircle className="h-4 w-4" />,
   devis_a_faire: <ClipboardList className="h-4 w-4" />,
   devis_envoye: <Send className="h-4 w-4" />,
   clos_signe: <CheckCircle className="h-4 w-4" />,
   clos_perdu: <XCircle className="h-4 w-4" />,
+  invoice_pending: <Receipt className="h-4 w-4" />,
+  invoice_paid: <CreditCard className="h-4 w-4" />,
 };
 
 interface StatusCountersProps {
@@ -21,11 +22,15 @@ interface StatusCountersProps {
 }
 
 export function StatusCounters({ counts, activeFilter, onFilterChange }: StatusCountersProps) {
-  const statuses: DossierStatus[] = ["nouveau", "a_qualifier", "devis_a_faire", "devis_envoye", "clos_signe", "clos_perdu"];
+  // Merge a_qualifier count into nouveau
+  const mergedCounts = { ...counts };
+  if (mergedCounts.a_qualifier) {
+    mergedCounts.nouveau = (mergedCounts.nouveau || 0) + mergedCounts.a_qualifier;
+  }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {statuses.map((status) => (
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      {DASHBOARD_STATUSES.map((status) => (
         <button
           key={status}
           onClick={() => onFilterChange(activeFilter === status ? null : status)}
@@ -40,7 +45,7 @@ export function StatusCounters({ counts, activeFilter, onFilterChange }: StatusC
             {STATUS_ICONS[status]}
             <span>{STATUS_LABELS[status]}</span>
           </div>
-          <span className="text-2xl font-bold text-foreground tabular-nums">{counts[status]}</span>
+          <span className="text-2xl font-bold text-foreground tabular-nums">{mergedCounts[status] || 0}</span>
         </button>
       ))}
     </div>

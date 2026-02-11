@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useDossier, useDossierHistorique, useDossierMedias } from "@/hooks/useDossier";
 import { ClientBlock } from "@/components/dossier/ClientBlock";
+import { DossierProgressBanner } from "@/components/dossier/DossierProgressBanner";
 import { InterventionBlock } from "@/components/dossier/InterventionBlock";
 import { MediaGallery } from "@/components/dossier/MediaGallery";
 import { SummaryBlock } from "@/components/dossier/SummaryBlock";
@@ -78,6 +79,7 @@ export default function DossierDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left column - main info */}
           <div className="lg:col-span-2 space-y-4">
+            <DossierProgressBanner dossier={dossier} />
             <AppointmentBanner
               dossier={dossier}
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}

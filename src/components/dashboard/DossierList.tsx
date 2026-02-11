@@ -1,8 +1,8 @@
 import type { Dossier } from "@/hooks/useDossiers";
-import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS, SOURCE_LABELS, APPOINTMENT_STATUS_COLORS } from "@/lib/constants";
+import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS, APPOINTMENT_STATUS_LABELS } from "@/lib/constants";
 import type { AppointmentStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check } from "lucide-react";
+import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check, Receipt } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -24,22 +24,32 @@ const RDV_BADGE_CONFIG: Partial<Record<AppointmentStatus, { label: string; class
     icon: <Send className="h-3 w-3" />,
   },
   client_selected: {
-    label: "RDV : à confirmer",
+    label: "RDV : en attente client",
     className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800/30",
     icon: <Clock className="h-3 w-3" />,
   },
 };
 
 function AppointmentBadge({ dossier }: { dossier: Dossier }) {
-  const status = ((dossier as any).appointment_status || "none") as AppointmentStatus;
+  const status = (dossier.appointment_status || "none") as AppointmentStatus;
 
-  if (status === "none" || status === "done" || status === "cancelled") return null;
+  if (status === "none" || status === "cancelled") return null;
+
+  // Done
+  if (status === "done") {
+    return (
+      <Badge className="bg-primary/15 text-primary border-primary/30 text-[11px] gap-1 font-medium">
+        <Check className="h-3 w-3" />
+        RDV terminé
+      </Badge>
+    );
+  }
 
   // Confirmed RDV: show date + time prominently
   if (status === "rdv_confirmed") {
-    const date = (dossier as any).appointment_date as string | null;
-    const timeStart = (dossier as any).appointment_time_start as string | null;
-    const timeEnd = (dossier as any).appointment_time_end as string | null;
+    const date = dossier.appointment_date as string | null;
+    const timeStart = dossier.appointment_time_start as string | null;
+    const timeEnd = dossier.appointment_time_end as string | null;
 
     if (!date) return null;
 
@@ -47,12 +57,10 @@ function AppointmentBadge({ dossier }: { dossier: Dossier }) {
     const timeStr = timeStart && timeEnd ? `${timeStart.slice(0, 5)}–${timeEnd.slice(0, 5)}` : "";
 
     return (
-      <div className="flex items-center gap-1.5 mt-1">
-        <Badge className="bg-success/15 text-success border-success/30 text-[11px] gap-1 font-medium">
-          <Calendar className="h-3 w-3" />
-          RDV : {dateStr}{timeStr ? ` — ${timeStr}` : ""}
-        </Badge>
-      </div>
+      <Badge className="bg-success/15 text-success border-success/30 text-[11px] gap-1 font-medium">
+        <Calendar className="h-3 w-3" />
+        RDV : {dateStr}{timeStr ? ` — ${timeStr}` : ""}
+      </Badge>
     );
   }
 
@@ -61,13 +69,31 @@ function AppointmentBadge({ dossier }: { dossier: Dossier }) {
   if (!config) return null;
 
   return (
-    <div className="flex items-center gap-1.5 mt-1">
-      <Badge className={cn("text-[11px] gap-1 font-medium border", config.className)}>
-        {config.icon}
-        {config.label}
-      </Badge>
-    </div>
+    <Badge className={cn("text-[11px] gap-1 font-medium border", config.className)}>
+      {config.icon}
+      {config.label}
+    </Badge>
   );
+}
+
+function InvoiceBadge({ dossier }: { dossier: Dossier }) {
+  if (dossier.status === "invoice_pending") {
+    return (
+      <Badge className="bg-warning/15 text-warning border-warning/30 text-[11px] gap-1 font-medium">
+        <Receipt className="h-3 w-3" />
+        Facture : en attente
+      </Badge>
+    );
+  }
+  if (dossier.status === "invoice_paid") {
+    return (
+      <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/30 text-[11px] gap-1 font-medium">
+        <Receipt className="h-3 w-3" />
+        Facture : payée
+      </Badge>
+    );
+  }
+  return null;
 }
 
 export function DossierList({ dossiers, onSelect }: DossierListProps) {
@@ -120,10 +146,13 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
                 )}
               </div>
 
-              {/* RDV badge */}
-              <AppointmentBadge dossier={dossier} />
+              {/* RDV + Invoice badges */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <AppointmentBadge dossier={dossier} />
+                <InvoiceBadge dossier={dossier} />
+              </div>
 
-              {/* Phone + source + date */}
+              {/* Phone + date */}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 {dossier.client_phone && (
                   <span className="flex items-center gap-1">
@@ -132,8 +161,6 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
                   </span>
                 )}
                 {dossier.client_phone && <span>·</span>}
-                <span>{SOURCE_LABELS[dossier.source]}</span>
-                <span>·</span>
                 <span>
                   {formatDistanceToNow(new Date(dossier.created_at), { addSuffix: true, locale: fr })}
                 </span>

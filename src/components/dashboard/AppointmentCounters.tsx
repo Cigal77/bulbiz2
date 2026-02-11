@@ -1,39 +1,32 @@
 import { useMemo } from "react";
 import type { Dossier } from "@/hooks/useDossiers";
-import type { AppointmentStatus } from "@/lib/constants";
+import type { AppointmentStatus, AppointmentTileKey } from "@/lib/constants";
+import { APPOINTMENT_TILE_LABELS, toAppointmentTileKey } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Calendar, Clock, AlertTriangle, Send, CheckCircle2 } from "lucide-react";
-import { format, isToday, isTomorrow, isThisWeek } from "date-fns";
-import { fr } from "date-fns/locale";
+import { Calendar, Clock, AlertTriangle, Send, CheckCircle2, CheckCheck } from "lucide-react";
+import { isToday, isTomorrow, isThisWeek } from "date-fns";
 
 interface AppointmentCountersProps {
   dossiers: Dossier[];
-  activeFilter: AppointmentStatus | null;
-  onFilterChange: (filter: AppointmentStatus | null) => void;
+  activeFilter: AppointmentTileKey | null;
+  onFilterChange: (filter: AppointmentTileKey | null) => void;
 }
 
-const TILES: { key: AppointmentStatus; label: string; icon: React.ReactNode; color: string; activeColor: string }[] = [
+const TILES: { key: AppointmentTileKey; label: string; icon: React.ReactNode; color: string; activeColor: string }[] = [
   {
-    key: "rdv_pending",
+    key: "slots_needed",
     label: "Créneaux à proposer",
     icon: <AlertTriangle className="h-4 w-4" />,
     color: "text-warning",
     activeColor: "border-warning bg-warning/5 ring-1 ring-warning/20",
   },
   {
-    key: "slots_proposed",
+    key: "waiting_client",
     label: "En attente client",
     icon: <Send className="h-4 w-4" />,
     color: "text-blue-600 dark:text-blue-400",
     activeColor: "border-blue-500 bg-blue-50 dark:bg-blue-900/10 ring-1 ring-blue-200 dark:ring-blue-800/30",
-  },
-  {
-    key: "client_selected",
-    label: "À confirmer",
-    icon: <Clock className="h-4 w-4" />,
-    color: "text-orange-600 dark:text-orange-400",
-    activeColor: "border-orange-500 bg-orange-50 dark:bg-orange-900/10 ring-1 ring-orange-200 dark:ring-orange-800/30",
   },
   {
     key: "rdv_confirmed",
@@ -42,15 +35,22 @@ const TILES: { key: AppointmentStatus; label: string; icon: React.ReactNode; col
     color: "text-success",
     activeColor: "border-success bg-success/5 ring-1 ring-success/20",
   },
+  {
+    key: "rdv_done",
+    label: "RDV terminé",
+    icon: <CheckCheck className="h-4 w-4" />,
+    color: "text-primary",
+    activeColor: "border-primary bg-primary/5 ring-1 ring-primary/20",
+  },
 ];
 
 export function AppointmentCounters({ dossiers, activeFilter, onFilterChange }: AppointmentCountersProps) {
   const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    TILES.forEach((t) => { c[t.key] = 0; });
+    const c: Record<AppointmentTileKey, number> = { slots_needed: 0, waiting_client: 0, rdv_confirmed: 0, rdv_done: 0 };
     dossiers.forEach((d) => {
-      const status = (d as any).appointment_status as string;
-      if (status && c[status] !== undefined) c[status]++;
+      const status = d.appointment_status as AppointmentStatus;
+      const tileKey = toAppointmentTileKey(status);
+      if (tileKey) c[tileKey]++;
     });
     return c;
   }, [dossiers]);
@@ -133,7 +133,7 @@ export function RdvDateFilters({ active, onChange }: RdvDateFiltersProps) {
 export function filterByRdvDate(dossiers: Dossier[], filter: RdvDateFilter): Dossier[] {
   if (filter === "all") return dossiers;
   return dossiers.filter((d) => {
-    const date = (d as any).appointment_date;
+    const date = d.appointment_date;
     if (!date) return false;
     const dt = new Date(date);
     if (filter === "today") return isToday(dt);
@@ -146,11 +146,11 @@ export function filterByRdvDate(dossiers: Dossier[], filter: RdvDateFilter): Dos
 /** Sort dossiers by appointment date/time */
 export function sortByAppointmentDate(dossiers: Dossier[]): Dossier[] {
   return [...dossiers].sort((a, b) => {
-    const dateA = (a as any).appointment_date || "";
-    const dateB = (b as any).appointment_date || "";
+    const dateA = a.appointment_date || "";
+    const dateB = b.appointment_date || "";
     if (dateA !== dateB) return dateA.localeCompare(dateB);
-    const timeA = (a as any).appointment_time_start || "";
-    const timeB = (b as any).appointment_time_start || "";
+    const timeA = a.appointment_time_start || "";
+    const timeB = b.appointment_time_start || "";
     return timeA.localeCompare(timeB);
   });
 }

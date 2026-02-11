@@ -10,14 +10,16 @@ describe("StatusCounters", () => {
     devis_envoye: 0,
     clos_signe: 5,
     clos_perdu: 1,
+    invoice_pending: 0,
+    invoice_paid: 0,
   } as const;
 
-  it("renders all status counts", () => {
+  it("renders all status counts (a_qualifier merged into nouveau)", () => {
     render(<StatusCounters counts={counts} activeFilter={null} onFilterChange={() => {}} />);
-    expect(screen.getByText("3")).toBeInTheDocument();
+    // 3 (nouveau) + 1 (a_qualifier) = 4
+    expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("Nouveau")).toBeInTheDocument();
-    expect(screen.getByText("À qualifier")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Devis signé")).toBeInTheDocument();
   });
 
   it("calls onFilterChange when clicked", () => {

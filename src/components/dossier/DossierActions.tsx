@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { STATUS_LABELS, SOURCE_LABELS } from "@/lib/constants";
+import { STATUS_LABELS, ALL_STATUSES } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
 import type { Database } from "@/integrations/supabase/types";
 import { useDossierActions } from "@/hooks/useDossierActions";
@@ -21,10 +21,6 @@ import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
-
-const ALL_STATUSES: DossierStatus[] = [
-  "nouveau", "a_qualifier", "devis_a_faire", "devis_envoye", "clos_signe", "clos_perdu",
-];
 
 interface DossierActionsProps {
   dossier: Dossier;
@@ -96,7 +92,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
             <Calendar className="h-3 w-3" />
             Créé le {format(new Date(dossier.created_at), "d MMMM yyyy", { locale: fr })}
           </div>
-          <div>Source : {SOURCE_LABELS[dossier.source]}</div>
         </div>
       </div>
 
@@ -145,7 +140,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
             </div>
           </div>
         )}
-
 
         <Button
           variant="outline"
