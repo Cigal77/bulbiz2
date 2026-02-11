@@ -1,12 +1,160 @@
+import { useState } from "react";
 import type { Media } from "@/hooks/useDossier";
-import { Image, Film, FileText } from "lucide-react";
+import { Image, Film, FileText, Mic, Trash2, Download, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MediaGalleryProps {
   medias: Media[];
   isLoading: boolean;
+  dossierId?: string;
 }
 
-export function MediaGallery({ medias, isLoading }: MediaGalleryProps) {
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return "";
+  return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function MediaSection({
+  title,
+  icon,
+  items,
+  onDelete,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  items: Media[];
+  onDelete?: (id: string) => void;
+}) {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {icon}
+        <span>{title} ({items.length})</span>
+      </div>
+
+      {title === "Notes vocales" ? (
+        <div className="space-y-2">
+          {items.map((m) => (
+            <div key={m.id} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-2">
+              <Mic className="h-4 w-4 text-primary shrink-0" />
+              <audio controls src={m.file_url} className="flex-1 h-8" preload="metadata" />
+              {(m as any).duration && (
+                <span className="text-xs text-muted-foreground tabular-nums">{formatDuration((m as any).duration)}</span>
+              )}
+              {onDelete && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(m.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : title === "Plans" ? (
+        <div className="space-y-2">
+          {items.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
+              {m.file_type === "application/pdf" ? (
+                <FileText className="h-5 w-5 text-primary shrink-0" />
+              ) : (
+                <img src={m.file_url} alt={m.file_name} className="h-12 w-12 rounded object-cover" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{m.file_name}</p>
+                <p className="text-xs text-muted-foreground">{m.file_size ? `${(m.file_size / 1024).toFixed(0)} KB` : ""}</p>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                  <a href={m.file_url} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+                {onDelete && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteId(m.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {items.map((m) => {
+            const isImage = m.file_type.startsWith("image/");
+            const isVideo = m.file_type.startsWith("video/");
+            return (
+              <div key={m.id} className="group relative aspect-square rounded-lg overflow-hidden bg-muted border border-border">
+                {isImage ? (
+                  <a href={m.file_url} target="_blank" rel="noopener noreferrer">
+                    <img src={m.file_url} alt={m.file_name} className="h-full w-full object-cover" loading="lazy" />
+                  </a>
+                ) : isVideo ? (
+                  <video src={m.file_url} controls className="h-full w-full object-cover" preload="metadata" />
+                ) : (
+                  <a href={m.file_url} target="_blank" rel="noopener noreferrer" className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground text-center truncate w-full">{m.file_name}</span>
+                  </a>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => setDeleteId(m.id)}
+                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce média ?</AlertDialogTitle>
+            <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deleteId && onDelete) { onDelete(deleteId); setDeleteId(null); } }}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+export function MediaGallery({ medias, isLoading, dossierId }: MediaGalleryProps) {
+  const mediaUpload = dossierId ? useMediaUpload(dossierId) : null;
+  const { toast } = useToast();
+
+  const handleDelete = (id: string) => {
+    mediaUpload?.deleteMedia.mutate(id, {
+      onSuccess: () => toast({ title: "Média supprimé" }),
+      onError: (e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="rounded-xl border border-border bg-card p-5 space-y-3">
@@ -20,48 +168,36 @@ export function MediaGallery({ medias, isLoading }: MediaGalleryProps) {
     );
   }
 
+  const getCategory = (m: Media): string => {
+    const cat = (m as any).media_category;
+    if (cat && cat !== "image") return cat;
+    if (m.file_type.startsWith("video/")) return "video";
+    if (m.file_type.startsWith("audio/")) return "audio";
+    if (m.file_type === "application/pdf") return "plan";
+    return "image";
+  };
+
+  const images = medias.filter((m) => getCategory(m) === "image");
+  const videos = medias.filter((m) => getCategory(m) === "video");
+  const audios = medias.filter((m) => getCategory(m) === "audio");
+  const plans = medias.filter((m) => getCategory(m) === "plan");
+
+  const hasAny = medias.length > 0;
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Médias {medias.length > 0 && <span className="text-foreground">({medias.length})</span>}
+        Médias {hasAny && <span className="text-foreground">({medias.length})</span>}
       </h3>
-      {medias.length === 0 ? (
+
+      {!hasAny ? (
         <p className="text-sm text-muted-foreground">Aucun média attaché.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {medias.map((media) => {
-            const isImage = media.file_type.startsWith("image/");
-            const isVideo = media.file_type.startsWith("video/");
-            return (
-              <a
-                key={media.id}
-                href={media.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative aspect-square rounded-lg overflow-hidden bg-muted border border-border hover:border-primary/30 transition-all"
-              >
-                {isImage ? (
-                  <img
-                    src={media.file_url}
-                    alt={media.file_name}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
-                    {isVideo ? (
-                      <Film className="h-6 w-6 text-muted-foreground" />
-                    ) : (
-                      <FileText className="h-6 w-6 text-muted-foreground" />
-                    )}
-                    <span className="text-xs text-muted-foreground text-center truncate w-full">
-                      {media.file_name}
-                    </span>
-                  </div>
-                )}
-              </a>
-            );
-          })}
+        <div className="space-y-4">
+          <MediaSection title="Photos" icon={<Image className="h-3.5 w-3.5" />} items={images} onDelete={dossierId ? handleDelete : undefined} />
+          <MediaSection title="Vidéos" icon={<Film className="h-3.5 w-3.5" />} items={videos} onDelete={dossierId ? handleDelete : undefined} />
+          <MediaSection title="Notes vocales" icon={<Mic className="h-3.5 w-3.5" />} items={audios} onDelete={dossierId ? handleDelete : undefined} />
+          <MediaSection title="Plans" icon={<FileText className="h-3.5 w-3.5" />} items={plans} onDelete={dossierId ? handleDelete : undefined} />
         </div>
       )}
     </div>

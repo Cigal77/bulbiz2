@@ -88,7 +88,7 @@ export default function DossierDetail() {
             <ClientBlock dossier={dossier} />
             <InterventionBlock dossier={dossier} />
             <QuoteBlock dossier={dossier} />
-            <MediaGallery medias={medias} isLoading={mediasLoading} />
+            <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
             <HistoriqueTimeline historique={historique} isLoading={histLoading} />
           </div>
 
