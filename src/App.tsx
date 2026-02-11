@@ -29,6 +29,8 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/client" element={<ClientForm />} />
+            <Route path="/devis/validation" element={<QuoteValidation />} />
+            <Route path="/facture/view" element={<InvoiceView />} />
             <Route
               path="/"
               element={
@@ -50,6 +52,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CreateDossier />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dossier/:dossierId/devis"
+              element={
+                <ProtectedRoute>
+                  <QuoteEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dossier/:id/facture/:invoiceId"
+              element={
+                <ProtectedRoute>
+                  <InvoiceEditor />
                 </ProtectedRoute>
               }
             />
