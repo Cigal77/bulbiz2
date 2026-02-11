@@ -215,6 +215,15 @@ export function useInvoiceActions(dossierId: string) {
         await supabase.from("invoice_lines").insert(invoiceLines);
       }
 
+      // Update dossier status to invoice_pending
+      await supabase
+        .from("dossiers")
+        .update({
+          status: "invoice_pending",
+          status_changed_at: new Date().toISOString(),
+        })
+        .eq("id", dossierId);
+
       // Historique
       await supabase.from("historique").insert({
         dossier_id: dossierId,

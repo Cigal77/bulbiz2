@@ -200,6 +200,8 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const { error } = await supabase
         .from("dossiers")
         .update({
+          status: "rdv_pris",
+          status_changed_at: new Date().toISOString(),
           appointment_status: "rdv_confirmed",
           appointment_date: manualDate,
           appointment_time_start: manualStart,
@@ -240,6 +242,8 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const { error } = await supabase
         .from("dossiers")
         .update({
+          status: "rdv_pris",
+          status_changed_at: new Date().toISOString(),
           appointment_status: "rdv_confirmed",
           appointment_date: selected.slot_date,
           appointment_time_start: selected.time_start,
@@ -297,7 +301,11 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     mutationFn: async () => {
       const { error } = await supabase
         .from("dossiers")
-        .update({ appointment_status: "done" } as any)
+        .update({
+          status: "rdv_termine",
+          status_changed_at: new Date().toISOString(),
+          appointment_status: "done",
+        } as any)
         .eq("id", dossier.id);
       if (error) throw error;
       await addHistorique("intervention_done", "Intervention marquée comme réalisée");
