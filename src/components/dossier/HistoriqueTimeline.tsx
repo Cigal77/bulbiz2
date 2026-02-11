@@ -1,12 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { Historique } from "@/hooks/useDossier";
 import { formatDistanceToNow, format, differenceInMinutes } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   FolderPlus, Send, FileText, Bell, ArrowRightLeft,
-  FilePenLine, FileCheck, FileX, Download, Trash2, UserCheck, Link2, Smartphone
+  FilePenLine, FileCheck, FileX, Download, Trash2, UserCheck, Link2, Smartphone,
+  ChevronDown, ChevronUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // ── Mapping tech → humain ──────────────────────────────────────────
 
@@ -314,18 +316,25 @@ interface HistoriqueTimelineProps {
 }
 
 export function HistoriqueTimeline({ historique, isLoading }: HistoriqueTimelineProps) {
+  const isMobile = useIsMobile();
+  const defaultCount = isMobile ? 2 : 3;
+  const [expanded, setExpanded] = useState(false);
+
   const displayEntries = useMemo(() => {
     const mapped = historique.map(mapEntry);
     return deduplicateEntries(mapped);
   }, [historique]);
 
+  const visibleEntries = expanded ? displayEntries : displayEntries.slice(0, defaultCount);
+  const hiddenCount = displayEntries.length - defaultCount;
+
   if (isLoading) {
     return (
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+      <div className="rounded-xl border border-border bg-card p-4 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Historique</h3>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 rounded-md bg-muted animate-pulse" />
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-10 rounded-md bg-muted animate-pulse" />
           ))}
         </div>
       </div>
@@ -333,45 +342,62 @@ export function HistoriqueTimeline({ historique, isLoading }: HistoriqueTimeline
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-4 space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Historique</h3>
       {displayEntries.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucune activité enregistrée.</p>
       ) : (
-        <div className="space-y-0">
-          {displayEntries.map((entry, idx) => (
-            <div key={entry.id} className="flex gap-3 relative">
-              {/* Timeline connector */}
-              {idx < displayEntries.length - 1 && (
-                <div className="absolute left-[13px] top-7 bottom-0 w-px bg-border" />
-              )}
-              {/* Icon */}
-              <div className={cn(
-                "flex h-7 w-7 items-center justify-center rounded-full shrink-0 z-10",
-                entry.iconColor
-              )}>
-                {entry.icon}
-              </div>
-              {/* Content */}
-              <div className="pb-5 min-w-0">
-                <p className="text-sm font-medium text-foreground leading-tight">
-                  {entry.title}
-                </p>
-                {entry.detail && (
-                  <p className="text-[13px] text-muted-foreground mt-0.5 leading-snug">
-                    {entry.detail}
-                  </p>
+        <>
+          <div className="space-y-0">
+            {visibleEntries.map((entry, idx) => (
+              <div key={entry.id} className="flex gap-2.5 relative">
+                {idx < visibleEntries.length - 1 && (
+                  <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
                 )}
-                <p
-                  className="text-[11px] text-muted-foreground/70 mt-1"
-                  title={format(entry.timestamp, "PPPp", { locale: fr })}
-                >
-                  {formatDistanceToNow(entry.timestamp, { addSuffix: true, locale: fr })}
-                </p>
+                <div className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full shrink-0 z-10",
+                  entry.iconColor
+                )}>
+                  {entry.icon}
+                </div>
+                <div className="pb-3.5 min-w-0">
+                  <p className="text-[13px] font-medium text-foreground leading-tight">
+                    {entry.title}
+                  </p>
+                  {entry.detail && (
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug truncate">
+                      {entry.detail}
+                    </p>
+                  )}
+                  <p
+                    className="text-[10px] text-muted-foreground/60 mt-0.5"
+                    title={format(entry.timestamp, "PPPp", { locale: fr })}
+                  >
+                    {formatDistanceToNow(entry.timestamp, { addSuffix: true, locale: fr })}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors pt-1"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Voir moins
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Voir + ({hiddenCount} événement{hiddenCount > 1 ? "s" : ""})
+                </>
+              )}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
