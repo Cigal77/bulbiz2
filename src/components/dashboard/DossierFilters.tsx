@@ -31,13 +31,13 @@ export function DossierFilters({
   showTrash, onTrashToggle,
 }: DossierFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-3">
       {/* Status filter */}
       <Select
         value={statusFilter ?? "all"}
         onValueChange={(v) => onStatusFilterChange(v === "all" ? null : v as DossierStatus)}
       >
-        <SelectTrigger className="w-[180px] h-9 text-sm">
+        <SelectTrigger className="w-full sm:w-[180px] h-10 sm:h-9 text-sm">
           <SelectValue placeholder="Filtrer par statut" />
         </SelectTrigger>
         <SelectContent>
@@ -50,7 +50,7 @@ export function DossierFilters({
 
       {/* Sort */}
       <Select value={sortOption} onValueChange={(v) => onSortChange(v as SortOption)}>
-        <SelectTrigger className="w-[200px] h-9 text-sm">
+        <SelectTrigger className="w-full sm:w-[200px] h-10 sm:h-9 text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

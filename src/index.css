@@ -121,4 +121,14 @@
   .text-balance {
     text-wrap: balance;
   }
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Mobile touch target minimum */
+@media (max-width: 767px) {
+  button, a[role="button"], [role="button"] {
+    min-height: 44px;
+  }
 }

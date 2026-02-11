@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import DossierDetail from "./pages/DossierDetail";
@@ -26,61 +27,22 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/client" element={<ClientForm />} />
-            <Route path="/devis/validation" element={<QuoteValidation />} />
-            <Route path="/facture/view" element={<InvoiceView />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dossier/:id"
-              element={
-                <ProtectedRoute>
-                  <DossierDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/nouveau"
-              element={
-                <ProtectedRoute>
-                  <CreateDossier />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dossier/:dossierId/devis"
-              element={
-                <ProtectedRoute>
-                  <QuoteEditor />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dossier/:id/facture/:invoiceId"
-              element={
-                <ProtectedRoute>
-                  <InvoiceEditor />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/parametres"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <div className="pb-16 md:pb-0">
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/client" element={<ClientForm />} />
+              <Route path="/devis/validation" element={<QuoteValidation />} />
+              <Route path="/facture/view" element={<InvoiceView />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/dossier/:id" element={<ProtectedRoute><DossierDetail /></ProtectedRoute>} />
+              <Route path="/nouveau" element={<ProtectedRoute><CreateDossier /></ProtectedRoute>} />
+              <Route path="/dossier/:dossierId/devis" element={<ProtectedRoute><QuoteEditor /></ProtectedRoute>} />
+              <Route path="/dossier/:id/facture/:invoiceId" element={<ProtectedRoute><InvoiceEditor /></ProtectedRoute>} />
+              <Route path="/parametres" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <MobileBottomNav />
+          </div>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

@@ -243,35 +243,35 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-3 sm:px-6 py-2.5">
         <BulbizLogo />
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" className="text-muted-foreground" onClick={() => navigate("/parametres")}>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hidden md:flex" onClick={() => navigate("/parametres")}>
             <Settings className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground hidden md:inline">{user?.email}</span>
-          <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground">
+          <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hidden md:flex">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
 
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-6">
+      <main className="flex-1 p-3 sm:p-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground">
               {showTrash ? "Corbeille" : "Dossiers"}
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               {filtered.length} dossier{filtered.length !== 1 ? "s" : ""}
-              {showTrash ? " dans la corbeille" : " au total"}
+              {showTrash ? " dans la corbeille" : ""}
             </p>
           </div>
           {!showTrash && (
-            <Button className="gap-2" onClick={() => navigate("/nouveau")}>
+            <Button className="gap-2 hidden md:flex" onClick={() => navigate("/nouveau")}>
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nouveau dossier</span>
+              <span>Nouveau dossier</span>
             </Button>
           )}
         </div>

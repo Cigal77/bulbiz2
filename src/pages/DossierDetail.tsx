@@ -19,17 +19,35 @@ import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
 import { DeleteDossierDialog } from "@/components/dashboard/DeleteDossierDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowLeft, Trash2, Phone, MapPin, ChevronDown } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useRef, useState, useEffect } from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
+
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="flex items-center justify-between w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors min-h-[48px]">
+        {title}
+        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
 
 export default function DossierDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { data: dossier, isLoading } = useDossier(id!);
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
   const { data: medias = [], isLoading: mediasLoading } = useDossierMedias(id!);
@@ -40,7 +58,6 @@ export default function DossierDetail() {
   const [importFactureOpen, setImportFactureOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Listen for custom events from NextStepBanner
   useEffect(() => {
     const openDevis = () => setImportDevisOpen(true);
     const openFacture = () => setImportFactureOpen(true);
@@ -55,18 +72,13 @@ export default function DossierDetail() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 backdrop-blur px-4 py-3">
           <Skeleton className="h-8 w-8 rounded-md" />
           <Skeleton className="h-5 w-48" />
         </header>
-        <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-4">
-              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
-            </div>
-            <div className="space-y-4">
-              {[1, 2].map((i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
-            </div>
+        <main className="flex-1 p-4 max-w-6xl mx-auto w-full">
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
           </div>
         </main>
       </div>
@@ -89,31 +101,60 @@ export default function DossierDetail() {
     ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
     : "Dossier sans nom";
 
+  const mapsUrl = dossier.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dossier.address)}`
+    : null;
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header with client name + status badge */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+      {/* Compact header */}
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-background/95 backdrop-blur px-3 sm:px-6 py-2.5">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0 h-9 w-9">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <BulbizLogo size={20} />
-        <span className="font-semibold text-foreground truncate ml-2">{clientName}</span>
-        <Badge className={cn("text-[10px] ml-auto shrink-0", STATUS_COLORS[dossier.status])}>
+        {!isMobile && <BulbizLogo size={20} />}
+        <div className="flex-1 min-w-0 ml-1">
+          <span className="font-semibold text-foreground text-sm truncate block">{clientName}</span>
+        </div>
+
+        {/* Quick actions in header on mobile */}
+        {isMobile && (
+          <div className="flex items-center gap-1 shrink-0">
+            {dossier.client_phone && (
+              <Button variant="ghost" size="icon" asChild className="h-9 w-9">
+                <a href={`tel:${dossier.client_phone}`}>
+                  <Phone className="h-4 w-4 text-primary" />
+                </a>
+              </Button>
+            )}
+            {mapsUrl && (
+              <Button variant="ghost" size="icon" asChild className="h-9 w-9">
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-4 w-4 text-primary" />
+                </a>
+              </Button>
+            )}
+          </div>
+        )}
+
+        <Badge className={cn("text-[10px] shrink-0", STATUS_COLORS[dossier.status])}>
           {STATUS_LABELS[dossier.status]}
         </Badge>
       </header>
 
       {/* Content */}
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column - main info */}
-          <div className="lg:col-span-2 space-y-4">
+      <main className="flex-1 p-3 sm:p-6 max-w-6xl mx-auto w-full">
+        {isMobile ? (
+          /* ═══ MOBILE LAYOUT ═══ */
+          <div className="space-y-3 pb-20">
+            {/* Progress + Next step (always visible) */}
             <DossierProgressBanner dossier={dossier} />
             <NextStepBanner
               dossier={dossier}
               onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
-            {/* RDV Block — FIRST, always visible */}
+
+            {/* RDV block — always visible, priority */}
             <div ref={appointmentRef}>
               <AppointmentBlock dossier={dossier} />
             </div>
@@ -121,33 +162,90 @@ export default function DossierDetail() {
               dossier={dossier}
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
-            <QuoteBlock dossier={dossier} />
-            <InvoiceBlock dossier={dossier} />
-            <SummaryBlock dossier={dossier} />
-            <ClientBlock dossier={dossier} />
-            <InterventionBlock dossier={dossier} />
-            <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
-            <HistoriqueTimeline historique={historique} isLoading={histLoading} />
+
+            {/* Accordion sections */}
+            <CollapsibleSection title="📝 Devis" defaultOpen={["nouveau", "a_qualifier", "devis_a_faire", "devis_envoye"].includes(dossier.status)}>
+              <QuoteBlock dossier={dossier} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="🧾 Facture" defaultOpen={["rdv_termine", "invoice_pending", "invoice_paid"].includes(dossier.status)}>
+              <InvoiceBlock dossier={dossier} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="📋 Résumé & Client">
+              <div className="space-y-3">
+                <SummaryBlock dossier={dossier} />
+                <ClientBlock dossier={dossier} />
+                <InterventionBlock dossier={dossier} />
+              </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="📷 Médias">
+              <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="📜 Historique">
+              <HistoriqueTimeline historique={historique} isLoading={histLoading} />
+            </CollapsibleSection>
+
+            {/* Actions + Client link + Delete */}
+            <CollapsibleSection title="⚙️ Actions">
+              <div className="space-y-3">
+                <DossierActions dossier={dossier} />
+                <ClientLinkBlock dossier={dossier} />
+                <div className="rounded-xl border border-destructive/20 bg-card p-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Supprimer le dossier
+                  </Button>
+                </div>
+              </div>
+            </CollapsibleSection>
           </div>
-
-          {/* Right column - actions */}
-          <div className="space-y-4">
-            <DossierActions dossier={dossier} />
-            <ClientLinkBlock dossier={dossier} />
-
-            {/* Delete button */}
-            <div className="rounded-xl border border-destructive/20 bg-card p-5">
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setDeleteOpen(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-                Supprimer le dossier
-              </Button>
+        ) : (
+          /* ═══ DESKTOP LAYOUT ═══ */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <DossierProgressBanner dossier={dossier} />
+              <NextStepBanner
+                dossier={dossier}
+                onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
+              />
+              <div ref={appointmentRef}>
+                <AppointmentBlock dossier={dossier} />
+              </div>
+              <AppointmentBanner
+                dossier={dossier}
+                onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
+              />
+              <QuoteBlock dossier={dossier} />
+              <InvoiceBlock dossier={dossier} />
+              <SummaryBlock dossier={dossier} />
+              <ClientBlock dossier={dossier} />
+              <InterventionBlock dossier={dossier} />
+              <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
+              <HistoriqueTimeline historique={historique} isLoading={histLoading} />
+            </div>
+            <div className="space-y-4">
+              <DossierActions dossier={dossier} />
+              <ClientLinkBlock dossier={dossier} />
+              <div className="rounded-xl border border-destructive/20 bg-card p-5">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer le dossier
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Import dialogs */}
