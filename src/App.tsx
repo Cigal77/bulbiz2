@@ -15,7 +15,6 @@ import QuoteEditor from "./pages/QuoteEditor";
 import QuoteValidation from "./pages/QuoteValidation";
 import InvoiceEditor from "./pages/InvoiceEditor";
 import InvoiceView from "./pages/InvoiceView";
-import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,10 +28,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/client" element={<ClientForm />} />
-            <Route path="/devis/validation" element={<QuoteValidation />} />
-            <Route path="/facture/view" element={<InvoiceView />} />
             <Route
               path="/"
               element={
@@ -54,22 +50,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CreateDossier />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dossier/:dossierId/devis"
-              element={
-                <ProtectedRoute>
-                  <QuoteEditor />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dossier/:id/facture/:invoiceId"
-              element={
-                <ProtectedRoute>
-                  <InvoiceEditor />
                 </ProtectedRoute>
               }
             />
