@@ -145,15 +145,15 @@ function MediaSection({
 }
 
 export function MediaGallery({ medias, isLoading, dossierId }: MediaGalleryProps) {
-  const mediaUpload = dossierId ? useMediaUpload(dossierId) : null;
+  const mediaUpload = useMediaUpload(dossierId ?? "");
   const { toast } = useToast();
 
-  const handleDelete = (id: string) => {
-    mediaUpload?.deleteMedia.mutate(id, {
+  const handleDelete = dossierId ? (id: string) => {
+    mediaUpload.deleteMedia.mutate(id, {
       onSuccess: () => toast({ title: "Média supprimé" }),
       onError: (e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
     });
-  };
+  } : undefined;
 
   if (isLoading) {
     return (
@@ -194,10 +194,10 @@ export function MediaGallery({ medias, isLoading, dossierId }: MediaGalleryProps
         <p className="text-sm text-muted-foreground">Aucun média attaché.</p>
       ) : (
         <div className="space-y-4">
-          <MediaSection title="Photos" icon={<Image className="h-3.5 w-3.5" />} items={images} onDelete={dossierId ? handleDelete : undefined} />
-          <MediaSection title="Vidéos" icon={<Film className="h-3.5 w-3.5" />} items={videos} onDelete={dossierId ? handleDelete : undefined} />
-          <MediaSection title="Notes vocales" icon={<Mic className="h-3.5 w-3.5" />} items={audios} onDelete={dossierId ? handleDelete : undefined} />
-          <MediaSection title="Plans" icon={<FileText className="h-3.5 w-3.5" />} items={plans} onDelete={dossierId ? handleDelete : undefined} />
+          <MediaSection title="Photos" icon={<Image className="h-3.5 w-3.5" />} items={images} onDelete={handleDelete} />
+          <MediaSection title="Vidéos" icon={<Film className="h-3.5 w-3.5" />} items={videos} onDelete={handleDelete} />
+          <MediaSection title="Notes vocales" icon={<Mic className="h-3.5 w-3.5" />} items={audios} onDelete={handleDelete} />
+          <MediaSection title="Plans" icon={<FileText className="h-3.5 w-3.5" />} items={plans} onDelete={handleDelete} />
         </div>
       )}
     </div>
