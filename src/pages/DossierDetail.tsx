@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useDossier, useDossierHistorique, useDossierMedias } from "@/hooks/useDossier";
+import { useDossierActions } from "@/hooks/useDossierActions";
 import { ClientBlock } from "@/components/dossier/ClientBlock";
 import { DossierProgressBanner } from "@/components/dossier/DossierProgressBanner";
 import { NextStepBanner } from "@/components/dossier/NextStepBanner";
@@ -15,14 +16,16 @@ import { AppointmentBanner } from "@/components/dossier/AppointmentBanner";
 import { InvoiceBlock } from "@/components/dossier/InvoiceBlock";
 import { ImportDevisDialog } from "@/components/dossier/ImportDevisDialog";
 import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
+import { DeleteDossierDialog } from "@/components/dashboard/DeleteDossierDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useRef, useState, useEffect } from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DossierDetail() {
   const { id } = useParams<{ id: string }>();
@@ -30,9 +33,12 @@ export default function DossierDetail() {
   const { data: dossier, isLoading } = useDossier(id!);
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
   const { data: medias = [], isLoading: mediasLoading } = useDossierMedias(id!);
+  const { softDelete } = useDossierActions(id!);
+  const { toast } = useToast();
   const appointmentRef = useRef<HTMLDivElement>(null);
   const [importDevisOpen, setImportDevisOpen] = useState(false);
   const [importFactureOpen, setImportFactureOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Listen for custom events from NextStepBanner
   useEffect(() => {
@@ -128,13 +134,42 @@ export default function DossierDetail() {
           <div className="space-y-4">
             <DossierActions dossier={dossier} />
             <ClientLinkBlock dossier={dossier} />
+
+            {/* Delete button */}
+            <div className="rounded-xl border border-destructive/20 bg-card p-5">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer le dossier
+              </Button>
+            </div>
           </div>
         </div>
       </main>
 
-      {/* Import dialogs (triggered from NextStepBanner + DossierActions) */}
+      {/* Import dialogs */}
       <ImportDevisDialog open={importDevisOpen} onClose={() => setImportDevisOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
       <ImportFactureDialog open={importFactureOpen} onClose={() => setImportFactureOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
+
+      {/* Delete dialog */}
+      <DeleteDossierDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={(reason) => {
+          softDelete.mutate(reason, {
+            onSuccess: () => {
+              toast({ title: "Dossier déplacé dans la corbeille" });
+              navigate("/");
+            },
+            onError: (e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+          });
+          setDeleteOpen(false);
+        }}
+        clientName={clientName}
+      />
     </div>
   );
 }

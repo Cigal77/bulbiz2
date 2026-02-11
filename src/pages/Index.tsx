@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useDossiers, type Dossier } from "@/hooks/useDossiers";
+import { useDossiers, type Dossier, type SortOption } from "@/hooks/useDossiers";
 import { StatusCounters } from "@/components/dashboard/StatusCounters";
 import { AppointmentCounters, RdvDateFilters, filterByRdvDate, sortByAppointmentDate, type RdvDateFilter } from "@/components/dashboard/AppointmentCounters";
 import { DossierList } from "@/components/dashboard/DossierList";
 import { SearchBar } from "@/components/dashboard/SearchBar";
+import { DossierFilters } from "@/components/dashboard/DossierFilters";
+import { DossierPagination } from "@/components/dashboard/DossierPagination";
+import { DeleteDossierDialog } from "@/components/dashboard/DeleteDossierDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, Plus, Settings } from "lucide-react";
@@ -13,18 +16,20 @@ import { BulbizLogo } from "@/components/BulbizLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
 import { URGENCY_ORDER, DASHBOARD_STATUSES } from "@/lib/constants";
 import type { AppointmentTileKey } from "@/lib/constants";
 import { toAppointmentTileKey } from "@/lib/constants";
+import { useDossierActions } from "@/hooks/useDossierActions";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
+
+const PAGE_SIZE = 10;
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { data: dossiers, isLoading } = useDossiers();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -32,6 +37,18 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<DossierStatus | null>(null);
   const [rdvFilter, setRdvFilter] = useState<AppointmentTileKey | null>(null);
   const [rdvDateFilter, setRdvDateFilter] = useState<RdvDateFilter>("all");
+  const [sortOption, setSortOption] = useState<SortOption>("recent");
+  const [showTrash, setShowTrash] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Delete dialog state
+  const [deleteTarget, setDeleteTarget] = useState<Dossier | null>(null);
+  const [deletePermanent, setDeletePermanent] = useState(false);
+
+  const { data: dossiers, isLoading } = useDossiers({ showTrash });
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, rdvFilter, rdvDateFilter, sortOption, showTrash]);
 
   // Realtime: listen for quote status changes
   useEffect(() => {
@@ -44,39 +61,27 @@ export default function Dashboard() {
           const newStatus = payload.new?.status;
           const oldStatus = payload.old?.status;
           if (newStatus === oldStatus) return;
-
           const quoteNumber = payload.new?.quote_number || "Devis";
-
           if (newStatus === "signe" && oldStatus !== "signe") {
-            toast({
-              title: "✅ Devis validé !",
-              description: `${quoteNumber} a été validé par le client.`,
-            });
+            toast({ title: "✅ Devis validé !", description: `${quoteNumber} a été validé par le client.` });
             queryClient.invalidateQueries({ queryKey: ["dossiers"] });
           } else if (newStatus === "refuse" && oldStatus !== "refuse") {
-            toast({
-              title: "❌ Devis refusé",
-              description: `${quoteNumber} a été refusé par le client.`,
-              variant: "destructive",
-            });
+            toast({ title: "❌ Devis refusé", description: `${quoteNumber} a été refusé par le client.`, variant: "destructive" });
             queryClient.invalidateQueries({ queryKey: ["dossiers"] });
           }
         }
       )
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [toast, queryClient]);
 
   const counts = useMemo(() => {
     const c = Object.fromEntries(DASHBOARD_STATUSES.map((s) => [s, 0])) as Record<DossierStatus, number>;
-    // Also init a_qualifier for merging
     c.a_qualifier = 0;
     dossiers?.forEach((d) => { c[d.status] = (c[d.status] || 0) + 1; });
     return c;
   }, [dossiers]);
 
-  // Clear status filter when rdv filter is active and vice versa
   const handleStatusFilter = (status: DossierStatus | null) => {
     setStatusFilter(status);
     if (status) setRdvFilter(null);
@@ -88,11 +93,51 @@ export default function Dashboard() {
     if (filter) setStatusFilter(null);
   };
 
+  const handleTrashToggle = (show: boolean) => {
+    setShowTrash(show);
+    setStatusFilter(null);
+    setRdvFilter(null);
+  };
+
+  // Sorting helper
+  const applySorting = (list: Dossier[]): Dossier[] => {
+    switch (sortOption) {
+      case "activity":
+        return list.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      case "rdv_next":
+        return list.sort((a, b) => {
+          const da = a.appointment_date || "9999";
+          const db = b.appointment_date || "9999";
+          return da.localeCompare(db);
+        });
+      case "devis_oldest":
+        return list
+          .filter(d => d.status === "devis_envoye")
+          .sort((a, b) => new Date(a.status_changed_at).getTime() - new Date(b.status_changed_at).getTime())
+          .concat(list.filter(d => d.status !== "devis_envoye"));
+      case "invoice_oldest":
+        return list
+          .filter(d => d.status === "invoice_pending")
+          .sort((a, b) => new Date(a.status_changed_at).getTime() - new Date(b.status_changed_at).getTime())
+          .concat(list.filter(d => d.status !== "invoice_pending"));
+      case "recent":
+      default:
+        return list.sort((a, b) => {
+          const isNewA = a.status === "nouveau" || a.status === "a_qualifier";
+          const isNewB = b.status === "nouveau" || b.status === "a_qualifier";
+          if (isNewA && !isNewB) return -1;
+          if (isNewB && !isNewA) return 1;
+          const urgDiff = URGENCY_ORDER[b.urgency] - URGENCY_ORDER[a.urgency];
+          if (urgDiff !== 0) return urgDiff;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+    }
+  };
+
   const filtered = useMemo(() => {
     if (!dossiers) return [];
     let list = [...dossiers];
 
-    // When filtering by "nouveau", also include "a_qualifier"
     if (statusFilter) {
       if (statusFilter === "nouveau") {
         list = list.filter((d) => d.status === "nouveau" || d.status === "a_qualifier");
@@ -101,13 +146,11 @@ export default function Dashboard() {
       }
     }
 
-    // RDV filter using tile keys
     if (rdvFilter) {
       list = list.filter((d) => {
         const tileKey = toAppointmentTileKey(d.appointment_status as any);
         return tileKey === rdvFilter;
       });
-      // Apply date filter for confirmed RDVs
       if (rdvFilter === "rdv_confirmed") {
         list = filterByRdvDate(list, rdvDateFilter);
         list = sortByAppointmentDate(list);
@@ -126,27 +169,80 @@ export default function Dashboard() {
       );
     }
 
-    // Sort: nouveau first, then by urgency desc, then by date desc
-    list.sort((a, b) => {
-      const isNewA = a.status === "nouveau" || a.status === "a_qualifier";
-      const isNewB = b.status === "nouveau" || b.status === "a_qualifier";
-      if (isNewA && !isNewB) return -1;
-      if (isNewB && !isNewA) return 1;
-      const urgDiff = URGENCY_ORDER[b.urgency] - URGENCY_ORDER[a.urgency];
-      if (urgDiff !== 0) return urgDiff;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
-
+    list = applySorting(list);
     return list;
-  }, [dossiers, statusFilter, search, rdvFilter, rdvDateFilter]);
+  }, [dossiers, statusFilter, search, rdvFilter, rdvDateFilter, sortOption]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedDossiers = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const handleSelect = (dossier: Dossier) => {
     navigate(`/dossier/${dossier.id}`);
   };
 
+  // Delete handlers
+  const handleDeleteRequest = (dossier: Dossier, permanent = false) => {
+    setDeleteTarget(dossier);
+    setDeletePermanent(permanent);
+  };
+
+  const handleDeleteConfirm = async (reason?: string) => {
+    if (!deleteTarget) return;
+    try {
+      if (deletePermanent) {
+        const { error } = await supabase.from("dossiers").delete().eq("id", deleteTarget.id);
+        if (error) throw error;
+        toast({ title: "Dossier supprimé définitivement" });
+      } else {
+        const { error } = await supabase.from("dossiers").update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id ?? null,
+          delete_reason: reason ?? null,
+        }).eq("id", deleteTarget.id);
+        if (error) throw error;
+        // Add historique
+        await supabase.from("historique").insert({
+          dossier_id: deleteTarget.id,
+          user_id: user?.id ?? null,
+          action: "dossier_deleted",
+          details: reason ? `Supprimé (${reason})` : "Dossier supprimé (corbeille)",
+        });
+        toast({ title: "Dossier déplacé dans la corbeille" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleRestore = async (dossier: Dossier) => {
+    try {
+      const { error } = await supabase.from("dossiers").update({
+        deleted_at: null, deleted_by: null, delete_reason: null,
+      }).eq("id", dossier.id);
+      if (error) throw error;
+      await supabase.from("historique").insert({
+        dossier_id: dossier.id,
+        user_id: user?.id ?? null,
+        action: "dossier_restored",
+        details: "Dossier restauré depuis la corbeille",
+      });
+      toast({ title: "Dossier restauré" });
+      queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const clientNameFor = (d: Dossier) =>
+    d.client_first_name || d.client_last_name
+      ? `${d.client_first_name ?? ""} ${d.client_last_name ?? ""}`.trim()
+      : "Client sans nom";
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 py-3">
         <BulbizLogo />
         <div className="flex items-center gap-2">
@@ -161,46 +257,55 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Main content */}
       <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-6">
-        {/* Title + action */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Dossiers</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {showTrash ? "Corbeille" : "Dossiers"}
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {dossiers?.length ?? 0} dossier{(dossiers?.length ?? 0) !== 1 ? "s" : ""} au total
+              {filtered.length} dossier{filtered.length !== 1 ? "s" : ""}
+              {showTrash ? " dans la corbeille" : " au total"}
             </p>
           </div>
-          <Button className="gap-2" onClick={() => navigate("/nouveau")}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nouveau dossier</span>
-          </Button>
+          {!showTrash && (
+            <Button className="gap-2" onClick={() => navigate("/nouveau")}>
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nouveau dossier</span>
+            </Button>
+          )}
         </div>
 
-        {/* Appointment counters */}
-        {!isLoading && dossiers && (
-          <AppointmentCounters
-            dossiers={dossiers}
-            activeFilter={rdvFilter}
-            onFilterChange={handleRdvFilter}
-          />
+        {/* Appointment counters (hide in trash mode) */}
+        {!isLoading && dossiers && !showTrash && (
+          <AppointmentCounters dossiers={dossiers} activeFilter={rdvFilter} onFilterChange={handleRdvFilter} />
         )}
-
-        {/* RDV date filters (when filtering confirmed RDVs) */}
         {rdvFilter === "rdv_confirmed" && (
           <RdvDateFilters active={rdvDateFilter} onChange={setRdvDateFilter} />
         )}
 
-        {/* Status counters */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <Skeleton key={i} className="h-[88px] rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
+        {/* Status counters (hide in trash mode) */}
+        {!showTrash && (
+          isLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <Skeleton key={i} className="h-[88px] rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
+          )
         )}
+
+        {/* Filters + Sort + Trash toggle */}
+        <DossierFilters
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilter}
+          sortOption={sortOption}
+          onSortChange={setSortOption}
+          showTrash={showTrash}
+          onTrashToggle={handleTrashToggle}
+        />
 
         {/* Search */}
         <div className="w-full sm:max-w-sm">
@@ -215,9 +320,34 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <DossierList dossiers={filtered} onSelect={handleSelect} />
+          <DossierList
+            dossiers={paginatedDossiers}
+            onSelect={handleSelect}
+            isTrash={showTrash}
+            onDelete={(d) => handleDeleteRequest(d, false)}
+            onPermanentDelete={(d) => handleDeleteRequest(d, true)}
+            onRestore={handleRestore}
+          />
         )}
+
+        {/* Pagination */}
+        <DossierPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </main>
+
+      {/* Delete dialog */}
+      {deleteTarget && (
+        <DeleteDossierDialog
+          open={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
+          clientName={clientNameFor(deleteTarget)}
+          permanent={deletePermanent}
+        />
+      )}
     </div>
   );
 }

@@ -260,6 +260,26 @@ function mapEntry(entry: Historique): DisplayEntry {
     };
   }
 
+  // Dossier delete/restore
+  if (action === "dossier_deleted") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Trash2 className="h-3.5 w-3.5" />,
+      iconColor: "bg-destructive/15 text-destructive",
+      title: "Dossier supprimé (corbeille)",
+      detail: details || null,
+    };
+  }
+  if (action === "dossier_restored") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <FolderPlus className="h-3.5 w-3.5" />,
+      iconColor: "bg-success/15 text-success",
+      title: "Dossier restauré",
+      detail: details || null,
+    };
+  }
+
   // Fallback: display action as-is but clean it up
   return {
     id: entry.id, timestamp: ts,

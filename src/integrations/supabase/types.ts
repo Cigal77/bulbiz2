@@ -269,6 +269,9 @@ export type Database = {
           client_token_expires_at: string | null
           country: string | null
           created_at: string
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           description: string | null
           google_place_id: string | null
           id: string
@@ -307,6 +310,9 @@ export type Database = {
           client_token_expires_at?: string | null
           country?: string | null
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           google_place_id?: string | null
           id?: string
@@ -345,6 +351,9 @@ export type Database = {
           client_token_expires_at?: string | null
           country?: string | null
           created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           description?: string | null
           google_place_id?: string | null
           id?: string

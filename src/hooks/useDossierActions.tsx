@@ -102,5 +102,44 @@ export function useDossierActions(dossierId: string) {
     onSuccess: invalidate,
   });
 
-  return { changeStatus, addNote, toggleRelance, sendRelance, updateDossier };
+  const softDelete = useMutation({
+    mutationFn: async (reason?: string) => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id ?? null,
+          delete_reason: reason ?? null,
+        })
+        .eq("id", dossierId);
+      if (error) throw error;
+      await addHistorique("dossier_deleted", reason ? `Supprimé (${reason})` : "Dossier supprimé (corbeille)");
+    },
+    onSuccess: invalidate,
+  });
+
+  const restoreDossier = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({ deleted_at: null, deleted_by: null, delete_reason: null })
+        .eq("id", dossierId);
+      if (error) throw error;
+      await addHistorique("dossier_restored", "Dossier restauré depuis la corbeille");
+    },
+    onSuccess: invalidate,
+  });
+
+  const permanentDelete = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dossiers")
+        .delete()
+        .eq("id", dossierId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { changeStatus, addNote, toggleRelance, sendRelance, updateDossier, softDelete, restoreDossier, permanentDelete };
 }
