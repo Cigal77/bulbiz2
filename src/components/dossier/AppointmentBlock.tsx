@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
-  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle, CheckCircle2, RefreshCw,
+  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle, CheckCircle2, RefreshCw, MapPin, Phone, Navigation, Receipt,
 } from "lucide-react";
 
 interface AppointmentBlockProps {
@@ -32,6 +33,17 @@ interface Slot {
   time_end: string;
   selected_at: string | null;
 }
+
+// Visual config per status
+const STATUS_CONFIG: Record<string, { bg: string; border: string; iconColor: string; headerBg: string }> = {
+  none: { bg: "bg-muted/30", border: "border-border", iconColor: "text-muted-foreground", headerBg: "bg-muted/50" },
+  rdv_pending: { bg: "bg-warning/5", border: "border-warning/30", iconColor: "text-warning", headerBg: "bg-warning/10" },
+  slots_proposed: { bg: "bg-blue-50 dark:bg-blue-950/20", border: "border-blue-200 dark:border-blue-800/40", iconColor: "text-blue-600 dark:text-blue-400", headerBg: "bg-blue-100/50 dark:bg-blue-900/20" },
+  client_selected: { bg: "bg-orange-50 dark:bg-orange-950/20", border: "border-orange-200 dark:border-orange-800/40", iconColor: "text-orange-600 dark:text-orange-400", headerBg: "bg-orange-100/50 dark:bg-orange-900/20" },
+  rdv_confirmed: { bg: "bg-success/5", border: "border-success/30", iconColor: "text-success", headerBg: "bg-success/10" },
+  done: { bg: "bg-primary/5", border: "border-primary/30", iconColor: "text-primary", headerBg: "bg-primary/10" },
+  cancelled: { bg: "bg-destructive/5", border: "border-destructive/20", iconColor: "text-destructive", headerBg: "bg-destructive/10" },
+};
 
 export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
   const { user } = useAuth();
@@ -53,11 +65,13 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
   const [resending, setResending] = useState(false);
 
   const hasValidContact = !!(dossier.client_email || dossier.client_phone);
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.none;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
     queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
     queryClient.invalidateQueries({ queryKey: ["appointment_slots", dossier.id] });
+    queryClient.invalidateQueries({ queryKey: ["dossiers"] });
   };
 
   // Fetch slots
@@ -83,7 +97,6 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     });
   };
 
-  // Send notification helper
   const sendNotification = async (eventType: string, extraPayload?: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke("send-appointment-notification", {
       body: { event_type: eventType, dossier_id: dossier.id, payload: extraPayload || {} },
@@ -91,28 +104,20 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
 
-    // Show result
     if (data?.email_status === "FAILED" && data?.sms_status === "FAILED") {
-      toast({
-        title: "⚠️ Notifications échouées",
-        description: data.error_message || "Email et SMS n'ont pas pu être envoyés.",
-        variant: "destructive",
-      });
+      toast({ title: "⚠️ Notifications échouées", description: data.error_message || "Email et SMS n'ont pas pu être envoyés.", variant: "destructive" });
     } else if (data?.email_status === "SENT" || data?.sms_status === "SENT") {
       const parts: string[] = [];
       if (data.email_status === "SENT") parts.push("Email");
       if (data.sms_status === "SENT") parts.push("SMS");
       toast({ title: `${parts.join(" + ")} envoyé(s) ✅` });
     }
-
     return data;
   };
 
-  // Resend notification
   const handleResend = async (eventType: string) => {
     setResending(true);
     try {
-      // Build extra payload for SLOTS_PROPOSED
       let extraPayload: Record<string, unknown> = {};
       if (eventType === "SLOTS_PROPOSED" && slots.length > 0) {
         const slotsText = slots.map(s =>
@@ -129,7 +134,6 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
           appointment_time: timeStart && timeEnd ? `${timeStart.slice(0, 5)}–${timeEnd.slice(0, 5)}` : "",
         };
       }
-
       await sendNotification(eventType, extraPayload);
     } catch (e: any) {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });
@@ -145,18 +149,11 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const validSlots = newSlots.filter((s) => s.date && s.start && s.end);
       if (!validSlots.length) throw new Error("Ajoutez au moins un créneau");
 
-      // Insert slots
       const { error: slotErr } = await supabase.from("appointment_slots").insert(
-        validSlots.map((s) => ({
-          dossier_id: dossier.id,
-          slot_date: s.date,
-          time_start: s.start,
-          time_end: s.end,
-        }))
+        validSlots.map((s) => ({ dossier_id: dossier.id, slot_date: s.date, time_start: s.start, time_end: s.end }))
       );
       if (slotErr) throw slotErr;
 
-      // Update status
       const { error: statusErr } = await supabase
         .from("dossiers")
         .update({ appointment_status: "slots_proposed" } as any)
@@ -165,21 +162,12 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
 
       await addHistorique("slots_proposed", `${validSlots.length} créneau(x) proposé(s)`);
 
-      // Send notification
-      const slotsText = validSlots.map(s =>
-        `<p>• ${s.date} ${s.start}–${s.end}</p>`
-      ).join("");
-
+      const slotsText = validSlots.map(s => `<p>• ${s.date} ${s.start}–${s.end}</p>`).join("");
       let appointmentLink = "";
-      if (dossier.client_token) {
-        appointmentLink = `${window.location.origin}/client?token=${dossier.client_token}`;
-      }
+      if (dossier.client_token) appointmentLink = `${window.location.origin}/client?token=${dossier.client_token}`;
 
       try {
-        await sendNotification("SLOTS_PROPOSED", {
-          slots_text: slotsText,
-          appointment_link: appointmentLink,
-        });
+        await sendNotification("SLOTS_PROPOSED", { slots_text: slotsText, appointment_link: appointmentLink });
       } catch (e) {
         console.error("Notification error after slots proposed:", e);
       }
@@ -196,18 +184,13 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
   const setManualRdv = useMutation({
     mutationFn: async () => {
       if (!manualDate) throw new Error("Choisissez une date");
-
       const { error } = await supabase
         .from("dossiers")
         .update({
-          status: "rdv_pris",
-          status_changed_at: new Date().toISOString(),
-          appointment_status: "rdv_confirmed",
-          appointment_date: manualDate,
-          appointment_time_start: manualStart,
-          appointment_time_end: manualEnd,
-          appointment_source: "manual",
-          appointment_confirmed_at: new Date().toISOString(),
+          status: "rdv_pris", status_changed_at: new Date().toISOString(),
+          appointment_status: "rdv_confirmed", appointment_date: manualDate,
+          appointment_time_start: manualStart, appointment_time_end: manualEnd,
+          appointment_source: "manual", appointment_confirmed_at: new Date().toISOString(),
         } as any)
         .eq("id", dossier.id);
       if (error) throw error;
@@ -215,12 +198,8 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const dateStr = format(new Date(manualDate), "EEEE d MMMM yyyy", { locale: fr });
       await addHistorique("rdv_confirmed", `Rendez-vous fixé manuellement : ${dateStr} ${manualStart}–${manualEnd}`);
 
-      // Send confirmation notification
       try {
-        await sendNotification("APPOINTMENT_CONFIRMED", {
-          appointment_date: dateStr,
-          appointment_time: `${manualStart}–${manualEnd}`,
-        });
+        await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${manualStart}–${manualEnd}` });
       } catch (e) {
         console.error("Notification error after manual rdv:", e);
       }
@@ -238,18 +217,13 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     mutationFn: async () => {
       const selected = slots.find((s) => s.selected_at);
       if (!selected) throw new Error("Aucun créneau sélectionné par le client");
-
       const { error } = await supabase
         .from("dossiers")
         .update({
-          status: "rdv_pris",
-          status_changed_at: new Date().toISOString(),
-          appointment_status: "rdv_confirmed",
-          appointment_date: selected.slot_date,
-          appointment_time_start: selected.time_start,
-          appointment_time_end: selected.time_end,
-          appointment_source: "client_selected",
-          appointment_confirmed_at: new Date().toISOString(),
+          status: "rdv_pris", status_changed_at: new Date().toISOString(),
+          appointment_status: "rdv_confirmed", appointment_date: selected.slot_date,
+          appointment_time_start: selected.time_start, appointment_time_end: selected.time_end,
+          appointment_source: "client_selected", appointment_confirmed_at: new Date().toISOString(),
         } as any)
         .eq("id", dossier.id);
       if (error) throw error;
@@ -257,20 +231,13 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const dateStr = format(new Date(selected.slot_date), "EEEE d MMMM yyyy", { locale: fr });
       await addHistorique("rdv_confirmed", `Rendez-vous confirmé : ${dateStr} ${selected.time_start}–${selected.time_end}`);
 
-      // Send confirmation notification
       try {
-        await sendNotification("APPOINTMENT_CONFIRMED", {
-          appointment_date: dateStr,
-          appointment_time: `${selected.time_start.slice(0, 5)}–${selected.time_end.slice(0, 5)}`,
-        });
+        await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${selected.time_start.slice(0, 5)}–${selected.time_end.slice(0, 5)}` });
       } catch (e) {
         console.error("Notification error after confirm slot:", e);
       }
     },
-    onSuccess: () => {
-      toast({ title: "Rendez-vous confirmé ✅" });
-      invalidate();
-    },
+    onSuccess: () => { toast({ title: "Rendez-vous confirmé ✅" }); invalidate(); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
@@ -279,21 +246,12 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     mutationFn: async () => {
       const { error } = await supabase
         .from("dossiers")
-        .update({
-          appointment_status: "cancelled",
-          appointment_date: null,
-          appointment_time_start: null,
-          appointment_time_end: null,
-          appointment_confirmed_at: null,
-        } as any)
+        .update({ appointment_status: "cancelled", appointment_date: null, appointment_time_start: null, appointment_time_end: null, appointment_confirmed_at: null } as any)
         .eq("id", dossier.id);
       if (error) throw error;
       await addHistorique("rdv_cancelled", "Rendez-vous annulé");
     },
-    onSuccess: () => {
-      toast({ title: "Rendez-vous annulé" });
-      invalidate();
-    },
+    onSuccess: () => { toast({ title: "Rendez-vous annulé" }); invalidate(); },
   });
 
   // Mark intervention as done
@@ -301,73 +259,138 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     mutationFn: async () => {
       const { error } = await supabase
         .from("dossiers")
-        .update({
-          status: "rdv_termine",
-          status_changed_at: new Date().toISOString(),
-          appointment_status: "done",
-        } as any)
+        .update({ status: "rdv_termine", status_changed_at: new Date().toISOString(), appointment_status: "done" } as any)
         .eq("id", dossier.id);
       if (error) throw error;
       await addHistorique("intervention_done", "Intervention marquée comme réalisée");
     },
-    onSuccess: () => {
-      toast({ title: "Intervention réalisée ✅" });
-      invalidate();
-    },
+    onSuccess: () => { toast({ title: "Intervention réalisée ✅" }); invalidate(); },
   });
 
   const addSlotRow = () => {
     if (newSlots.length >= 5) return;
     setNewSlots([...newSlots, { date: "", start: "09:00", end: "11:00" }]);
   };
-
-  const removeSlotRow = (idx: number) => {
-    setNewSlots(newSlots.filter((_, i) => i !== idx));
-  };
-
-  const updateSlotRow = (idx: number, field: string, value: string) => {
+  const removeSlotRow = (idx: number) => setNewSlots(newSlots.filter((_, i) => i !== idx));
+  const updateSlotRow = (idx: number, field: string, value: string) =>
     setNewSlots(newSlots.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
-  };
 
   const selectedSlot = slots.find((s) => s.selected_at);
 
-  // Determine which resend event to show
   const resendEventMap: Partial<Record<AppointmentStatus, { label: string; event: string }>> = {
-    rdv_pending: { label: "Renvoyer la proposition de RDV", event: "APPOINTMENT_REQUESTED" },
-    slots_proposed: { label: "Renvoyer le lien de choix de créneau", event: "SLOTS_PROPOSED" },
-    client_selected: { label: "Renvoyer le lien de choix de créneau", event: "SLOTS_PROPOSED" },
-    rdv_confirmed: { label: "Renvoyer la confirmation RDV", event: "APPOINTMENT_CONFIRMED" },
+    rdv_pending: { label: "Renvoyer la proposition", event: "APPOINTMENT_REQUESTED" },
+    slots_proposed: { label: "Renvoyer le lien", event: "SLOTS_PROPOSED" },
+    client_selected: { label: "Renvoyer le lien", event: "SLOTS_PROPOSED" },
+    rdv_confirmed: { label: "Renvoyer la confirmation", event: "APPOINTMENT_CONFIRMED" },
   };
   const resendInfo = resendEventMap[status];
 
+  // Navigation helpers
+  const address = dossier.address;
+  const lat = (dossier as any).lat;
+  const lng = (dossier as any).lng;
+  const hasCoords = lat && lng;
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" />
-          Rendez-vous
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={cn("rounded-xl border-2 p-5 space-y-4", config.bg, config.border)}
+    >
+      {/* Header */}
+      <div className={cn("flex items-center justify-between rounded-lg px-3 py-2 -mx-1 -mt-1", config.headerBg)}>
+        <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+          <motion.div
+            animate={status === "none" || status === "rdv_pending" ? { scale: [1, 1.15, 1] } : {}}
+            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 3 }}
+          >
+            <Calendar className={cn("h-5 w-5", config.iconColor)} />
+          </motion.div>
+          <span className={config.iconColor}>Rendez-vous</span>
         </h3>
-        <Badge className={cn("text-[10px]", APPOINTMENT_STATUS_COLORS[status])}>
+        <Badge className={cn("text-[10px] font-semibold", APPOINTMENT_STATUS_COLORS[status])}>
           {APPOINTMENT_STATUS_LABELS[status]}
         </Badge>
       </div>
 
-      {/* Confirmed RDV display */}
+      {/* ─── CONFIRMED RDV ─── */}
       {status === "rdv_confirmed" && appointmentDate && (
-        <div className="rounded-lg bg-success/10 border border-success/20 p-3">
-          <p className="text-sm font-semibold text-foreground">
-            📅 {format(new Date(appointmentDate), "EEEE d MMMM yyyy", { locale: fr })}
-          </p>
-          {timeStart && timeEnd && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-              <Clock className="h-3 w-3" />
-              {timeStart.slice(0, 5)} – {timeEnd.slice(0, 5)}
-            </p>
-          )}
-        </div>
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="rounded-lg bg-success/10 border border-success/20 p-4 space-y-3"
+        >
+          <div className="flex items-start gap-3">
+            <Calendar className="h-5 w-5 text-success shrink-0 mt-0.5" />
+            <div>
+              <p className="text-base font-bold text-foreground capitalize">
+                {format(new Date(appointmentDate), "EEEE d MMMM yyyy", { locale: fr })}
+              </p>
+              {timeStart && timeEnd && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  {timeStart.slice(0, 5)} – {timeEnd.slice(0, 5)}
+                </p>
+              )}
+            </div>
+          </div>
+          {/* Quick navigation links */}
+          <div className="flex flex-wrap gap-2">
+            {hasCoords && (
+              <>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href={`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`} target="_blank" rel="noopener noreferrer">
+                    <Navigation className="h-3.5 w-3.5" /> Waze
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`} target="_blank" rel="noopener noreferrer">
+                    <MapPin className="h-3.5 w-3.5" /> Maps
+                  </a>
+                </Button>
+              </>
+            )}
+            {!hasCoords && address && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-3.5 w-3.5" /> Itinéraire
+                </a>
+              </Button>
+            )}
+            {dossier.client_phone && (
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                <a href={`tel:${dossier.client_phone}`}>
+                  <Phone className="h-3.5 w-3.5" /> Appeler
+                </a>
+              </Button>
+            )}
+          </div>
+        </motion.div>
       )}
 
-      {/* Client selected - pending confirmation */}
+      {/* ─── DONE ─── */}
+      {status === "done" && (
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="rounded-lg bg-primary/10 border border-primary/20 p-4 space-y-2"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
+            <p className="text-base font-bold text-primary">Intervention réalisée</p>
+          </div>
+          {appointmentDate && (
+            <p className="text-sm text-muted-foreground ml-7">
+              Le {format(new Date(appointmentDate), "d MMMM yyyy", { locale: fr })}
+              {timeStart && timeEnd ? ` — ${timeStart.slice(0, 5)}–${timeEnd.slice(0, 5)}` : ""}
+            </p>
+          )}
+        </motion.div>
+      )}
+
+      {/* ─── CLIENT SELECTED ─── */}
       {status === "client_selected" && selectedSlot && (
         <div className="rounded-lg bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 p-3 space-y-2">
           <p className="text-sm font-medium text-foreground">
@@ -376,18 +399,58 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         </div>
       )}
 
+      {/* ─── NO RDV — prominent CTA ─── */}
+      {(status === "none" || status === "cancelled") && (
+        <div className="text-center py-2 space-y-3">
+          <p className="text-sm text-muted-foreground">Aucun rendez-vous fixé</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button
+                className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-base h-11"
+                onClick={() => setShowManualForm(true)}
+              >
+                <Calendar className="h-4 w-4" />
+                Fixer un RDV
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button variant="outline" className="w-full gap-2 h-11" onClick={() => setShowSlotForm(true)}>
+                <Send className="h-4 w-4" />
+                Proposer des créneaux
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── PENDING — waiting action ─── */}
+      {status === "rdv_pending" && (
+        <div className="text-center py-2 space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <p className="text-sm font-medium text-foreground">Créneaux à proposer au client</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md h-11" onClick={() => setShowSlotForm(true)}>
+                <Send className="h-4 w-4" /> Proposer des créneaux
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button variant="outline" className="w-full gap-2 h-11" onClick={() => setShowManualForm(true)}>
+                <Edit2 className="h-4 w-4" /> Fixer manuellement
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
       {/* Proposed slots list */}
       {(status === "slots_proposed" || status === "client_selected") && slots.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[11px] text-muted-foreground font-medium">Créneaux proposés :</p>
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground font-medium">Créneaux proposés :</p>
           {slots.map((slot) => (
-            <div
-              key={slot.id}
-              className={cn(
-                "text-xs rounded px-2 py-1 flex items-center gap-2",
-                slot.selected_at ? "bg-primary/10 text-primary font-medium" : "bg-muted text-muted-foreground"
-              )}
-            >
+            <div key={slot.id} className={cn("text-xs rounded px-2.5 py-1.5 flex items-center gap-2", slot.selected_at ? "bg-primary/10 text-primary font-medium" : "bg-muted text-muted-foreground")}>
               {format(new Date(slot.slot_date), "EEE d MMM", { locale: fr })} {slot.time_start.slice(0, 5)}–{slot.time_end.slice(0, 5)}
               {slot.selected_at && <Check className="h-3 w-3" />}
             </div>
@@ -395,140 +458,69 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         </div>
       )}
 
-      {/* Actions based on status */}
+      {/* Action buttons for slots_proposed / client_selected / rdv_confirmed */}
       <div className="flex flex-col gap-2">
-        {(status === "none" || status === "rdv_pending") && (
-          <>
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => setShowSlotForm(true)}
-            >
-              <Send className="h-3.5 w-3.5" />
-              Proposer des créneaux
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => setShowManualForm(true)}
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-              Définir RDV manuellement
-            </Button>
-          </>
-        )}
-
         {status === "slots_proposed" && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-1.5"
-            onClick={() => setShowSlotForm(true)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Proposer d'autres créneaux
-          </Button>
-        )}
-
-        {status === "client_selected" && (
-          <>
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => confirmSlot.mutate()}
-              disabled={confirmSlot.isPending}
-            >
-              {confirmSlot.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Confirmer le rendez-vous
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowSlotForm(true)}>
+              <Plus className="h-3.5 w-3.5" /> Ajouter des créneaux
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => setShowSlotForm(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Proposer d'autres créneaux
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowManualForm(true)}>
+              <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
             </Button>
-          </>
-        )}
-
-        {status === "rdv_confirmed" && (
-          <>
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => markDone.mutate()}
-              disabled={markDone.isPending}
-            >
-              {markDone.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-              Marquer intervention réalisée
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5"
-              onClick={() => setShowManualForm(true)}
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-              Modifier le RDV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5 text-destructive"
-              onClick={() => cancelRdv.mutate()}
-              disabled={cancelRdv.isPending}
-            >
-              <X className="h-3.5 w-3.5" />
-              Annuler le RDV
-            </Button>
-          </>
-        )}
-
-        {status === "done" && (
-          <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-center">
-            <p className="text-sm font-medium text-primary">✅ Intervention réalisée</p>
           </div>
         )}
 
-        {status === "cancelled" && (
-          <Button
-            variant="default"
-            size="sm"
-            className="w-full gap-1.5"
-            onClick={() => setShowSlotForm(true)}
-          >
-            <Send className="h-3.5 w-3.5" />
-            Proposer de nouveaux créneaux
+        {status === "client_selected" && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button className="w-full gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11" onClick={() => confirmSlot.mutate()} disabled={confirmSlot.isPending}>
+                {confirmSlot.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Confirmer le rendez-vous
+              </Button>
+            </motion.div>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowSlotForm(true)}>
+              <Plus className="h-3.5 w-3.5" /> Autres créneaux
+            </Button>
+          </div>
+        )}
+
+        {status === "rdv_confirmed" && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+              <Button className="w-full gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11" onClick={() => markDone.mutate()} disabled={markDone.isPending}>
+                {markDone.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Intervention réalisée
+              </Button>
+            </motion.div>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowManualForm(true)}>
+              <Edit2 className="h-3.5 w-3.5" /> Modifier
+            </Button>
+            <Button variant="outline" className="gap-1.5 text-destructive" onClick={() => cancelRdv.mutate()} disabled={cancelRdv.isPending}>
+              <X className="h-3.5 w-3.5" /> Annuler
+            </Button>
+          </div>
+        )}
+
+        {status === "done" && (
+          <Button variant="outline" className="w-full gap-1.5" onClick={() => window.dispatchEvent(new CustomEvent("open-import-facture"))}>
+            <Receipt className="h-3.5 w-3.5" /> Générer / importer facture
           </Button>
         )}
 
-        {/* Resend notification button */}
+        {/* Resend notification */}
         {resendInfo && (
           <Tooltip>
             <TooltipTrigger asChild>
               <div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full gap-1.5 text-xs text-muted-foreground"
-                  onClick={() => handleResend(resendInfo.event)}
-                  disabled={resending || !hasValidContact}
-                >
+                <Button variant="ghost" size="sm" className="w-full gap-1.5 text-xs text-muted-foreground" onClick={() => handleResend(resendInfo.event)} disabled={resending || !hasValidContact}>
                   {resending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                   {resendInfo.label}
                 </Button>
               </div>
             </TooltipTrigger>
             {!hasValidContact && (
-              <TooltipContent>
-                <p>Ajoutez un email ou téléphone client pour envoyer</p>
-              </TooltipContent>
+              <TooltipContent><p>Ajoutez un email ou téléphone client pour envoyer</p></TooltipContent>
             )}
           </Tooltip>
         )}
@@ -536,36 +528,21 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
 
       {/* Slot proposal form */}
       {showSlotForm && (
-        <div className="border border-border rounded-lg p-3 space-y-3 bg-muted/30">
+        <div className="border border-border rounded-lg p-3 space-y-3 bg-background">
           <p className="text-xs font-medium text-foreground">Ajouter des créneaux (max 5)</p>
           {newSlots.map((slot, idx) => (
             <div key={idx} className="flex items-end gap-2">
               <div className="flex-1 space-y-1">
                 <Label className="text-[10px]">Date</Label>
-                <Input
-                  type="date"
-                  value={slot.date}
-                  onChange={(e) => updateSlotRow(idx, "date", e.target.value)}
-                  className="h-8 text-xs"
-                />
+                <Input type="date" value={slot.date} onChange={(e) => updateSlotRow(idx, "date", e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="w-20 space-y-1">
                 <Label className="text-[10px]">Début</Label>
-                <Input
-                  type="time"
-                  value={slot.start}
-                  onChange={(e) => updateSlotRow(idx, "start", e.target.value)}
-                  className="h-8 text-xs"
-                />
+                <Input type="time" value={slot.start} onChange={(e) => updateSlotRow(idx, "start", e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="w-20 space-y-1">
                 <Label className="text-[10px]">Fin</Label>
-                <Input
-                  type="time"
-                  value={slot.end}
-                  onChange={(e) => updateSlotRow(idx, "end", e.target.value)}
-                  className="h-8 text-xs"
-                />
+                <Input type="time" value={slot.end} onChange={(e) => updateSlotRow(idx, "end", e.target.value)} className="h-8 text-xs" />
               </div>
               {newSlots.length > 1 && (
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeSlotRow(idx)}>
@@ -590,47 +567,39 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         </div>
       )}
 
-      {/* Manual RDV form */}
+      {/* Manual RDV form — simplified */}
       {showManualForm && (
-        <div className="border border-border rounded-lg p-3 space-y-3 bg-muted/30">
-          <p className="text-xs font-medium text-foreground">Définir un rendez-vous</p>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="border border-border rounded-lg p-4 space-y-3 bg-background"
+        >
+          <p className="text-sm font-medium text-foreground">📅 Fixer un rendez-vous</p>
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1">
-              <Label className="text-[10px]">Date</Label>
-              <Input
-                type="date"
-                value={manualDate}
-                onChange={(e) => setManualDate(e.target.value)}
-                className="h-8 text-xs"
-              />
+              <Label className="text-xs">Date</Label>
+              <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="h-9" />
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-[10px]">Début</Label>
-              <Input
-                type="time"
-                value={manualStart}
-                onChange={(e) => setManualStart(e.target.value)}
-                className="h-8 text-xs"
-              />
+            <div className="w-24 space-y-1">
+              <Label className="text-xs">Début</Label>
+              <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-9" />
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-[10px]">Fin</Label>
-              <Input
-                type="time"
-                value={manualEnd}
-                onChange={(e) => setManualEnd(e.target.value)}
-                className="h-8 text-xs"
-              />
+            <div className="w-24 space-y-1">
+              <Label className="text-xs">Fin</Label>
+              <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-9" />
             </div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending}>
-              {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirmer"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowManualForm(false)}>Annuler</Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+              <Button onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending} className="gap-2">
+                {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Confirmer
+              </Button>
+            </motion.div>
+            <Button variant="ghost" onClick={() => setShowManualForm(false)}>Annuler</Button>
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
