@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -21,14 +21,16 @@ function getPasswordStrength(pw: string) {
 const strengthLabels = ["", "Faible", "Moyen", "Bon", "Fort"];
 const strengthColors = ["", "bg-destructive", "bg-orange-400", "bg-yellow-400", "bg-green-500"];
 
+type PageState = "loading" | "ready" | "error" | "done";
+
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [pageState, setPageState] = useState<PageState>("loading");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
@@ -36,37 +38,68 @@ export default function ResetPassword() {
   const isValid = hasLetter && hasNumber && isLongEnough && password === confirm;
   const strength = getPasswordStrength(password);
 
+  useEffect(() => {
+    // Supabase puts tokens in the URL hash after redirect.
+    // The JS client auto-detects them via onAuthStateChange.
+    // We just need to check if a session exists (PASSWORD_RECOVERY event sets it).
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setPageState("ready");
+      } else {
+        // Give the client a moment to process the hash tokens
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, session) => {
+            if (event === "PASSWORD_RECOVERY" && session) {
+              setPageState("ready");
+              subscription.unsubscribe();
+            }
+          }
+        );
+        // Timeout: if no session after 3s, show error
+        setTimeout(() => {
+          setPageState((prev) => (prev === "loading" ? "error" : prev));
+          subscription.unsubscribe();
+        }, 3000);
+      }
+    };
+    checkSession();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValid) return;
     setSubmitting(true);
-    setError(null);
 
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      setDone(true);
+      await supabase.auth.signOut();
+      setPageState("done");
       setTimeout(() => navigate("/auth"), 2500);
     } catch (err: any) {
-      const msg = err.message?.toLowerCase() || "";
-      if (msg.includes("expired") || msg.includes("invalid")) {
-        setError("Ce lien a expiré ou est invalide.");
-      } else {
-        setError(err.message);
-      }
+      setErrorMsg(err.message);
       toast({ title: "Erreur", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleResend = () => navigate("/auth");
+  // Loading
+  if (pageState === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
 
-  if (done) {
+  // Success
+  if (pageState === "done") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">
         <div className="w-full max-w-sm space-y-6 text-center">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
+          <CheckCircle2 className="mx-auto h-12 w-12 text-primary" />
           <h2 className="text-2xl font-bold text-foreground">Mot de passe mis à jour ✅</h2>
           <p className="text-sm text-muted-foreground">Redirection vers la connexion…</p>
         </div>
@@ -74,6 +107,26 @@ export default function ResetPassword() {
     );
   }
 
+  // Error / expired link
+  if (pageState === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-sm space-y-6 text-center">
+          <BulbizLogo size={28} />
+          <h2 className="text-2xl font-bold text-foreground">Lien invalide ou expiré</h2>
+          <p className="text-sm text-muted-foreground">
+            Ce lien de réinitialisation n'est plus valide. Demandez-en un nouveau.
+          </p>
+          <Button onClick={() => navigate("/auth")} className="w-full">
+            Renvoyer un lien
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Ready — show form
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm space-y-8">
@@ -86,12 +139,9 @@ export default function ResetPassword() {
           <p className="text-sm text-muted-foreground">Choisissez un mot de passe sécurisé</p>
         </div>
 
-        {error && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center space-y-3">
-            <p className="text-sm text-destructive font-medium">{error}</p>
-            <Button variant="outline" size="sm" onClick={handleResend}>
-              Renvoyer un lien
-            </Button>
+        {errorMsg && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-center">
+            <p className="text-sm text-destructive font-medium">{errorMsg}</p>
           </div>
         )}
 
@@ -125,13 +175,13 @@ export default function ResetPassword() {
                 </div>
                 <p className="text-xs text-muted-foreground">{strengthLabels[strength]}</p>
                 <ul className="text-xs space-y-0.5">
-                  <li className={isLongEnough ? "text-green-600" : "text-muted-foreground"}>
+                  <li className={isLongEnough ? "text-primary" : "text-muted-foreground"}>
                     {isLongEnough ? "✓" : "○"} 10 caractères minimum
                   </li>
-                  <li className={hasLetter ? "text-green-600" : "text-muted-foreground"}>
+                  <li className={hasLetter ? "text-primary" : "text-muted-foreground"}>
                     {hasLetter ? "✓" : "○"} Au moins 1 lettre
                   </li>
-                  <li className={hasNumber ? "text-green-600" : "text-muted-foreground"}>
+                  <li className={hasNumber ? "text-primary" : "text-muted-foreground"}>
                     {hasNumber ? "✓" : "○"} Au moins 1 chiffre
                   </li>
                 </ul>
