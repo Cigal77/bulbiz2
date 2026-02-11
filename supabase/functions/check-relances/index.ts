@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const { data: infoMDossiers } = await supabase
       .from("dossiers").select("*")
-      .eq("status", "a_qualifier").eq("relance_active", true).eq("relance_count", 0)
+      .in("status", ["nouveau", "a_qualifier"]).eq("relance_active", true).eq("relance_count", 0)
       .not("client_email", "is", null).lt("created_at", oneDayAgo);
 
     if (infoMDossiers && infoMDossiers.length > 0) {

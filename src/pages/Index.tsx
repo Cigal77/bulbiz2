@@ -6,7 +6,6 @@ import { StatusCounters } from "@/components/dashboard/StatusCounters";
 import { AppointmentCounters, RdvDateFilters, filterByRdvDate, sortByAppointmentDate, type RdvDateFilter } from "@/components/dashboard/AppointmentCounters";
 import { DossierList } from "@/components/dashboard/DossierList";
 import { SearchBar } from "@/components/dashboard/SearchBar";
-import { SourceFilter } from "@/components/dashboard/SourceFilter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LogOut, Plus, Settings } from "lucide-react";
@@ -16,13 +15,11 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Database } from "@/integrations/supabase/types";
-import { URGENCY_ORDER } from "@/lib/constants";
-import type { AppointmentStatus } from "@/lib/constants";
+import { URGENCY_ORDER, DASHBOARD_STATUSES } from "@/lib/constants";
+import type { AppointmentTileKey } from "@/lib/constants";
+import { toAppointmentTileKey } from "@/lib/constants";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
-type DossierSource = Database["public"]["Enums"]["dossier_source"];
-
-const ALL_STATUSES: DossierStatus[] = ["nouveau", "a_qualifier", "devis_a_faire", "devis_envoye", "clos_signe", "clos_perdu"];
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
@@ -33,8 +30,7 @@ export default function Dashboard() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<DossierStatus | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<DossierSource | null>(null);
-  const [rdvFilter, setRdvFilter] = useState<AppointmentStatus | null>(null);
+  const [rdvFilter, setRdvFilter] = useState<AppointmentTileKey | null>(null);
   const [rdvDateFilter, setRdvDateFilter] = useState<RdvDateFilter>("all");
 
   // Realtime: listen for quote status changes
@@ -73,8 +69,10 @@ export default function Dashboard() {
   }, [toast, queryClient]);
 
   const counts = useMemo(() => {
-    const c = Object.fromEntries(ALL_STATUSES.map((s) => [s, 0])) as Record<DossierStatus, number>;
-    dossiers?.forEach((d) => { c[d.status]++; });
+    const c = Object.fromEntries(DASHBOARD_STATUSES.map((s) => [s, 0])) as Record<DossierStatus, number>;
+    // Also init a_qualifier for merging
+    c.a_qualifier = 0;
+    dossiers?.forEach((d) => { c[d.status] = (c[d.status] || 0) + 1; });
     return c;
   }, [dossiers]);
 
@@ -84,7 +82,7 @@ export default function Dashboard() {
     if (status) setRdvFilter(null);
   };
 
-  const handleRdvFilter = (filter: AppointmentStatus | null) => {
+  const handleRdvFilter = (filter: AppointmentTileKey | null) => {
     setRdvFilter(filter);
     setRdvDateFilter("all");
     if (filter) setStatusFilter(null);
@@ -94,17 +92,26 @@ export default function Dashboard() {
     if (!dossiers) return [];
     let list = [...dossiers];
 
-    if (statusFilter) list = list.filter((d) => d.status === statusFilter);
-    if (sourceFilter) list = list.filter((d) => d.source === sourceFilter);
+    // When filtering by "nouveau", also include "a_qualifier"
+    if (statusFilter) {
+      if (statusFilter === "nouveau") {
+        list = list.filter((d) => d.status === "nouveau" || d.status === "a_qualifier");
+      } else {
+        list = list.filter((d) => d.status === statusFilter);
+      }
+    }
 
-    // RDV filter
+    // RDV filter using tile keys
     if (rdvFilter) {
-      list = list.filter((d) => (d as any).appointment_status === rdvFilter);
+      list = list.filter((d) => {
+        const tileKey = toAppointmentTileKey(d.appointment_status as any);
+        return tileKey === rdvFilter;
+      });
       // Apply date filter for confirmed RDVs
       if (rdvFilter === "rdv_confirmed") {
         list = filterByRdvDate(list, rdvDateFilter);
         list = sortByAppointmentDate(list);
-        return list; // Skip default sort
+        return list;
       }
     }
 
@@ -121,15 +128,17 @@ export default function Dashboard() {
 
     // Sort: nouveau first, then by urgency desc, then by date desc
     list.sort((a, b) => {
-      if (a.status === "nouveau" && b.status !== "nouveau") return -1;
-      if (b.status === "nouveau" && a.status !== "nouveau") return 1;
+      const isNewA = a.status === "nouveau" || a.status === "a_qualifier";
+      const isNewB = b.status === "nouveau" || b.status === "a_qualifier";
+      if (isNewA && !isNewB) return -1;
+      if (isNewB && !isNewA) return 1;
       const urgDiff = URGENCY_ORDER[b.urgency] - URGENCY_ORDER[a.urgency];
       if (urgDiff !== 0) return urgDiff;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
     return list;
-  }, [dossiers, statusFilter, sourceFilter, search, rdvFilter, rdvDateFilter]);
+  }, [dossiers, statusFilter, search, rdvFilter, rdvDateFilter]);
 
   const handleSelect = (dossier: Dossier) => {
     navigate(`/dossier/${dossier.id}`);
@@ -184,8 +193,8 @@ export default function Dashboard() {
 
         {/* Status counters */}
         {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {Array.from({ length: 7 }).map((_, i) => (
               <Skeleton key={i} className="h-[88px] rounded-xl" />
             ))}
           </div>
@@ -193,12 +202,9 @@ export default function Dashboard() {
           <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
         )}
 
-        {/* Search + filters */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-          <div className="flex-1 w-full sm:max-w-sm">
-            <SearchBar value={search} onChange={setSearch} />
-          </div>
-          <SourceFilter active={sourceFilter} onChange={setSourceFilter} />
+        {/* Search */}
+        <div className="w-full sm:max-w-sm">
+          <SearchBar value={search} onChange={setSearch} />
         </div>
 
         {/* Dossier list */}
