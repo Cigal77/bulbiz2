@@ -8,7 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Lock, Calendar, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
@@ -41,6 +43,28 @@ interface DossierData {
   appointment_slots?: SlotData[];
 }
 
+function validateEmail(email: string): boolean {
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function normalizePhone(phone: string): string {
+  const cleaned = phone.replace(/[\s.\-()]/g, "");
+  if (cleaned.startsWith("0") && cleaned.length === 10) {
+    return "+33" + cleaned.slice(1);
+  }
+  return cleaned;
+}
+
+function PrefilledBadge() {
+  return (
+    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-normal gap-0.5">
+      <Info className="h-2.5 w-2.5" />
+      Pré-rempli
+    </Badge>
+  );
+}
+
 export default function ClientForm() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -51,6 +75,7 @@ export default function ClientForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [slotSuccess, setSlotSuccess] = useState(false);
+  const [emailError, setEmailError] = useState("");
 
   const [dossier, setDossier] = useState<DossierData | null>(null);
   const [form, setForm] = useState({
@@ -60,17 +85,22 @@ export default function ClientForm() {
     client_email: "",
     address: "",
     description: "",
+    category: "autre",
+    urgency: "semaine",
   });
+  const [addressData, setAddressData] = useState<Partial<AddressData>>({});
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [selectingSlot, setSelectingSlot] = useState(false);
 
-  // Determine mode: slot selection vs form completion
   const hasSlots = (dossier?.appointment_slots?.length ?? 0) > 0;
   const isSlotMode = hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
   const alreadySelected = dossier?.appointment_slots?.find(s => s.selected_at);
+
+  // Track which fields were pre-filled by artisan
+  const [prefilled, setPrefilled] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!token) {
@@ -89,7 +119,21 @@ export default function ClientForm() {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
       setDossier(data);
-      // Pre-select already selected slot
+
+      // Pre-fill form with existing data
+      const pf = new Set<string>();
+      const newForm = { ...form };
+      if (data.client_first_name) { newForm.client_first_name = data.client_first_name; pf.add("client_first_name"); }
+      if (data.client_last_name) { newForm.client_last_name = data.client_last_name; pf.add("client_last_name"); }
+      if (data.client_phone) { newForm.client_phone = data.client_phone; pf.add("client_phone"); }
+      if (data.client_email) { newForm.client_email = data.client_email; pf.add("client_email"); }
+      if (data.address) { newForm.address = data.address; pf.add("address"); }
+      if (data.description) { newForm.description = data.description; pf.add("description"); }
+      if (data.category) { newForm.category = data.category; if (data.category !== "autre") pf.add("category"); }
+      if (data.urgency) { newForm.urgency = data.urgency; if (data.urgency !== "semaine") pf.add("urgency"); }
+      setForm(newForm);
+      setPrefilled(pf);
+
       const existing = data?.appointment_slots?.find((s: SlotData) => s.selected_at);
       if (existing) setSelectedSlotId(existing.id);
     } catch (e: any) {
@@ -126,20 +170,16 @@ export default function ClientForm() {
 
   const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
 
-  // Check which fields are missing (editable by client)
-  const missingFields = dossier ? {
-    client_first_name: !dossier.client_first_name,
-    client_last_name: !dossier.client_last_name,
-    client_phone: !dossier.client_phone,
-    client_email: !dossier.client_email,
-    address: !dossier.address,
-    description: !dossier.description,
-  } : {};
-
-  const hasMissingInfo = Object.values(missingFields).some(Boolean);
-
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
+
+    // Validate email
+    if (form.client_email && !validateEmail(form.client_email)) {
+      setEmailError("Format d'email invalide");
+      setStep(1);
+      return;
+    }
+
     setSubmitting(true);
     setUploadProgress(0);
     setError(null);
@@ -163,12 +203,27 @@ export default function ClientForm() {
         }
       }
 
-      // Submit to edge function — only send data for missing fields
+      // Send ALL form data (not just missing fields)
       const clientData: Record<string, string> = {};
-      for (const [key, isMissing] of Object.entries(missingFields)) {
-        if (isMissing && form[key as keyof typeof form]?.trim()) {
-          clientData[key] = form[key as keyof typeof form].trim();
-        }
+      const normalizedPhone = form.client_phone ? normalizePhone(form.client_phone) : "";
+      
+      if (form.client_first_name.trim()) clientData.client_first_name = form.client_first_name.trim();
+      if (form.client_last_name.trim()) clientData.client_last_name = form.client_last_name.trim();
+      if (normalizedPhone) clientData.client_phone = normalizedPhone;
+      if (form.client_email.trim()) clientData.client_email = form.client_email.trim();
+      if (form.address.trim()) clientData.address = form.address.trim();
+      if (form.description.trim()) clientData.description = form.description.trim();
+      if (form.category) clientData.category = form.category;
+      if (form.urgency) clientData.urgency = form.urgency;
+
+      // Pass address data if selected from Google
+      if (addressData.google_place_id) {
+        clientData.google_place_id = addressData.google_place_id;
+        if (addressData.lat) clientData.lat = String(addressData.lat);
+        if (addressData.lng) clientData.lng = String(addressData.lng);
+        if (addressData.postal_code) clientData.postal_code = addressData.postal_code;
+        if (addressData.city) clientData.city = addressData.city;
+        if (addressData.address_line) clientData.address_line = addressData.address_line;
       }
 
       const { data, error: fnError } = await supabase.functions.invoke("submit-client-form", {
@@ -190,7 +245,6 @@ export default function ClientForm() {
     }
   };
 
-  // Format slot date for display
   const formatSlotDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
@@ -220,7 +274,6 @@ export default function ClientForm() {
     );
   }
 
-  // Slot selection success
   if (slotSuccess) {
     const chosen = dossier?.appointment_slots?.find(s => s.id === selectedSlotId);
     return (
@@ -262,17 +315,14 @@ export default function ClientForm() {
     );
   }
 
-  // ── Slot selection mode ──
+  // Slot selection mode
   if (isSlotMode) {
     const slots = dossier?.appointment_slots ?? [];
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
-          <div className="max-w-lg mx-auto">
-            <BulbizLogo size={20} />
-          </div>
+          <div className="max-w-lg mx-auto"><BulbizLogo size={20} /></div>
         </header>
-
         <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
           <Card>
             <CardHeader>
@@ -280,9 +330,7 @@ export default function ClientForm() {
                 <Calendar className="h-5 w-5 text-primary" />
                 Choisissez votre créneau
               </CardTitle>
-              <CardDescription>
-                Sélectionnez le créneau qui vous convient le mieux pour l'intervention.
-              </CardDescription>
+              <CardDescription>Sélectionnez le créneau qui vous convient le mieux pour l'intervention.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {slots.map((slot) => {
@@ -294,9 +342,7 @@ export default function ClientForm() {
                     onClick={() => setSelectedSlotId(slot.id)}
                     className={cn(
                       "w-full text-left rounded-xl border-2 p-4 transition-all",
-                      isSelected
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border hover:border-primary/40 bg-card"
+                      isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40 bg-card"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -307,42 +353,25 @@ export default function ClientForm() {
                         {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">
-                          {formatSlotDate(slot.slot_date)}
-                        </p>
+                        <p className="text-sm font-semibold text-foreground">{formatSlotDate(slot.slot_date)}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                           <Clock className="h-3 w-3" />
                           {slot.time_start.slice(0, 5)} – {slot.time_end.slice(0, 5)}
                         </p>
                       </div>
                       {wasAlreadyChosen && (
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                          Choisi
-                        </span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Choisi</span>
                       )}
                     </div>
                   </button>
                 );
               })}
-
               {error && <p className="text-sm text-destructive">{error}</p>}
-
-              <Button
-                onClick={handleSlotSelect}
-                disabled={!selectedSlotId || selectingSlot}
-                className="w-full mt-4 gap-2"
-              >
-                {selectingSlot ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>
-                ) : (
-                  "Confirmer ce créneau"
-                )}
+              <Button onClick={handleSlotSelect} disabled={!selectedSlotId || selectingSlot} className="w-full mt-4 gap-2">
+                {selectingSlot ? (<><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>) : "Confirmer ce créneau"}
               </Button>
-
               {alreadySelected && selectedSlotId === alreadySelected.id && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre si vous le souhaitez.
-                </p>
+                <p className="text-xs text-muted-foreground text-center">Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre.</p>
               )}
             </CardContent>
           </Card>
@@ -351,25 +380,15 @@ export default function ClientForm() {
     );
   }
 
-  // ── Standard form completion mode ──
+  // Standard form mode — ALL fields editable
   const totalSteps = 3;
   const progressPercent = (step / totalSteps) * 100;
-
-  const ReadOnlyField = ({ label, value }: { label: string; value: string }) => (
-    <div className="space-y-1">
-      <Label className="text-muted-foreground text-xs flex items-center gap-1">
-        <Lock className="h-3 w-3" /> {label}
-      </Label>
-      <div className="rounded-md bg-muted/50 border border-border px-3 py-2 text-sm text-foreground">{value}</div>
-    </div>
-  );
+  const hasSomePrefilled = prefilled.size > 0;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
-        <div className="max-w-lg mx-auto">
-          <BulbizLogo size={20} />
-        </div>
+        <div className="max-w-lg mx-auto"><BulbizLogo size={20} /></div>
       </header>
 
       <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
@@ -382,90 +401,134 @@ export default function ClientForm() {
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Bonjour{dossier?.client_first_name ? ` ${dossier.client_first_name}` : ""}, complétez les informations manquantes pour que votre artisan puisse intervenir au mieux.
+          Bonjour{form.client_first_name ? ` ${form.client_first_name}` : ""}, vérifiez et complétez vos informations pour que votre artisan puisse intervenir au mieux.
         </p>
 
-        {/* Step 1: Info */}
+        {hasSomePrefilled && step === 1 && (
+          <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+            Certaines informations sont pré-remplies par votre artisan. Vous pouvez les corriger si nécessaire.
+          </div>
+        )}
+
+        {/* Step 1: Info — ALL fields editable */}
         {step === 1 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Vos informations</CardTitle>
-              <CardDescription>Les champs verrouillés ont déjà été renseignés. Complétez les autres.</CardDescription>
+              <CardDescription>Vérifiez et corrigez si besoin.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                {dossier?.client_first_name ? (
-                  <ReadOnlyField label="Prénom" value={dossier.client_first_name} />
-                ) : (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Prénom</Label>
-                    <Input placeholder="Jean" value={form.client_first_name} onChange={(e) => setForm({ ...form, client_first_name: e.target.value })} />
-                  </div>
-                )}
-                {dossier?.client_last_name ? (
-                  <ReadOnlyField label="Nom" value={dossier.client_last_name} />
-                ) : (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nom</Label>
-                    <Input placeholder="Dupont" value={form.client_last_name} onChange={(e) => setForm({ ...form, client_last_name: e.target.value })} />
-                  </div>
-                )}
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Prénom
+                    {prefilled.has("client_first_name") && <PrefilledBadge />}
+                  </Label>
+                  <Input
+                    placeholder="Jean"
+                    value={form.client_first_name}
+                    onChange={(e) => setForm({ ...form, client_first_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Nom
+                    {prefilled.has("client_last_name") && <PrefilledBadge />}
+                  </Label>
+                  <Input
+                    placeholder="Dupont"
+                    value={form.client_last_name}
+                    onChange={(e) => setForm({ ...form, client_last_name: e.target.value })}
+                  />
+                </div>
               </div>
 
-              {dossier?.client_phone ? (
-                <ReadOnlyField label="Téléphone" value={dossier.client_phone} />
-              ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs">Téléphone</Label>
-                  <Input placeholder="06 12 34 56 78" type="tel" value={form.client_phone} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} />
-                </div>
-              )}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5">
+                  Téléphone
+                  {prefilled.has("client_phone") && <PrefilledBadge />}
+                </Label>
+                <Input
+                  placeholder="06 12 34 56 78"
+                  type="tel"
+                  value={form.client_phone}
+                  onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+                />
+              </div>
 
-              {dossier?.client_email ? (
-                <ReadOnlyField label="Email" value={dossier.client_email} />
-              ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs">Email</Label>
-                  <Input placeholder="client@email.com" type="email" value={form.client_email} onChange={(e) => setForm({ ...form, client_email: e.target.value })} />
-                </div>
-              )}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5">
+                  Email
+                  {prefilled.has("client_email") && <PrefilledBadge />}
+                </Label>
+                <Input
+                  placeholder="client@email.com"
+                  type="email"
+                  value={form.client_email}
+                  onChange={(e) => { setForm({ ...form, client_email: e.target.value }); setEmailError(""); }}
+                  className={emailError ? "border-destructive" : ""}
+                />
+                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+              </div>
 
-              {dossier?.address ? (
-                <ReadOnlyField label="Adresse" value={dossier.address} />
-              ) : (
-                <div className="space-y-1">
-                  <Label className="text-xs">Adresse d'intervention</Label>
-                  <AddressAutocomplete
-                    value={form.address}
-                    onChange={(val) => setForm({ ...form, address: val })}
-                    onAddressSelect={(data) => setForm({ ...form, address: data.address })}
-                  />
-                  <p className="text-xs text-muted-foreground">L'adresse est assistée par Google Maps pour éviter les erreurs de saisie.</p>
-                </div>
-              )}
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5">
+                  Adresse d'intervention
+                  {prefilled.has("address") && <PrefilledBadge />}
+                </Label>
+                <AddressAutocomplete
+                  value={form.address}
+                  onChange={(val) => { setForm({ ...form, address: val }); setAddressData({}); }}
+                  onAddressSelect={(data) => { setForm({ ...form, address: data.address }); setAddressData(data); }}
+                />
+              </div>
 
-              {dossier?.category && dossier.category !== "autre" && (
-                <ReadOnlyField label="Catégorie" value={CATEGORY_LABELS[dossier.category as keyof typeof CATEGORY_LABELS] || dossier.category} />
-              )}
-              {dossier?.urgency && dossier.urgency !== "semaine" && (
-                <ReadOnlyField label="Urgence" value={URGENCY_LABELS[dossier.urgency as keyof typeof URGENCY_LABELS] || dossier.urgency} />
-              )}
-
-              {dossier?.description ? (
-                <ReadOnlyField label="Description" value={dossier.description} />
-              ) : (
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Décrivez votre problème</Label>
-                  <Textarea
-                    rows={5}
-                    placeholder="Ex : Fuite sous l'évier de la cuisine depuis hier soir…"
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    maxLength={5000}
-                  />
-                  <span className="text-xs text-muted-foreground">{form.description.length}/5000</span>
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Type de problème
+                    {prefilled.has("category") && <PrefilledBadge />}
+                  </Label>
+                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Urgence
+                    {prefilled.has("urgency") && <PrefilledBadge />}
+                  </Label>
+                  <Select value={form.urgency} onValueChange={(v) => setForm({ ...form, urgency: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(URGENCY_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1.5">
+                  Description du problème
+                  {prefilled.has("description") && <PrefilledBadge />}
+                </Label>
+                <Textarea
+                  rows={5}
+                  placeholder="Ex : Fuite sous l'évier de la cuisine depuis hier soir…"
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  maxLength={5000}
+                />
+                <span className="text-xs text-muted-foreground">{form.description.length}/5000</span>
+              </div>
 
               <div className="flex justify-end">
                 <Button onClick={() => setStep(2)}>Suivant</Button>
@@ -507,7 +570,7 @@ export default function ClientForm() {
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                   <span className="text-sm text-muted-foreground">Appuyez pour ajouter</span>
                   <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 10 Mo</span>
-                  <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} />
+                  <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} capture="environment" />
                 </label>
               )}
 
@@ -529,13 +592,14 @@ export default function ClientForm() {
             <CardContent className="space-y-5">
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
                 <p className="font-medium text-foreground">Récapitulatif :</p>
-                {hasMissingInfo && (
-                  <p className="text-muted-foreground">
-                    Champs complétés : {Object.entries(missingFields).filter(([, missing]) => missing && form[Object.keys(missingFields).find(k => k === Object.keys(missingFields).find(k2 => k2)) as keyof typeof form]).length > 0 ? "oui" : "aucun nouveau champ"}
-                  </p>
+                {form.client_first_name && (
+                  <p className="text-muted-foreground">Client : {form.client_first_name} {form.client_last_name}</p>
                 )}
-                {form.description && !dossier?.description && (
-                  <p className="text-muted-foreground line-clamp-3">Description : {form.description}</p>
+                {form.address && (
+                  <p className="text-muted-foreground truncate">Adresse : {form.address}</p>
+                )}
+                {form.description && (
+                  <p className="text-muted-foreground line-clamp-2">Description : {form.description}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   {files.length} fichier{files.length !== 1 ? "s" : ""} joint{files.length !== 1 ? "s" : ""}
@@ -549,7 +613,7 @@ export default function ClientForm() {
                     <p className="text-sm font-medium text-foreground">Protection de vos données</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Vos données sont traitées uniquement pour la gestion de votre demande d'intervention.
-                      Elles ne sont pas partagées avec des tiers. Vous pouvez exercer vos droits en contactant votre artisan.
+                      Elles ne sont pas partagées avec des tiers.
                     </p>
                   </div>
                 </div>

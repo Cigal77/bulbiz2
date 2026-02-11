@@ -44,9 +44,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ACTION: get dossier info (initial load)
+    // ACTION: get dossier info
     if (!action || action === "get") {
-      // Also fetch appointment slots if any
       const { data: slots } = await supabase
         .from("appointment_slots")
         .select("id, slot_date, time_start, time_end, selected_at")
@@ -69,7 +68,7 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // ACTION: submit client data (merge only empty fields)
+    // ACTION: submit client data (update ALL provided fields, track changes)
     if (action === "submit") {
       const { data: clientData, rgpd_consent, media_urls } = body;
 
@@ -79,39 +78,65 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Build update object: only fill fields that are currently empty/null
+      // Build update object and track what changed
       const updates: Record<string, unknown> = {};
-      const fieldsToMerge = [
-        "client_first_name", "client_last_name", "client_phone",
-        "client_email", "address", "description",
+      const changedFields: string[] = [];
+
+      const textFields = [
+        { key: "client_first_name", label: "Prénom" },
+        { key: "client_last_name", label: "Nom" },
+        { key: "client_phone", label: "Téléphone" },
+        { key: "client_email", label: "Email" },
+        { key: "address", label: "Adresse" },
+        { key: "description", label: "Description" },
       ] as const;
 
-      for (const field of fieldsToMerge) {
-        const currentVal = dossier[field];
-        const newVal = clientData?.[field]?.trim?.();
-        if ((!currentVal || currentVal === "") && newVal) {
-          updates[field] = newVal;
+      for (const { key, label } of textFields) {
+        const newVal = clientData?.[key]?.trim?.();
+        if (newVal !== undefined && newVal !== "") {
+          const currentVal = (dossier as Record<string, unknown>)[key] as string | null;
+          if (newVal !== (currentVal || "")) {
+            updates[key] = newVal;
+            if (currentVal) {
+              changedFields.push(`${label} modifié`);
+            } else {
+              changedFields.push(`${label} ajouté`);
+            }
+          }
         }
       }
 
-      // Category/urgency: only update if still default
-      if (clientData?.category && dossier.category === "autre") {
+      // Category & urgency
+      if (clientData?.category && clientData.category !== dossier.category) {
         updates.category = clientData.category;
+        changedFields.push("Catégorie modifiée");
       }
-      if (clientData?.urgency && dossier.urgency === "semaine") {
+      if (clientData?.urgency && clientData.urgency !== dossier.urgency) {
         updates.urgency = clientData.urgency;
+        changedFields.push("Urgence modifiée");
       }
 
-      // Update source to lien_client
+      // Address structured data
+      if (clientData?.google_place_id) {
+        updates.google_place_id = clientData.google_place_id;
+        if (clientData.lat) updates.lat = parseFloat(clientData.lat);
+        if (clientData.lng) updates.lng = parseFloat(clientData.lng);
+        if (clientData.postal_code) updates.postal_code = clientData.postal_code;
+        if (clientData.city) updates.city = clientData.city;
+        if (clientData.address_line) updates.address_line = clientData.address_line;
+      }
+
+      // Update source
       updates.source = "lien_client";
 
-      // Auto-transition: if we now have minimum info, upgrade status
+      // Auto-transition status
       const mergedFirstName = updates.client_first_name || dossier.client_first_name;
       const mergedPhone = updates.client_phone || dossier.client_phone;
       const mergedAddress = updates.address || dossier.address;
       const mergedDescription = updates.description || dossier.description;
 
-      if (dossier.status === "a_qualifier" && mergedFirstName && mergedPhone && mergedAddress && mergedDescription) {
+      const hasMinInfo = mergedFirstName && mergedPhone && mergedAddress && mergedDescription;
+      if ((dossier.status === "nouveau" || dossier.status === "a_qualifier") && hasMinInfo) {
         updates.status = "devis_a_faire";
         updates.status_changed_at = new Date().toISOString();
       }
@@ -124,7 +149,7 @@ Deno.serve(async (req) => {
         if (updateError) throw updateError;
       }
 
-      // Insert media records if provided
+      // Insert media records
       if (media_urls && Array.isArray(media_urls)) {
         for (const media of media_urls) {
           await supabase.from("medias").insert({
@@ -138,15 +163,16 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Log in historique
-      const filledFields = Object.keys(updates).filter(k => k !== "source" && k !== "status" && k !== "status_changed_at");
+      // Log in historique with detailed changes
+      const details = changedFields.length > 0
+        ? `Le client a mis à jour : ${changedFields.join(", ")}${media_urls?.length ? ` + ${media_urls.length} média(s)` : ""}`
+        : `Le client a soumis le formulaire${media_urls?.length ? ` avec ${media_urls.length} média(s)` : ""}`;
+
       await supabase.from("historique").insert({
         dossier_id: dossier.id,
         user_id: null,
         action: "client_form_submitted",
-        details: filledFields.length > 0
-          ? `Le client a complété : ${filledFields.join(", ")}${media_urls?.length ? ` + ${media_urls.length} média(s)` : ""}`
-          : `Le client a soumis le formulaire${media_urls?.length ? ` avec ${media_urls.length} média(s)` : ""}`,
+        details,
       });
 
       if (updates.status === "devis_a_faire") {
@@ -154,17 +180,16 @@ Deno.serve(async (req) => {
           dossier_id: dossier.id,
           user_id: null,
           action: "status_change",
-          details: "Statut passé automatiquement à \"Devis à faire\" (informations complètes)",
+          details: 'Statut passé automatiquement à "Devis à faire" (informations complètes)',
         });
       }
 
-      // Don't invalidate token — allow multiple visits
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ACTION: select an appointment slot
+    // ACTION: select appointment slot
     if (action === "select_slot") {
       const { slot_id } = body;
       if (!slot_id) {
@@ -173,7 +198,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Verify slot belongs to this dossier
       const { data: slot, error: slotErr } = await supabase
         .from("appointment_slots")
         .select("*")
@@ -186,26 +210,22 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Mark this slot as selected
       await supabase
         .from("appointment_slots")
         .update({ selected_at: new Date().toISOString() })
         .eq("id", slot_id);
 
-      // Clear other selections for this dossier
       await supabase
         .from("appointment_slots")
         .update({ selected_at: null })
         .eq("dossier_id", dossier.id)
         .neq("id", slot_id);
 
-      // Update dossier appointment status
       await supabase
         .from("dossiers")
         .update({ appointment_status: "client_selected" })
         .eq("id", dossier.id);
 
-      // Log
       const slotDate = new Date(slot.slot_date).toLocaleDateString("fr-FR");
       await supabase.from("historique").insert({
         dossier_id: dossier.id,
