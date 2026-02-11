@@ -276,25 +276,29 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Appointment counters (hide in trash mode) */}
+        {/* Appointment counters - desktop only */}
         {!isLoading && dossiers && !showTrash && (
-          <AppointmentCounters dossiers={dossiers} activeFilter={rdvFilter} onFilterChange={handleRdvFilter} />
+          <div className="hidden md:block">
+            <AppointmentCounters dossiers={dossiers} activeFilter={rdvFilter} onFilterChange={handleRdvFilter} />
+          </div>
         )}
         {rdvFilter === "rdv_confirmed" && (
           <RdvDateFilters active={rdvDateFilter} onChange={setRdvDateFilter} />
         )}
 
-        {/* Status counters (hide in trash mode) */}
+        {/* Status counters - desktop only */}
         {!showTrash && (
-          isLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className="h-[88px] rounded-xl" />
-              ))}
-            </div>
-          ) : (
-            <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
-          )
+          <div className="hidden md:block">
+            {isLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[88px] rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <StatusCounters counts={counts} activeFilter={statusFilter} onFilterChange={handleStatusFilter} />
+            )}
+          </div>
         )}
 
         {/* Filters + Sort + Trash toggle */}

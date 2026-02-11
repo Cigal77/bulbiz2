@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import Index from "./pages/Index";
+import TodoActions from "./pages/TodoActions";
 import Auth from "./pages/Auth";
 import DossierDetail from "./pages/DossierDetail";
 import CreateDossier from "./pages/CreateDossier";
@@ -34,6 +35,7 @@ const App = () => (
               <Route path="/devis/validation" element={<QuoteValidation />} />
               <Route path="/facture/view" element={<InvoiceView />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/a-faire" element={<ProtectedRoute><TodoActions /></ProtectedRoute>} />
               <Route path="/dossier/:id" element={<ProtectedRoute><DossierDetail /></ProtectedRoute>} />
               <Route path="/nouveau" element={<ProtectedRoute><CreateDossier /></ProtectedRoute>} />
               <Route path="/dossier/:dossierId/devis" element={<ProtectedRoute><QuoteEditor /></ProtectedRoute>} />
