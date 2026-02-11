@@ -1243,6 +1243,10 @@ export type Database = {
         | "clos_perdu"
         | "invoice_pending"
         | "invoice_paid"
+        | "devis_signe"
+        | "en_attente_rdv"
+        | "rdv_pris"
+        | "rdv_termine"
       invoice_status: "draft" | "sent" | "paid"
       problem_category:
         | "wc"
@@ -1403,6 +1407,10 @@ export const Constants = {
         "clos_perdu",
         "invoice_pending",
         "invoice_paid",
+        "devis_signe",
+        "en_attente_rdv",
+        "rdv_pris",
+        "rdv_termine",
       ],
       invoice_status: ["draft", "sent", "paid"],
       problem_category: [
