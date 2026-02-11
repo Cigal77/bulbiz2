@@ -4,21 +4,20 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
-// Status changes are now automatic via NextStepBanner
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useToast } from "@/hooks/use-toast";
 import {
   Phone, MessageSquarePlus, FileText, Bell, BellOff, Calendar, RefreshCw, Loader2,
-  Mic, Camera, Map,
+  Mic, Camera, Map, Receipt,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { VoiceRecorderDialog } from "./VoiceRecorderDialog";
 import { MediaUploadDialog } from "./MediaUploadDialog";
-
-
+import { ImportDevisDialog } from "./ImportDevisDialog";
+import { ImportFactureDialog } from "./ImportFactureDialog";
 
 interface DossierActionsProps {
   dossier: Dossier;
@@ -33,6 +32,10 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [importDevisOpen, setImportDevisOpen] = useState(false);
+  const [importFactureOpen, setImportFactureOpen] = useState(false);
+
+  const status = dossier.status;
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
@@ -53,7 +56,7 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   };
 
   const handleSendRelance = () => {
-    const type = dossier.status === "devis_envoye" ? "devis_non_signe" as const : "info_manquante" as const;
+    const type = status === "devis_envoye" ? "devis_non_signe" as const : "info_manquante" as const;
     sendRelance.mutate(type, {
       onSuccess: () => toast({ title: "Relance envoyée !" }),
       onError: (e) => toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" }),
@@ -78,6 +81,12 @@ export function DossierActions({ dossier }: DossierActionsProps) {
     toast({ title: "Plan ajouté" });
   };
 
+  // Status-aware visibility for contextual actions
+  const showImportDevis = ["nouveau", "a_qualifier", "devis_a_faire"].includes(status);
+  const showImportFacture = ["rdv_termine"].includes(status);
+  const showRelancerNow = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
+  const showToggleRelance = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
+
   return (
     <div className="space-y-4">
       {/* Status + meta */}
@@ -85,8 +94,8 @@ export function DossierActions({ dossier }: DossierActionsProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Infos dossier</h3>
 
         <div className="flex items-center gap-2">
-          <Badge className={cn("text-xs", STATUS_COLORS[dossier.status])}>
-            {STATUS_LABELS[dossier.status]}
+          <Badge className={cn("text-xs", STATUS_COLORS[status])}>
+            {STATUS_LABELS[status]}
           </Badge>
         </div>
 
@@ -102,7 +111,7 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
-        {/* Phone */}
+        {/* 1. Phone */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
           {dossier.client_phone ? (
             <a href={`tel:${dossier.client_phone}`}>
@@ -117,7 +126,7 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           )}
         </Button>
 
-        {/* Note text */}
+        {/* 2. Note text */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setNoteOpen(!noteOpen)}>
           <MessageSquarePlus className="h-4 w-4 text-primary" />
           Ajouter une note
@@ -142,64 +151,80 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           </div>
         )}
 
-        {/* Voice note */}
+        {/* 3. Voice note */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setVoiceOpen(true)}>
           <Mic className="h-4 w-4 text-primary" />
           Ajouter note vocale
         </Button>
 
-        {/* Photo / Video */}
+        {/* 4. Photo / Video */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setPhotoOpen(true)}>
           <Camera className="h-4 w-4 text-primary" />
           Ajouter photo / vidéo
         </Button>
 
-        {/* Plan */}
+        {/* 5. Plan */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setPlanOpen(true)}>
           <Map className="h-4 w-4 text-primary" />
           Ajouter plan
         </Button>
 
-        {/* Relance */}
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2"
-          onClick={handleSendRelance}
-          disabled={sendRelance.isPending || !dossier.client_email}
-        >
-          {sendRelance.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 text-primary" />
-          )}
-          Relancer maintenant
-        </Button>
+        {/* 6. Relancer maintenant (contextual) */}
+        {showRelancerNow && (
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={handleSendRelance}
+            disabled={sendRelance.isPending || !dossier.client_email}
+          >
+            {sendRelance.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 text-primary" />
+            )}
+            Relancer maintenant
+          </Button>
+        )}
 
-        {/* Créer devis */}
-        <Button variant="outline" className="w-full justify-start gap-2" disabled>
-          <FileText className="h-4 w-4 text-primary" />
-          Créer devis
-        </Button>
+        {/* 7. Importer devis (contextual) */}
+        {showImportDevis && (
+          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportDevisOpen(true)}>
+            <FileText className="h-4 w-4 text-primary" />
+            Importer devis (PDF)
+          </Button>
+        )}
 
-        {/* Toggle relances */}
-        <Button
-          variant="outline"
-          className={cn("w-full justify-start gap-2", !dossier.relance_active && "text-muted-foreground")}
-          onClick={handleToggleRelance}
-        >
-          {dossier.relance_active ? (
-            <BellOff className="h-4 w-4 text-destructive" />
-          ) : (
-            <Bell className="h-4 w-4 text-primary" />
-          )}
-          {dossier.relance_active ? "Stop relances" : "Activer relances"}
-        </Button>
+        {/* 8. Importer facture (contextual) */}
+        {showImportFacture && (
+          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportFactureOpen(true)}>
+            <Receipt className="h-4 w-4 text-primary" />
+            Importer facture (PDF)
+          </Button>
+        )}
+
+        {/* 9. Toggle relances (contextual) */}
+        {showToggleRelance && (
+          <Button
+            variant="outline"
+            className={cn("w-full justify-start gap-2", !dossier.relance_active && "text-muted-foreground")}
+            onClick={handleToggleRelance}
+          >
+            {dossier.relance_active ? (
+              <BellOff className="h-4 w-4 text-destructive" />
+            ) : (
+              <Bell className="h-4 w-4 text-primary" />
+            )}
+            {dossier.relance_active ? "Stop relances" : "Activer relances"}
+          </Button>
+        )}
       </div>
 
       {/* Dialogs */}
       <VoiceRecorderDialog open={voiceOpen} onClose={() => setVoiceOpen(false)} onSave={handleVoiceSave} />
       <MediaUploadDialog open={photoOpen} onClose={() => setPhotoOpen(false)} onUpload={handlePhotoUpload} mode="photo_video" />
       <MediaUploadDialog open={planOpen} onClose={() => setPlanOpen(false)} onUpload={handlePlanUpload} mode="plan" />
+      <ImportDevisDialog open={importDevisOpen} onClose={() => setImportDevisOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
+      <ImportFactureDialog open={importFactureOpen} onClose={() => setImportFactureOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
     </div>
   );
 }
