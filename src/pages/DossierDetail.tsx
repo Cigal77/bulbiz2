@@ -107,14 +107,19 @@ export default function DossierDetail() {
               dossier={dossier}
               onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
+            {/* RDV Block — FIRST, always visible */}
+            <div ref={appointmentRef}>
+              <AppointmentBlock dossier={dossier} />
+            </div>
             <AppointmentBanner
               dossier={dossier}
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
+            <QuoteBlock dossier={dossier} />
+            <InvoiceBlock dossier={dossier} />
             <SummaryBlock dossier={dossier} />
             <ClientBlock dossier={dossier} />
             <InterventionBlock dossier={dossier} />
-            <QuoteBlock dossier={dossier} />
             <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
             <HistoriqueTimeline historique={historique} isLoading={histLoading} />
           </div>
@@ -122,10 +127,6 @@ export default function DossierDetail() {
           {/* Right column - actions */}
           <div className="space-y-4">
             <DossierActions dossier={dossier} />
-            <div ref={appointmentRef}>
-              <AppointmentBlock dossier={dossier} />
-            </div>
-            <InvoiceBlock dossier={dossier} />
             <ClientLinkBlock dossier={dossier} />
           </div>
         </div>
