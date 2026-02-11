@@ -3,7 +3,7 @@ import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_
 import type { AppointmentStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check, Receipt } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow, format, differenceInHours, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 
@@ -96,6 +96,37 @@ function InvoiceBadge({ dossier }: { dossier: Dossier }) {
   return null;
 }
 
+function getSmartCounter(dossier: Dossier): { text: string; color: string } | null {
+  const now = new Date();
+  const status = dossier.status;
+  const noCounter = ["nouveau", "a_qualifier", "devis_a_faire", "rdv_termine", "invoice_paid", "clos_perdu", "clos_signe"];
+  if (noCounter.includes(status)) return null;
+
+  const fmt = (prefix: string, ref: Date) => {
+    const hours = differenceInHours(now, ref);
+    const days = differenceInDays(now, ref);
+    if (hours < 24) return { text: `${prefix} il y a ${Math.max(1, hours)}h`, color: "text-muted-foreground" };
+    if (days <= 7) return { text: `${prefix} il y a ${days}j`, color: "text-muted-foreground" };
+    return { text: `${prefix} il y a ${days}j`, color: "text-warning" };
+  };
+
+  if (status === "devis_envoye") return fmt("Envoyé", new Date(dossier.status_changed_at));
+  if (status === "devis_signe" || status === "en_attente_rdv") return fmt("En attente", new Date(dossier.status_changed_at));
+  if (status === "rdv_pris") {
+    const d = dossier.appointment_date;
+    if (d) {
+      const rdv = new Date(d);
+      const h = differenceInHours(rdv, now);
+      const dd = differenceInDays(rdv, now);
+      if (h < 0) return { text: `RDV passé (${Math.abs(dd)}j)`, color: "text-warning" };
+      if (h < 24) return { text: `RDV dans ${Math.max(1, h)}h`, color: "text-muted-foreground" };
+      return { text: `RDV dans ${dd}j`, color: "text-muted-foreground" };
+    }
+  }
+  if (status === "invoice_pending") return fmt("Émise", new Date(dossier.status_changed_at));
+  return null;
+}
+
 export function DossierList({ dossiers, onSelect }: DossierListProps) {
   if (dossiers.length === 0) {
     return (
@@ -146,10 +177,20 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
                 )}
               </div>
 
-              {/* RDV + Invoice badges */}
+              {/* RDV + Invoice badges + Time counter */}
               <div className="flex items-center gap-1.5 flex-wrap">
                 <AppointmentBadge dossier={dossier} />
                 <InvoiceBadge dossier={dossier} />
+                {(() => {
+                  const counter = getSmartCounter(dossier);
+                  if (!counter) return null;
+                  return (
+                    <span className={cn("text-[10px] flex items-center gap-0.5", counter.color)}>
+                      <Clock className="h-2.5 w-2.5" />
+                      {counter.text}
+                    </span>
+                  );
+                })()}
               </div>
 
               {/* Phone + date */}
