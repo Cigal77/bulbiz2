@@ -15,7 +15,7 @@ import type { AppointmentStatus } from "@/lib/constants";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles, CreditCard,
+  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles, CreditCard, Link2, AlertCircle,
 } from "lucide-react";
 
 interface NextStepBannerProps {
@@ -161,9 +161,32 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     });
   };
 
-  // Determine next step
+  // Send client link mutation
+  const sendClientLink = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("send-client-link", {
+        body: { dossier_id: dossier.id },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Lien envoyé au client ✅" });
+      invalidate();
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Detect missing client info
+  const missingFields: string[] = [];
+  if (!dossier.client_email) missingFields.push("email");
+  if (!dossier.client_phone) missingFields.push("téléphone");
+  if (!dossier.address && !dossier.address_line) missingFields.push("adresse");
+  const hasIncompleteInfo = missingFields.length > 0;
+
+  // Determine next step with priority logic
   const getNextStep = (): {
     message: string;
+    hint?: string;
     primaryLabel: string;
     primaryIcon: React.ReactNode;
     primaryAction: () => void;
@@ -175,23 +198,38 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   } | null => {
     const status = dossier.status;
 
-    if (status === "nouveau" || status === "a_qualifier" || status === "devis_a_faire") {
+    // ──── PRIORITY 1: Incomplete client info (for early statuses) ────
+    if (hasIncompleteInfo && ["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
+      const hasAnyContact = dossier.client_email || dossier.client_phone;
+      return {
+        message: "Prochaine étape : Récupérer les informations manquantes",
+        hint: `Le client n'a pas encore renseigné : ${missingFields.join(", ")}.`,
+        primaryLabel: "Envoyer lien client",
+        primaryIcon: <Link2 className="h-4 w-4" />,
+        primaryAction: () => sendClientLink.mutate(),
+        isPending: sendClientLink.isPending,
+        secondaryLabel: "Importer devis (PDF)",
+        secondaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
+      };
+    }
+
+    // ──── Early statuses with complete info → Import/Create devis ────
+    if (["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
       return {
         message: "Prochaine étape : Importer ou créer un devis",
         primaryLabel: "Importer devis (PDF)",
         primaryIcon: <FileText className="h-4 w-4" />,
-        primaryAction: () => {
-          // Trigger import dialog via DOM event (handled in DossierDetail)
-          window.dispatchEvent(new CustomEvent("open-import-devis"));
-        },
+        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
         secondaryLabel: "Créer un devis",
         secondaryAction: () => navigate(`/dossier/${dossier.id}/devis`),
       };
     }
 
+    // ──── Devis envoyé → Waiting for signature ────
     if (status === "devis_envoye") {
       return {
         message: "En attente de la signature du client",
+        hint: "Le devis a été envoyé. Relancez si le client tarde à répondre.",
         primaryLabel: "Renvoyer le devis",
         primaryIcon: <Send className="h-4 w-4" />,
         primaryAction: () => {
@@ -204,9 +242,11 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
-    if (status === "devis_signe" || (status === "en_attente_rdv")) {
+    // ──── PRIORITY 2: Devis signé / en attente RDV → Fixer RDV ────
+    if (status === "devis_signe" || status === "en_attente_rdv") {
       return {
         message: "Prochaine étape : Fixer un rendez-vous",
+        hint: "Le devis est signé. Proposez des créneaux au client pour l'intervention.",
         primaryLabel: "Proposer des créneaux",
         primaryIcon: <Calendar className="h-4 w-4" />,
         primaryAction: () => onScrollToAppointment?.(),
@@ -215,6 +255,7 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
+    // ──── PRIORITY 3: RDV pris → Marquer intervention terminée ────
     if (status === "rdv_pris") {
       const appointmentDate = (dossier as any).appointment_date;
       const timeStart = (dossier as any).appointment_time_start;
@@ -226,6 +267,7 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
 
       return {
         message: `Intervention prévue ${dateInfo}${timeInfo}`,
+        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer à la facturation.",
         primaryLabel: "Marquer intervention terminée",
         primaryIcon: <CheckCircle2 className="h-4 w-4" />,
         primaryAction: () => markDone.mutate(),
@@ -233,23 +275,25 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
+    // ──── PRIORITY 4: RDV terminé → Facturer ────
     if (status === "rdv_termine") {
       return {
         message: "Prochaine étape : Importer ou générer la facture",
+        hint: "L'intervention est terminée. Envoyez la facture au client.",
         primaryLabel: "Importer facture (PDF)",
         primaryIcon: <Receipt className="h-4 w-4" />,
-        primaryAction: () => {
-          window.dispatchEvent(new CustomEvent("open-import-facture"));
-        },
+        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-facture")),
         secondaryLabel: "Générer la facture",
         secondaryAction: handleGenerate,
       };
     }
 
+    // ──── PRIORITY 5: Facture en attente → Marquer payée ────
     if (status === "invoice_pending") {
       const inv = invoices[0];
       return {
         message: inv ? `Facture ${inv.invoice_number} en attente de paiement` : "Facture en attente de paiement",
+        hint: "Marquez la facture comme payée dès réception du règlement.",
         primaryLabel: "Marquer payée",
         primaryIcon: <CreditCard className="h-4 w-4" />,
         primaryAction: () => markPaid.mutate(),
@@ -294,6 +338,14 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         <Sparkles className="h-4 w-4 text-primary shrink-0" />
         <p className="text-sm font-medium text-foreground">{step.message}</p>
       </div>
+
+      {/* Hint — "Pourquoi ?" */}
+      {step.hint && (
+        <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2">
+          <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground">{step.hint}</p>
+        </div>
+      )}
 
       {/* Done state */}
       {step.done && step.badge && (
