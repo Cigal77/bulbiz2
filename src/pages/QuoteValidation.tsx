@@ -52,6 +52,7 @@ export default function QuoteValidation() {
   const [refuseReason, setRefuseReason] = useState("");
   const [showRefuseForm, setShowRefuseForm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(true);
 
   useEffect(() => {
     if (!token) {
@@ -243,15 +244,48 @@ export default function QuoteValidation() {
           </Card>
         )}
 
-        {/* PDF link */}
+        {/* PDF preview + link */}
         {quote?.pdf_url && (
-          <Button variant="outline" className="w-full gap-2" asChild>
-            <a href={quote.pdf_url} target="_blank" rel="noopener noreferrer">
-              <FileText className="h-4 w-4" />
-              Voir le devis (PDF)
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </Button>
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Aperçu du devis</p>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-muted-foreground"
+                  onClick={() => setShowPdfPreview((v) => !v)}
+                >
+                  {showPdfPreview ? "Masquer" : "Afficher"}
+                </Button>
+              </div>
+
+              {showPdfPreview && (
+                <div className="w-full overflow-hidden rounded-lg border bg-muted">
+                  {/* ratio ~ A4 portrait */}
+                  <div className="relative w-full" style={{ paddingTop: "141%" }}>
+                    <iframe
+                      title="Aperçu devis PDF"
+                      src={`${quote.pdf_url}#view=FitH`}
+                      className="absolute inset-0 h-full w-full"
+                    />
+                  </div>
+                  <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                    Si l’aperçu ne s’affiche pas, ouvrez le PDF en plein écran.
+                  </p>
+                </div>
+              )}
+
+              <Button variant="outline" className="w-full gap-2" asChild>
+                <a href={quote.pdf_url} target="_blank" rel="noopener noreferrer">
+                  <FileText className="h-4 w-4" />
+                  Voir le devis (PDF)
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Notes */}
