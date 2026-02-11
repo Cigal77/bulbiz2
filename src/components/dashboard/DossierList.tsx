@@ -2,14 +2,25 @@ import type { Dossier } from "@/hooks/useDossiers";
 import { STATUS_LABELS, STATUS_COLORS, CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS, APPOINTMENT_STATUS_LABELS } from "@/lib/constants";
 import type { AppointmentStatus } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check, Receipt } from "lucide-react";
+import { Phone, MapPin, Clock, Calendar, AlertTriangle, Send, Check, Receipt, Trash2, RotateCcw, MoreVertical } from "lucide-react";
 import { formatDistanceToNow, format, differenceInHours, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 interface DossierListProps {
   dossiers: Dossier[];
   onSelect: (dossier: Dossier) => void;
+  isTrash?: boolean;
+  onDelete?: (dossier: Dossier) => void;
+  onPermanentDelete?: (dossier: Dossier) => void;
+  onRestore?: (dossier: Dossier) => void;
 }
 
 const RDV_BADGE_CONFIG: Partial<Record<AppointmentStatus, { label: string; className: string; icon: React.ReactNode }>> = {
@@ -127,16 +138,18 @@ function getSmartCounter(dossier: Dossier): { text: string; color: string } | nu
   return null;
 }
 
-export function DossierList({ dossiers, onSelect }: DossierListProps) {
+export function DossierList({ dossiers, onSelect, isTrash, onDelete, onPermanentDelete, onRestore }: DossierListProps) {
   if (dossiers.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-          <Clock className="h-6 w-6 text-muted-foreground" />
+          {isTrash ? <Trash2 className="h-6 w-6 text-muted-foreground" /> : <Clock className="h-6 w-6 text-muted-foreground" />}
         </div>
-        <p className="text-lg font-medium text-foreground">Aucun dossier</p>
+        <p className="text-lg font-medium text-foreground">
+          {isTrash ? "Corbeille vide" : "Aucun dossier"}
+        </p>
         <p className="text-sm text-muted-foreground mt-1">
-          Créez votre premier dossier pour commencer.
+          {isTrash ? "Aucun dossier supprimé." : "Créez votre premier dossier pour commencer."}
         </p>
       </div>
     );
@@ -145,13 +158,12 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
   return (
     <div className="space-y-2">
       {dossiers.map((dossier) => (
-        <button
+        <div
           key={dossier.id}
-          onClick={() => onSelect(dossier)}
-          className="w-full text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm group"
+          className="w-full text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm group relative"
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0 space-y-1.5">
+            <button onClick={() => onSelect(dossier)} className="flex-1 min-w-0 space-y-1.5 text-left">
               {/* Client name + urgency */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-foreground truncate">
@@ -206,14 +218,49 @@ export function DossierList({ dossiers, onSelect }: DossierListProps) {
                   {formatDistanceToNow(new Date(dossier.created_at), { addSuffix: true, locale: fr })}
                 </span>
               </div>
-            </div>
+            </button>
 
-            {/* Status badge */}
-            <div className={cn("shrink-0 rounded-md px-2.5 py-1 text-xs font-medium", STATUS_COLORS[dossier.status])}>
-              {STATUS_LABELS[dossier.status]}
+            {/* Right: Status + actions menu */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={cn("rounded-md px-2.5 py-1 text-xs font-medium", STATUS_COLORS[dossier.status])}>
+                {STATUS_LABELS[dossier.status]}
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {isTrash ? (
+                    <>
+                      <DropdownMenuItem onClick={() => onRestore?.(dossier)}>
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Restaurer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => onPermanentDelete?.(dossier)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer définitivement
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => onDelete?.(dossier)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </button>
+        </div>
       ))}
     </div>
   );
