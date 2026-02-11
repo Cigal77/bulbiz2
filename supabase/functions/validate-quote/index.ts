@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       await supabase
         .from("dossiers")
         .update({
-          status: "clos_signe",
+          status: "en_attente_rdv",
           status_changed_at: now,
           relance_active: false,
           appointment_status: "rdv_pending",
@@ -235,7 +235,7 @@ Deno.serve(async (req) => {
                 <h2 style="color:#16a34a;">✅ Bonne nouvelle !</h2>
                 <p>Bonjour ${artisanName},</p>
                 <p><strong>${clientName}</strong> a validé votre devis <strong>${quote.quote_number}</strong>.</p>
-                <p>Le dossier a été automatiquement passé en <strong>Clos – Signé</strong>.</p>
+                <p>Le dossier a été automatiquement passé en <strong>En attente de RDV</strong>.</p>
               </div>`
             : `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
                 <h2 style="color:#dc2626;">❌ Devis refusé</h2>

@@ -23,8 +23,9 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
   const { data: invoices = [], isLoading } = useInvoices(dossier.id);
   const { generateFromQuote } = useInvoiceActions(dossier.id);
 
-  // Only show if appointment is done or invoices exist
-  if (appointmentStatus !== "done" && invoices.length === 0) return null;
+  // Show if RDV terminé, or invoice statuses, or invoices exist
+  const showStatuses = ["rdv_termine", "invoice_pending", "invoice_paid"];
+  if (appointmentStatus !== "done" && !showStatuses.includes(dossier.status) && invoices.length === 0) return null;
 
   const handleGenerate = () => {
     generateFromQuote.mutate(undefined, {

@@ -1,7 +1,7 @@
 import { STATUS_LABELS, STATUS_COLORS, DASHBOARD_STATUSES } from "@/lib/constants";
 import type { Database } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
-import { FileText, ClipboardList, Send, CheckCircle, XCircle, Receipt, CreditCard } from "lucide-react";
+import { FileText, ClipboardList, Send, CheckCircle, XCircle, Receipt, CreditCard, Calendar, Clock, CheckCheck } from "lucide-react";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
 
@@ -9,7 +9,10 @@ const STATUS_ICONS: Partial<Record<DossierStatus, React.ReactNode>> = {
   nouveau: <FileText className="h-4 w-4" />,
   devis_a_faire: <ClipboardList className="h-4 w-4" />,
   devis_envoye: <Send className="h-4 w-4" />,
-  clos_signe: <CheckCircle className="h-4 w-4" />,
+  devis_signe: <CheckCircle className="h-4 w-4" />,
+  en_attente_rdv: <Clock className="h-4 w-4" />,
+  rdv_pris: <Calendar className="h-4 w-4" />,
+  rdv_termine: <CheckCheck className="h-4 w-4" />,
   clos_perdu: <XCircle className="h-4 w-4" />,
   invoice_pending: <Receipt className="h-4 w-4" />,
   invoice_paid: <CreditCard className="h-4 w-4" />,
@@ -29,7 +32,7 @@ export function StatusCounters({ counts, activeFilter, onFilterChange }: StatusC
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
       {DASHBOARD_STATUSES.map((status) => (
         <button
           key={status}
