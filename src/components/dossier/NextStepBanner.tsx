@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -332,45 +333,78 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   if (!step) return null;
 
   return (
-    <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-3">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-3"
+    >
       {/* Next step message */}
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary shrink-0" />
+      <motion.div
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.15, duration: 0.3 }}
+        className="flex items-center gap-2"
+      >
+        <motion.div
+          animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+          transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
+        >
+          <Sparkles className="h-4 w-4 text-primary shrink-0" />
+        </motion.div>
         <p className="text-sm font-medium text-foreground">{step.message}</p>
-      </div>
+      </motion.div>
 
       {/* Hint — "Pourquoi ?" */}
       {step.hint && (
-        <div className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2">
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          transition={{ delay: 0.25, duration: 0.3 }}
+          className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2"
+        >
           <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">{step.hint}</p>
-        </div>
+        </motion.div>
       )}
 
       {/* Done state */}
       {step.done && step.badge && (
-        <Badge className="bg-success/15 text-success text-sm px-3 py-1">{step.badge}</Badge>
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 300 }}>
+          <Badge className="bg-success/15 text-success text-sm px-3 py-1">{step.badge}</Badge>
+        </motion.div>
       )}
 
       {/* Primary action button */}
       {!step.done && step.primaryLabel && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
-            onClick={step.primaryAction}
-            disabled={step.isPending}
-          >
-            {step.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : step.primaryIcon}
-            {step.primaryLabel}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.3 }}
+          className="flex flex-wrap gap-2"
+        >
+          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <Button
+              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
+              onClick={step.primaryAction}
+              disabled={step.isPending}
+            >
+              {step.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : step.primaryIcon}
+              {step.primaryLabel}
+              <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2 }}>
+                <ArrowRight className="h-4 w-4" />
+              </motion.div>
+            </Button>
+          </motion.div>
 
           {step.secondaryLabel && step.secondaryAction && (
-            <Button variant="outline" className="gap-2" onClick={step.secondaryAction}>
-              {step.secondaryLabel}
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button variant="outline" className="gap-2" onClick={step.secondaryAction}>
+                {step.secondaryLabel}
+              </Button>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* Manual RDV inline form */}
@@ -414,6 +448,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
