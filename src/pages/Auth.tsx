@@ -10,7 +10,7 @@ import { Navigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 
-type AuthMode = "login" | "signup" | "magic";
+type AuthMode = "login" | "signup" | "magic" | "reset";
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -126,18 +126,62 @@ export default function Auth() {
 
           <div className="space-y-2 text-center lg:text-left">
             <h2 className="text-2xl font-bold text-foreground">
-              {mode === "signup" ? "Créer un compte" : mode === "magic" ? "Connexion par lien" : "Se connecter"}
+              {mode === "signup" ? "Créer un compte" : mode === "magic" ? "Connexion par lien" : mode === "reset" ? "Mot de passe oublié" : "Se connecter"}
             </h2>
             <p className="text-sm text-muted-foreground">
               {mode === "signup"
                 ? "Commencez à centraliser vos demandes"
                 : mode === "magic"
                 ? "Recevez un lien de connexion par email"
+                : mode === "reset"
+                ? "Recevez un lien pour réinitialiser votre mot de passe"
                 : "Accédez à vos dossiers"}
             </p>
           </div>
 
-          {mode === "magic" ? (
+          {mode === "reset" ? (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setSubmitting(true);
+              try {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: window.location.origin + "/reset-password",
+                });
+                if (error) throw error;
+                toast({
+                  title: "Lien envoyé",
+                  description: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
+                });
+              } catch (error: any) {
+                toast({
+                  title: "Lien envoyé",
+                  description: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.",
+                });
+              } finally {
+                setSubmitting(false);
+              }
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={submitting}>
+                {submitting ? "Envoi..." : "Envoyer le lien de réinitialisation"}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </form>
+          ) : mode === "magic" ? (
             <form onSubmit={handleMagicLink} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="magic-email">Email</Label>
@@ -216,6 +260,17 @@ export default function Auth() {
                   />
                 </div>
               </div>
+              {mode === "login" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setMode("reset")}
+                    className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? "Chargement..." : mode === "signup" ? "Créer mon compte" : "Se connecter"}
                 <ArrowRight className="ml-2 h-4 w-4" />
