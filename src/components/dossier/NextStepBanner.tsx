@@ -16,8 +16,9 @@ import type { AppointmentStatus } from "@/lib/constants";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles, CreditCard, Link2, AlertCircle,
+  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles, CreditCard, Link2, AlertCircle, Clock,
 } from "lucide-react";
+import { differenceInHours, differenceInDays } from "date-fns";
 
 interface NextStepBannerProps {
   dossier: Dossier;
@@ -185,6 +186,73 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   const hasIncompleteInfo = missingFields.length > 0;
 
   // Determine next step with priority logic
+  // ── Smart time counter logic ──
+  const getTimeCounter = (): { text: string; color: "muted" | "warning" | "destructive" } | null => {
+    const now = new Date();
+    const status = dossier.status;
+
+    // Don't show for: nouveau, devis_a_faire, rdv_termine, invoice_paid, clos_perdu, clos_signe
+    const noCounterStatuses = ["nouveau", "a_qualifier", "devis_a_faire", "rdv_termine", "invoice_paid", "clos_perdu", "clos_signe"];
+    if (noCounterStatuses.includes(status)) return null;
+
+    // Devis envoyé → since sent_at
+    if (status === "devis_envoye") {
+      const sentQuote = quotes.find(q => q.sent_at);
+      const ref = sentQuote?.sent_at ? new Date(sentQuote.sent_at) : new Date(dossier.status_changed_at);
+      return formatCounter("Envoyé", ref, now);
+    }
+
+    // Devis signé / en attente RDV → since status change
+    if (status === "devis_signe" || status === "en_attente_rdv") {
+      const ref = new Date(dossier.status_changed_at);
+      return formatCounter("En attente", ref, now);
+    }
+
+    // RDV pris → countdown to appointment
+    if (status === "rdv_pris") {
+      const appointmentDate = (dossier as any).appointment_date;
+      if (appointmentDate) {
+        const rdvDate = new Date(appointmentDate);
+        const hoursUntil = differenceInHours(rdvDate, now);
+        const daysUntil = differenceInDays(rdvDate, now);
+        if (hoursUntil < 0) return { text: `RDV passé depuis ${Math.abs(daysUntil)} jour(s)`, color: "warning" };
+        if (hoursUntil < 24) return { text: `RDV dans ${Math.max(1, hoursUntil)} heure(s)`, color: "muted" };
+        return { text: `RDV dans ${daysUntil} jour(s)`, color: "muted" };
+      }
+      return null;
+    }
+
+    // Facture en attente → since invoice creation
+    if (status === "invoice_pending") {
+      const inv = invoices[0];
+      const ref = inv ? new Date(inv.created_at) : new Date(dossier.status_changed_at);
+      const days = differenceInDays(now, ref);
+      // Check payment terms for overdue
+      if (inv?.payment_terms) {
+        const termDays = parseInt(inv.payment_terms, 10);
+        if (!isNaN(termDays)) {
+          const dueDate = new Date(ref);
+          dueDate.setDate(dueDate.getDate() + termDays);
+          if (now > dueDate) {
+            const overdueDays = differenceInDays(now, dueDate);
+            return { text: `En retard de ${overdueDays} jour(s)`, color: "destructive" };
+          }
+        }
+      }
+      return formatCounter("Émise", ref, now);
+    }
+
+    return null;
+  };
+
+  const formatCounter = (prefix: string, ref: Date, now: Date): { text: string; color: "muted" | "warning" | "destructive" } => {
+    const hours = differenceInHours(now, ref);
+    const days = differenceInDays(now, ref);
+    if (hours < 24) return { text: `${prefix} il y a ${Math.max(1, hours)} heure(s)`, color: "muted" };
+    if (days <= 7) return { text: `${prefix} il y a ${days} jour(s)`, color: "muted" };
+    return { text: `${prefix} il y a ${days} jour(s)`, color: "warning" };
+  };
+
   const getNextStep = (): {
     message: string;
     hint?: string;
@@ -330,7 +398,14 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   };
 
   const step = getNextStep();
+  const timeCounter = getTimeCounter();
   if (!step) return null;
+
+  const counterColorClass = timeCounter?.color === "destructive"
+    ? "text-destructive"
+    : timeCounter?.color === "warning"
+      ? "text-warning"
+      : "text-muted-foreground";
 
   return (
     <motion.div
@@ -344,15 +419,28 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.15, duration: 0.3 }}
-        className="flex items-center gap-2"
+        className="space-y-1"
       >
-        <motion.div
-          animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
-          transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
-        >
-          <Sparkles className="h-4 w-4 text-primary shrink-0" />
-        </motion.div>
-        <p className="text-sm font-medium text-foreground">{step.message}</p>
+        <div className="flex items-center gap-2">
+          <motion.div
+            animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+            transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
+          >
+            <Sparkles className="h-4 w-4 text-primary shrink-0" />
+          </motion.div>
+          <p className="text-sm font-medium text-foreground">{step.message}</p>
+        </div>
+        {timeCounter && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.3 }}
+            className={`text-[11px] flex items-center gap-1 ml-6 ${counterColorClass}`}
+          >
+            <Clock className="h-3 w-3" />
+            {timeCounter.text}
+          </motion.p>
+        )}
       </motion.div>
 
       {/* Hint — "Pourquoi ?" */}
