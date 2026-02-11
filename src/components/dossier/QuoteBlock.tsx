@@ -103,9 +103,9 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
     }
   };
 
-  // Only show for relevant statuses
-  const showStatuses = ["devis_a_faire", "devis_envoye", "clos_signe", "clos_perdu"];
-  if (!showStatuses.includes(dossier.status)) return null;
+  // Show for all statuses where quotes are relevant (hide only for brand new dossiers without quotes)
+  const hideStatuses = ["nouveau", "a_qualifier"];
+  if (hideStatuses.includes(dossier.status) && quotes.length === 0) return null;
 
   return (
     <Card>
