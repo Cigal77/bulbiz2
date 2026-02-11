@@ -1,0 +1,91 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+type MediaCategory = "image" | "video" | "audio" | "plan";
+
+export function useMediaUpload(dossierId: string) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["medias", dossierId] });
+    queryClient.invalidateQueries({ queryKey: ["historique", dossierId] });
+  };
+
+  const addHistorique = async (action: string, details?: string) => {
+    await supabase.from("historique").insert({
+      dossier_id: dossierId,
+      user_id: user?.id ?? null,
+      action,
+      details,
+    });
+  };
+
+  const uploadFiles = useMutation({
+    mutationFn: async ({
+      files,
+      category,
+      duration,
+    }: {
+      files: File[] | Blob[];
+      category: MediaCategory;
+      duration?: number;
+    }) => {
+      if (!user) throw new Error("Non authentifié");
+
+      for (const file of files) {
+        const fileName = file instanceof File ? file.name : `note-vocale-${Date.now()}.webm`;
+        const fileType = file instanceof File ? file.type : "audio/webm";
+        const fileSize = file.size;
+        const storagePath = `${user.id}/${dossierId}/${Date.now()}-${fileName}`;
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+          .from("dossier-medias")
+          .upload(storagePath, file, { contentType: fileType });
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("dossier-medias")
+          .getPublicUrl(storagePath);
+
+        // Insert media record
+        const { error: insertError } = await supabase.from("medias").insert({
+          dossier_id: dossierId,
+          user_id: user.id,
+          file_name: fileName,
+          file_type: fileType,
+          file_url: urlData.publicUrl,
+          file_size: fileSize,
+          media_category: category,
+          duration: duration ?? null,
+        });
+        if (insertError) throw insertError;
+
+        // Add historique
+        const labels: Record<MediaCategory, string> = {
+          image: "Photo ajoutée",
+          video: "Vidéo ajoutée",
+          audio: "Note vocale ajoutée",
+          plan: "Plan ajouté",
+        };
+        const durationStr = duration ? ` (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")})` : "";
+        await addHistorique("media_added", `${labels[category]}${durationStr} — ${fileName}`);
+      }
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteMedia = useMutation({
+    mutationFn: async (mediaId: string) => {
+      const { error } = await supabase.from("medias").delete().eq("id", mediaId);
+      if (error) throw error;
+      await addHistorique("media_deleted", "Média supprimé");
+    },
+    onSuccess: invalidate,
+  });
+
+  return { uploadFiles, deleteMedia };
+}

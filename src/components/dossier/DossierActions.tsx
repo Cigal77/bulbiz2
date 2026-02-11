@@ -12,13 +12,17 @@ import { STATUS_LABELS, ALL_STATUSES } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
 import type { Database } from "@/integrations/supabase/types";
 import { useDossierActions } from "@/hooks/useDossierActions";
+import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useToast } from "@/hooks/use-toast";
 import {
   Phone, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar, RefreshCw, Loader2,
+  Mic, Camera, Map,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { VoiceRecorderDialog } from "./VoiceRecorderDialog";
+import { MediaUploadDialog } from "./MediaUploadDialog";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
 
@@ -28,9 +32,13 @@ interface DossierActionsProps {
 
 export function DossierActions({ dossier }: DossierActionsProps) {
   const { changeStatus, addNote, toggleRelance, sendRelance } = useDossierActions(dossier.id);
+  const { uploadFiles } = useMediaUpload(dossier.id);
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
 
   const handleStatusChange = (status: string) => {
     changeStatus.mutate(status as DossierStatus, {
@@ -63,6 +71,24 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       onSuccess: () => toast({ title: "Relance envoyée !" }),
       onError: (e) => toast({ title: "Erreur d'envoi", description: e.message, variant: "destructive" }),
     });
+  };
+
+  const handleVoiceSave = async (blob: Blob, duration: number) => {
+    await uploadFiles.mutateAsync({ files: [blob], category: "audio", duration });
+    toast({ title: "Note vocale enregistrée" });
+  };
+
+  const handlePhotoUpload = async (files: File[]) => {
+    for (const f of files) {
+      const cat = f.type.startsWith("video/") ? "video" as const : "image" as const;
+      await uploadFiles.mutateAsync({ files: [f], category: cat });
+    }
+    toast({ title: `${files.length} fichier(s) ajouté(s)` });
+  };
+
+  const handlePlanUpload = async (files: File[]) => {
+    await uploadFiles.mutateAsync({ files, category: "plan" });
+    toast({ title: "Plan ajouté" });
   };
 
   return (
@@ -99,6 +125,7 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
+        {/* Phone */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
           {dossier.client_phone ? (
             <a href={`tel:${dossier.client_phone}`}>
@@ -113,11 +140,8 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           )}
         </Button>
 
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2"
-          onClick={() => setNoteOpen(!noteOpen)}
-        >
+        {/* Note text */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setNoteOpen(!noteOpen)}>
           <MessageSquarePlus className="h-4 w-4 text-primary" />
           Ajouter une note
         </Button>
@@ -141,6 +165,25 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           </div>
         )}
 
+        {/* Voice note */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setVoiceOpen(true)}>
+          <Mic className="h-4 w-4 text-primary" />
+          Ajouter note vocale
+        </Button>
+
+        {/* Photo / Video */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setPhotoOpen(true)}>
+          <Camera className="h-4 w-4 text-primary" />
+          Ajouter photo / vidéo
+        </Button>
+
+        {/* Plan */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setPlanOpen(true)}>
+          <Map className="h-4 w-4 text-primary" />
+          Ajouter plan
+        </Button>
+
+        {/* Relance */}
         <Button
           variant="outline"
           className="w-full justify-start gap-2"
@@ -155,11 +198,13 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           Relancer maintenant
         </Button>
 
+        {/* Créer devis */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled>
           <FileText className="h-4 w-4 text-primary" />
           Créer devis
         </Button>
 
+        {/* Toggle relances */}
         <Button
           variant="outline"
           className={cn("w-full justify-start gap-2", !dossier.relance_active && "text-muted-foreground")}
@@ -173,6 +218,11 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           {dossier.relance_active ? "Stop relances" : "Activer relances"}
         </Button>
       </div>
+
+      {/* Dialogs */}
+      <VoiceRecorderDialog open={voiceOpen} onClose={() => setVoiceOpen(false)} onSave={handleVoiceSave} />
+      <MediaUploadDialog open={photoOpen} onClose={() => setPhotoOpen(false)} onUpload={handlePhotoUpload} mode="photo_video" />
+      <MediaUploadDialog open={planOpen} onClose={() => setPlanOpen(false)} onUpload={handlePlanUpload} mode="plan" />
     </div>
   );
 }

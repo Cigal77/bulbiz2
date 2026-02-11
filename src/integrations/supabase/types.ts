@@ -655,31 +655,37 @@ export type Database = {
         Row: {
           created_at: string
           dossier_id: string
+          duration: number | null
           file_name: string
           file_size: number | null
           file_type: string
           file_url: string
           id: string
+          media_category: string
           user_id: string
         }
         Insert: {
           created_at?: string
           dossier_id: string
+          duration?: number | null
           file_name: string
           file_size?: number | null
           file_type: string
           file_url: string
           id?: string
+          media_category?: string
           user_id: string
         }
         Update: {
           created_at?: string
           dossier_id?: string
+          duration?: number | null
           file_name?: string
           file_size?: number | null
           file_type?: string
           file_url?: string
           id?: string
+          media_category?: string
           user_id?: string
         }
         Relationships: [
