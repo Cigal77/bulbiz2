@@ -104,7 +104,7 @@ Deno.serve(async (req: Request) => {
           const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
 
           await resend.emails.send({
-            from: `${artisanName} <noreply@bulbiz.fr`,
+            from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [dossier.client_email],
             subject: `${artisanName} – Complétez votre demande d'intervention`,
             html: `
