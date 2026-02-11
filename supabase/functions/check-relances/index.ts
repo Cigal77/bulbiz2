@@ -108,8 +108,9 @@ Deno.serve(async (req: Request) => {
         try {
           // Email
           await resend.emails.send({
-            from: `${artisanName} <noreply@bulbiz.fr>`,
-            to: [dossier.client_email!],
+            from: "Bulbiz <no-reply@bulbiz.fr>",
+            reply_to: profile?.email || "contact@bulbiz.fr",
+            to: [dossier.client_email],
             subject: `${artisanName} – Informations complémentaires nécessaires`,
             html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <p>Bonjour ${dossier.client_first_name || ""},</p>
@@ -142,15 +143,13 @@ Deno.serve(async (req: Request) => {
             }
           }
 
-          await supabase
-            .from("relances")
-            .insert({
-              dossier_id: dossier.id,
-              user_id: dossier.user_id,
-              type: "info_manquante",
-              email_to: dossier.client_email!,
-              status: "sent",
-            });
+          await supabase.from("relances").insert({
+            dossier_id: dossier.id,
+            user_id: dossier.user_id,
+            type: "info_manquante",
+            email_to: dossier.client_email!,
+            status: "sent",
+          });
           await supabase
             .from("dossiers")
             .update({ relance_count: 1, last_relance_at: now.toISOString() })
@@ -234,15 +233,13 @@ Deno.serve(async (req: Request) => {
             }
           }
 
-          await supabase
-            .from("relances")
-            .insert({
-              dossier_id: dossier.id,
-              user_id: dossier.user_id,
-              type: "devis_non_signe",
-              email_to: dossier.client_email!,
-              status: "sent",
-            });
+          await supabase.from("relances").insert({
+            dossier_id: dossier.id,
+            user_id: dossier.user_id,
+            type: "devis_non_signe",
+            email_to: dossier.client_email!,
+            status: "sent",
+          });
           await supabase
             .from("dossiers")
             .update({ relance_count: dossier.relance_count + 1, last_relance_at: now.toISOString() })
