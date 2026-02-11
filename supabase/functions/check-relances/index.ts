@@ -108,9 +108,8 @@ Deno.serve(async (req: Request) => {
         try {
           // Email
           await resend.emails.send({
-            from: "Bulbiz <no-reply@bulbiz.fr>",
-            reply_to: profile?.email || "contact@bulbiz.fr",
-            to: [dossier.client_email],
+            from: `${artisanName} <noreply@bulbiz.fr>`,
+            to: [dossier.client_email!],
             subject: `${artisanName} – Informations complémentaires nécessaires`,
             html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <p>Bonjour ${dossier.client_first_name || ""},</p>
