@@ -29,8 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/client" element={<ClientForm />} />
-            /*
-            <Route path="/devis/validation" element={<QuoteValidation />} /> */
+            <Route path="/devis/validation" element={<QuoteValidation />} />
             <Route path="/facture/view" element={<InvoiceView />} />
             <Route
               path="/"
