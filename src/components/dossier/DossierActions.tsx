@@ -1,21 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { STATUS_LABELS, ALL_STATUSES } from "@/lib/constants";
+import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
-import type { Database } from "@/integrations/supabase/types";
+// Status changes are now automatic via NextStepBanner
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Phone, MessageSquarePlus, FileText, Bell, BellOff, ArrowRightLeft, Calendar, RefreshCw, Loader2,
+  Phone, MessageSquarePlus, FileText, Bell, BellOff, Calendar, RefreshCw, Loader2,
   Mic, Camera, Map,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -24,14 +18,14 @@ import { cn } from "@/lib/utils";
 import { VoiceRecorderDialog } from "./VoiceRecorderDialog";
 import { MediaUploadDialog } from "./MediaUploadDialog";
 
-type DossierStatus = Database["public"]["Enums"]["dossier_status"];
+
 
 interface DossierActionsProps {
   dossier: Dossier;
 }
 
 export function DossierActions({ dossier }: DossierActionsProps) {
-  const { changeStatus, addNote, toggleRelance, sendRelance } = useDossierActions(dossier.id);
+  const { addNote, toggleRelance, sendRelance } = useDossierActions(dossier.id);
   const { uploadFiles } = useMediaUpload(dossier.id);
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
@@ -39,13 +33,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
-
-  const handleStatusChange = (status: string) => {
-    changeStatus.mutate(status as DossierStatus, {
-      onSuccess: () => toast({ title: "Statut mis à jour" }),
-      onError: (e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-    });
-  };
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
@@ -95,23 +82,13 @@ export function DossierActions({ dossier }: DossierActionsProps) {
     <div className="space-y-4">
       {/* Status + meta */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Statut & actions</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Infos dossier</h3>
 
-        <Select value={dossier.status} onValueChange={handleStatusChange}>
-          <SelectTrigger className="w-full">
-            <div className="flex items-center gap-2">
-              <ArrowRightLeft className="h-3.5 w-3.5" />
-              <SelectValue />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            {ALL_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Badge className={cn("text-xs", STATUS_COLORS[dossier.status])}>
+            {STATUS_LABELS[dossier.status]}
+          </Badge>
+        </div>
 
         <div className="text-xs text-muted-foreground space-y-1">
           <div className="flex items-center gap-1.5">
