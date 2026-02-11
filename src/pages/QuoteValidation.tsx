@@ -65,7 +65,9 @@ export default function QuoteValidation() {
   const loadQuote = async () => {
     const { data: q, error: qErr } = await supabase
       .from("quotes")
-      .select("id, quote_number, status, total_ht, total_tva, total_ttc, pdf_url, validity_days, created_at, notes, signature_token_expires_at, dossier_id, user_id")
+      .select(
+        "id, quote_number, status, total_ht, total_tva, total_ttc, pdf_url, validity_days, created_at, notes, signature_token_expires_at, dossier_id, user_id",
+      )
       .eq("signature_token", token!)
       .maybeSingle();
 
@@ -88,8 +90,16 @@ export default function QuoteValidation() {
 
     // Load dossier & profile
     const [dRes, pRes] = await Promise.all([
-      supabase.from("dossiers").select("client_first_name, client_last_name, address").eq("id", q.dossier_id).maybeSingle(),
-      supabase.from("profiles").select("company_name, first_name, last_name, phone, email, siret").eq("user_id", q.user_id).maybeSingle(),
+      supabase
+        .from("dossiers")
+        .select("client_first_name, client_last_name, address")
+        .eq("id", q.dossier_id)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("company_name, first_name, last_name, phone, email, siret")
+        .eq("user_id", q.user_id)
+        .maybeSingle(),
     ]);
 
     setQuote(q as QuoteData);
@@ -115,12 +125,11 @@ export default function QuoteValidation() {
     }
   };
 
-  const artisanName = profile?.company_name ||
-    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+  const artisanName =
+    profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
   const clientName = [dossier?.client_first_name, dossier?.client_last_name].filter(Boolean).join(" ");
 
-  const formatCurrency = (v: number | null) =>
-    v != null ? `${v.toFixed(2)} €` : "—";
+  const formatCurrency = (v: number | null) => (v != null ? `${v.toFixed(2)} €` : "—");
 
   // ── Render states ──
 
@@ -163,9 +172,13 @@ export default function QuoteValidation() {
     return (
       <PageShell>
         <ResultCard
-          icon={quote?.status === "signe"
-            ? <CheckCircle2 className="h-12 w-12 text-success" />
-            : <XCircle className="h-12 w-12 text-destructive" />}
+          icon={
+            quote?.status === "signe" ? (
+              <CheckCircle2 className="h-12 w-12 text-success" />
+            ) : (
+              <XCircle className="h-12 w-12 text-destructive" />
+            )
+          }
           title={quote?.status === "signe" ? "Devis déjà validé" : "Devis déjà refusé"}
           description={`Ce devis (${quote?.quote_number}) a déjà été ${quote?.status === "signe" ? "validé" : "refusé"}.`}
         />
@@ -241,26 +254,6 @@ export default function QuoteValidation() {
           </Button>
         )}
 
-        {/* Totals */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total HT</span>
-                <span className="font-medium">{formatCurrency(quote?.total_ht ?? null)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">TVA</span>
-                <span className="font-medium">{formatCurrency(quote?.total_tva ?? null)}</span>
-              </div>
-              <div className="border-t pt-2 flex justify-between">
-                <span className="font-semibold">Total TTC</span>
-                <span className="font-bold text-lg">{formatCurrency(quote?.total_ttc ?? null)}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Notes */}
         {quote?.notes && (
           <Card>
@@ -321,7 +314,10 @@ export default function QuoteValidation() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => { setShowRefuseForm(false); setRefuseReason(""); }}
+                    onClick={() => {
+                      setShowRefuseForm(false);
+                      setRefuseReason("");
+                    }}
                   >
                     Annuler
                   </Button>
@@ -349,9 +345,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
         <BulbizLogo size={22} />
         <span className="font-semibold text-sm text-foreground">Bulbiz</span>
       </header>
-      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-6">
-        {children}
-      </main>
+      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-6">{children}</main>
       <footer className="border-t px-4 py-3 text-center">
         <p className="text-[10px] text-muted-foreground">Propulsé par Bulbiz</p>
       </footer>
