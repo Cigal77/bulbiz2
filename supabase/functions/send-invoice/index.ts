@@ -22,7 +22,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -74,10 +77,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Update status to sent
-    await supabase
-      .from("invoices")
-      .update({ status: "sent", sent_at: new Date().toISOString() })
-      .eq("id", invoice_id);
+    await supabase.from("invoices").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", invoice_id);
 
     let emailSent = false;
     let emailError: string | null = null;
@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
           const artisanName = invoice.artisan_company || invoice.artisan_name || "Votre artisan";
 
           await resend.emails.send({
-            from: `${artisanName} <onboarding@resend.dev>`,
+            from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [invoice.client_email],
             subject: `Votre facture ${invoice.invoice_number}`,
             html: `
@@ -126,13 +126,16 @@ Deno.serve(async (req: Request) => {
         : `Facture ${invoice.invoice_number} marquée comme envoyée`,
     });
 
-    return new Response(JSON.stringify({
-      success: true,
-      email_sent: emailSent,
-      email_error: emailError,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        email_sent: emailSent,
+        email_error: emailError,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error: unknown) {
     console.error("Error in send-invoice:", error);
     const message = error instanceof Error ? error.message : "Unknown error";

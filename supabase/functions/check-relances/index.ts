@@ -19,13 +19,23 @@ async function sendSms(to: string, body: string): Promise<{ success: boolean; er
     const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(`${accountSid}:${authToken}`) },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      },
       body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
     });
-    if (!resp.ok) { const err = await resp.text(); console.error("Twilio error:", err); return { success: false, error: `Twilio ${resp.status}` }; }
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Twilio error:", err);
+      return { success: false, error: `Twilio ${resp.status}` };
+    }
     await resp.json();
     return { success: true };
-  } catch (e) { console.error("SMS error:", e); return { success: false, error: e instanceof Error ? e.message : "Unknown" }; }
+  } catch (e) {
+    console.error("SMS error:", e);
+    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
+  }
 }
 
 function normalizePhone(phone: string): string {
@@ -58,16 +68,23 @@ Deno.serve(async (req: Request) => {
     // ── 1. Info manquante ──
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const { data: infoMDossiers } = await supabase
-      .from("dossiers").select("*")
-      .in("status", ["nouveau", "a_qualifier"]).eq("relance_active", true).eq("relance_count", 0)
-      .not("client_email", "is", null).lt("created_at", oneDayAgo);
+      .from("dossiers")
+      .select("*")
+      .in("status", ["nouveau", "a_qualifier"])
+      .eq("relance_active", true)
+      .eq("relance_count", 0)
+      .not("client_email", "is", null)
+      .lt("created_at", oneDayAgo);
 
     if (infoMDossiers && infoMDossiers.length > 0) {
       for (const dossier of infoMDossiers) {
         const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", dossier.user_id).single();
         if (!profile?.auto_relance_enabled) continue;
 
-        const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+        const artisanName =
+          profile?.company_name ||
+          [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+          "Votre artisan";
         const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
         const smsEnabled = profile?.sms_enabled !== false;
 
@@ -76,9 +93,14 @@ Deno.serve(async (req: Request) => {
         if (!clientToken || !tokenExpiry || tokenExpiry < now) {
           const tokenBytes = new Uint8Array(32);
           crypto.getRandomValues(tokenBytes);
-          clientToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+          clientToken = Array.from(tokenBytes)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
           const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-          await supabase.from("dossiers").update({ client_token: clientToken, client_token_expires_at: expiresAt }).eq("id", dossier.id);
+          await supabase
+            .from("dossiers")
+            .update({ client_token: clientToken, client_token_expires_at: expiresAt })
+            .eq("id", dossier.id);
         }
         const siteUrl = Deno.env.get("SITE_URL") || "https://bulbiz.fr";
         const clientLink = `${siteUrl}/client?token=${clientToken}`;
@@ -86,7 +108,7 @@ Deno.serve(async (req: Request) => {
         try {
           // Email
           await resend.emails.send({
-            from: `${artisanName} <onboarding@resend.dev>`,
+            from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [dossier.client_email!],
             subject: `${artisanName} – Informations complémentaires nécessaires`,
             html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -99,7 +121,8 @@ Deno.serve(async (req: Request) => {
           });
 
           await supabase.from("historique").insert({
-            dossier_id: dossier.id, user_id: dossier.user_id,
+            dossier_id: dossier.id,
+            user_id: dossier.user_id,
             action: "relance_sent",
             details: `Relance auto "Info manquante" envoyée par email à ${dossier.client_email}`,
           });
@@ -111,15 +134,27 @@ Deno.serve(async (req: Request) => {
             const smsResult = await sendSms(phone, smsBody);
             if (smsResult.success) {
               await supabase.from("historique").insert({
-                dossier_id: dossier.id, user_id: dossier.user_id,
+                dossier_id: dossier.id,
+                user_id: dossier.user_id,
                 action: "relance_sent_sms",
                 details: `Relance auto "Info manquante" envoyée par SMS au ${dossier.client_phone}`,
               });
             }
           }
 
-          await supabase.from("relances").insert({ dossier_id: dossier.id, user_id: dossier.user_id, type: "info_manquante", email_to: dossier.client_email!, status: "sent" });
-          await supabase.from("dossiers").update({ relance_count: 1, last_relance_at: now.toISOString() }).eq("id", dossier.id);
+          await supabase
+            .from("relances")
+            .insert({
+              dossier_id: dossier.id,
+              user_id: dossier.user_id,
+              type: "info_manquante",
+              email_to: dossier.client_email!,
+              status: "sent",
+            });
+          await supabase
+            .from("dossiers")
+            .update({ relance_count: 1, last_relance_at: now.toISOString() })
+            .eq("id", dossier.id);
           totalSent++;
         } catch (e) {
           console.error(`Failed to send relance for dossier ${dossier.id}:`, e);
@@ -129,8 +164,11 @@ Deno.serve(async (req: Request) => {
 
     // ── 2. Devis non signé ──
     const { data: devisDossiers } = await supabase
-      .from("dossiers").select("*")
-      .eq("status", "devis_envoye").eq("relance_active", true).lt("relance_count", 2)
+      .from("dossiers")
+      .select("*")
+      .eq("status", "devis_envoye")
+      .eq("relance_active", true)
+      .lt("relance_count", 2)
       .not("client_email", "is", null);
 
     if (devisDossiers && devisDossiers.length > 0) {
@@ -143,7 +181,9 @@ Deno.serve(async (req: Request) => {
 
         const delay1 = profile?.relance_delay_devis_1 ?? 2;
         const delay2 = profile?.relance_delay_devis_2 ?? 5;
-        const shouldSend = (dossier.relance_count === 0 && daysSinceStatus >= delay1) || (dossier.relance_count === 1 && daysSinceStatus >= delay2);
+        const shouldSend =
+          (dossier.relance_count === 0 && daysSinceStatus >= delay1) ||
+          (dossier.relance_count === 1 && daysSinceStatus >= delay2);
         if (!shouldSend) continue;
 
         if (dossier.last_relance_at) {
@@ -151,14 +191,17 @@ Deno.serve(async (req: Request) => {
           if (hoursSince < 20) continue;
         }
 
-        const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+        const artisanName =
+          profile?.company_name ||
+          [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+          "Votre artisan";
         const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
         const smsEnabled = profile?.sms_enabled !== false;
 
         try {
           // Email
           await resend.emails.send({
-            from: `${artisanName} <onboarding@resend.dev>`,
+            from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [dossier.client_email!],
             subject: `${artisanName} – Suivi de votre devis`,
             html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -170,7 +213,8 @@ Deno.serve(async (req: Request) => {
           });
 
           await supabase.from("historique").insert({
-            dossier_id: dossier.id, user_id: dossier.user_id,
+            dossier_id: dossier.id,
+            user_id: dossier.user_id,
             action: "relance_sent",
             details: `Relance auto "Devis non signé" (${dossier.relance_count + 1}/2) envoyée par email à ${dossier.client_email}`,
           });
@@ -182,15 +226,27 @@ Deno.serve(async (req: Request) => {
             const smsResult = await sendSms(phone, smsBody);
             if (smsResult.success) {
               await supabase.from("historique").insert({
-                dossier_id: dossier.id, user_id: dossier.user_id,
+                dossier_id: dossier.id,
+                user_id: dossier.user_id,
                 action: "relance_sent_sms",
                 details: `Relance auto "Devis non signé" (${dossier.relance_count + 1}/2) envoyée par SMS au ${dossier.client_phone}`,
               });
             }
           }
 
-          await supabase.from("relances").insert({ dossier_id: dossier.id, user_id: dossier.user_id, type: "devis_non_signe", email_to: dossier.client_email!, status: "sent" });
-          await supabase.from("dossiers").update({ relance_count: dossier.relance_count + 1, last_relance_at: now.toISOString() }).eq("id", dossier.id);
+          await supabase
+            .from("relances")
+            .insert({
+              dossier_id: dossier.id,
+              user_id: dossier.user_id,
+              type: "devis_non_signe",
+              email_to: dossier.client_email!,
+              status: "sent",
+            });
+          await supabase
+            .from("dossiers")
+            .update({ relance_count: dossier.relance_count + 1, last_relance_at: now.toISOString() })
+            .eq("id", dossier.id);
           totalSent++;
         } catch (e) {
           console.error(`Failed to send devis relance for dossier ${dossier.id}:`, e);
@@ -199,13 +255,15 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify({ success: true, relances_sent: totalSent }), {
-      status: 200, headers: { "Content-Type": "application/json", ...corsHeaders },
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (error: unknown) {
     console.error("Error in check-relances:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
-      status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 });

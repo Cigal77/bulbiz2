@@ -25,10 +25,17 @@ async function sendSms(to: string, body: string): Promise<{ success: boolean; er
       },
       body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
     });
-    if (!resp.ok) { const err = await resp.text(); console.error("Twilio error:", err); return { success: false, error: `Twilio ${resp.status}` }; }
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Twilio error:", err);
+      return { success: false, error: `Twilio ${resp.status}` };
+    }
     await resp.json();
     return { success: true };
-  } catch (e) { console.error("SMS send error:", e); return { success: false, error: e instanceof Error ? e.message : "Unknown" }; }
+  } catch (e) {
+    console.error("SMS send error:", e);
+    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
+  }
 }
 
 function normalizePhone(phone: string): string {
@@ -60,7 +67,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -69,25 +79,34 @@ Deno.serve(async (req: Request) => {
     if (!quote_id) throw new Error("Missing quote_id");
 
     const { data: quote, error: qErr } = await supabase
-      .from("quotes").select("*").eq("id", quote_id).eq("user_id", user.id).single();
+      .from("quotes")
+      .select("*")
+      .eq("id", quote_id)
+      .eq("user_id", user.id)
+      .single();
     if (qErr || !quote) throw new Error("Devis introuvable");
 
     const { data: dossier, error: dErr } = await supabase
-      .from("dossiers").select("*").eq("id", quote.dossier_id).eq("user_id", user.id).single();
+      .from("dossiers")
+      .select("*")
+      .eq("id", quote.dossier_id)
+      .eq("user_id", user.id)
+      .single();
     if (dErr || !dossier) throw new Error("Dossier introuvable");
 
-    const { data: profile } = await supabase
-      .from("profiles").select("*").eq("user_id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
 
-    const artisanName = profile?.company_name ||
-      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+    const artisanName =
+      profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
     const smsEnabled = profile?.sms_enabled !== false;
 
     // Generate signature token
     const tokenBytes = new Uint8Array(32);
     crypto.getRandomValues(tokenBytes);
-    const signatureToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+    const signatureToken = Array.from(tokenBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
@@ -101,7 +120,7 @@ Deno.serve(async (req: Request) => {
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: `${artisanName} <onboarding@resend.dev>`,
+        from: `${artisanName} <noreply@bulbiz.fr>`,
         to: [dossier.client_email],
         subject: `${artisanName} – Votre devis ${quote.quote_number}`,
         html: `
@@ -123,7 +142,8 @@ Deno.serve(async (req: Request) => {
       });
 
       await supabase.from("historique").insert({
-        dossier_id: dossier.id, user_id: user.id,
+        dossier_id: dossier.id,
+        user_id: user.id,
         action: "quote_sent",
         details: `Devis ${quote.quote_number} envoyé par email à ${dossier.client_email}`,
       });
@@ -136,13 +156,15 @@ Deno.serve(async (req: Request) => {
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         await supabase.from("historique").insert({
-          dossier_id: dossier.id, user_id: user.id,
+          dossier_id: dossier.id,
+          user_id: user.id,
           action: "quote_sent_sms",
           details: `Devis ${quote.quote_number} envoyé par SMS au ${dossier.client_phone}`,
         });
       } else if (smsResult.error !== "SMS provider not configured") {
         await supabase.from("historique").insert({
-          dossier_id: dossier.id, user_id: user.id,
+          dossier_id: dossier.id,
+          user_id: user.id,
           action: "sms_error",
           details: `SMS non envoyé (erreur) – vérifier le numéro ${dossier.client_phone}`,
         });
@@ -150,17 +172,23 @@ Deno.serve(async (req: Request) => {
     }
 
     // Update quote status
-    await supabase.from("quotes").update({
-      status: "envoye",
-      sent_at: new Date().toISOString(),
-      signature_token: signatureToken,
-      signature_token_expires_at: expiresAt,
-    }).eq("id", quote_id);
+    await supabase
+      .from("quotes")
+      .update({
+        status: "envoye",
+        sent_at: new Date().toISOString(),
+        signature_token: signatureToken,
+        signature_token_expires_at: expiresAt,
+      })
+      .eq("id", quote_id);
 
-    await supabase.from("dossiers").update({
-      status: "devis_envoye",
-      status_changed_at: new Date().toISOString(),
-    }).eq("id", dossier.id);
+    await supabase
+      .from("dossiers")
+      .update({
+        status: "devis_envoye",
+        status_changed_at: new Date().toISOString(),
+      })
+      .eq("id", dossier.id);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

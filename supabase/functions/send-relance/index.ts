@@ -19,13 +19,23 @@ async function sendSms(to: string, body: string): Promise<{ success: boolean; er
     const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(`${accountSid}:${authToken}`) },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      },
       body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
     });
-    if (!resp.ok) { const err = await resp.text(); console.error("Twilio error:", err); return { success: false, error: `Twilio ${resp.status}` }; }
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Twilio error:", err);
+      return { success: false, error: `Twilio ${resp.status}` };
+    }
     await resp.json();
     return { success: true };
-  } catch (e) { console.error("SMS error:", e); return { success: false, error: e instanceof Error ? e.message : "Unknown" }; }
+  } catch (e) {
+    console.error("SMS error:", e);
+    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
+  }
 }
 
 function normalizePhone(phone: string): string {
@@ -62,7 +72,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -71,14 +84,17 @@ Deno.serve(async (req: Request) => {
     if (!dossier_id || !type) throw new Error("Missing dossier_id or type");
 
     const { data: dossier, error: dossierError } = await supabase
-      .from("dossiers").select("*").eq("id", dossier_id).eq("user_id", user.id).single();
+      .from("dossiers")
+      .select("*")
+      .eq("id", dossier_id)
+      .eq("user_id", user.id)
+      .single();
     if (dossierError || !dossier) throw new Error("Dossier not found");
 
-    const { data: profile } = await supabase
-      .from("profiles").select("*").eq("user_id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
 
-    const artisanName = profile?.company_name ||
-      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+    const artisanName =
+      profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
     const smsEnabled = profile?.sms_enabled !== false;
 
@@ -88,9 +104,14 @@ Deno.serve(async (req: Request) => {
     if (!clientToken || !tokenExpiry || tokenExpiry < new Date()) {
       const tokenBytes = new Uint8Array(32);
       crypto.getRandomValues(tokenBytes);
-      clientToken = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+      clientToken = Array.from(tokenBytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from("dossiers").update({ client_token: clientToken, client_token_expires_at: expiresAt }).eq("id", dossier_id);
+      await supabase
+        .from("dossiers")
+        .update({ client_token: clientToken, client_token_expires_at: expiresAt })
+        .eq("id", dossier_id);
     }
 
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
@@ -134,14 +155,15 @@ Deno.serve(async (req: Request) => {
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: `${artisanName} <onboarding@resend.dev>`,
+        from: `${artisanName} <noreply@bulbiz.fr`,
         to: [dossier.client_email],
         subject,
         html: htmlBody,
       });
 
       await supabase.from("historique").insert({
-        dossier_id, user_id: user.id,
+        dossier_id,
+        user_id: user.id,
         action: "relance_sent",
         details: `Relance "${relanceLabel}" envoyée par email à ${dossier.client_email}`,
       });
@@ -153,13 +175,15 @@ Deno.serve(async (req: Request) => {
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id,
+          dossier_id,
+          user_id: user.id,
           action: "relance_sent_sms",
           details: `Relance "${relanceLabel}" envoyée par SMS au ${dossier.client_phone}`,
         });
       } else if (smsResult.error !== "SMS provider not configured") {
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id,
+          dossier_id,
+          user_id: user.id,
           action: "sms_error",
           details: `SMS non envoyé (erreur) – vérifier le numéro ${dossier.client_phone}`,
         });
@@ -168,15 +192,20 @@ Deno.serve(async (req: Request) => {
 
     // Record relance
     await supabase.from("relances").insert({
-      dossier_id, user_id: user.id, type,
+      dossier_id,
+      user_id: user.id,
+      type,
       email_to: dossier.client_email || dossier.client_phone || "",
       status: "sent",
     });
 
-    await supabase.from("dossiers").update({
-      relance_count: (dossier.relance_count || 0) + 1,
-      last_relance_at: new Date().toISOString(),
-    }).eq("id", dossier_id);
+    await supabase
+      .from("dossiers")
+      .update({
+        relance_count: (dossier.relance_count || 0) + 1,
+        last_relance_at: new Date().toISOString(),
+      })
+      .eq("id", dossier_id);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

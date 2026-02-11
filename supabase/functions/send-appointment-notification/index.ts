@@ -17,10 +17,7 @@ interface NotifResult {
 }
 
 // ── Email templates ──
-function getEmailTemplate(
-  eventType: EventType,
-  payload: Record<string, unknown>
-): { subject: string; html: string } {
+function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>): { subject: string; html: string } {
   const clientName = (payload.client_first_name as string) || "Bonjour";
   const artisanName = (payload.artisan_name as string) || "Votre artisan";
   const artisanPhone = payload.artisan_phone ? ` au ${payload.artisan_phone}` : "";
@@ -78,10 +75,7 @@ function getEmailTemplate(
 }
 
 // ── SMS templates ──
-function getSmsTemplate(
-  eventType: EventType,
-  payload: Record<string, unknown>
-): string {
+function getSmsTemplate(eventType: EventType, payload: Record<string, unknown>): string {
   const artisanName = (payload.artisan_name as string) || "Votre artisan";
   const artisanPhone = (payload.artisan_phone as string) || "";
 
@@ -170,7 +164,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -198,14 +195,10 @@ Deno.serve(async (req: Request) => {
     if (dossier.user_id !== user.id) throw new Error("Unauthorized: not your dossier");
 
     // Fetch artisan profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle();
 
-    const artisanName = profile?.company_name ||
-      [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
+    const artisanName =
+      profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
 
     // Build payload
     const notifPayload: Record<string, unknown> = {
@@ -228,14 +221,17 @@ Deno.serve(async (req: Request) => {
     if (!clientEmail || !isValidEmail(clientEmail)) {
       // Log SKIPPED
       await supabase.from("notification_logs").insert({
-        dossier_id, event_type, channel: "email",
+        dossier_id,
+        event_type,
+        channel: "email",
         recipient: clientEmail || "MISSING",
         status: "SKIPPED",
         error_code: "INVALID_RECIPIENT",
         error_message: clientEmail ? "Email invalide" : "Email manquant",
       });
       await supabase.from("historique").insert({
-        dossier_id, user_id: user.id,
+        dossier_id,
+        user_id: user.id,
         action: "notification_skipped",
         details: `Email non envoyé (${label}) : email client manquant ou invalide`,
       });
@@ -243,14 +239,17 @@ Deno.serve(async (req: Request) => {
     } else if (artisanEmail && clientEmail === artisanEmail) {
       // Wrong recipient protection
       await supabase.from("notification_logs").insert({
-        dossier_id, event_type, channel: "email",
+        dossier_id,
+        event_type,
+        channel: "email",
         recipient: clientEmail,
         status: "FAILED",
         error_code: "WRONG_RECIPIENT",
         error_message: "L'email client est identique à l'email artisan",
       });
       await supabase.from("historique").insert({
-        dossier_id, user_id: user.id,
+        dossier_id,
+        user_id: user.id,
         action: "notification_failed",
         details: `Email non envoyé (${label}) : l'email client est identique à votre email`,
       });
@@ -259,14 +258,17 @@ Deno.serve(async (req: Request) => {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       if (!resendKey) {
         await supabase.from("notification_logs").insert({
-          dossier_id, event_type, channel: "email",
+          dossier_id,
+          event_type,
+          channel: "email",
           recipient: clientEmail,
           status: "FAILED",
           error_code: "EMAIL_NOT_CONFIGURED",
           error_message: "Service email non configuré",
         });
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id,
+          dossier_id,
+          user_id: user.id,
           action: "notification_failed",
           details: `Email non envoyé (${label}) : service email non configuré`,
         });
@@ -276,18 +278,22 @@ Deno.serve(async (req: Request) => {
           const resend = new Resend(resendKey);
           const template = getEmailTemplate(event_type as EventType, notifPayload);
           await resend.emails.send({
-            from: `${artisanName} <onboarding@resend.dev>`,
+            from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [clientEmail],
             subject: template.subject,
             html: template.html,
           });
 
           await supabase.from("notification_logs").insert({
-            dossier_id, event_type, channel: "email",
-            recipient: clientEmail, status: "SENT",
+            dossier_id,
+            event_type,
+            channel: "email",
+            recipient: clientEmail,
+            status: "SENT",
           });
           await supabase.from("historique").insert({
-            dossier_id, user_id: user.id,
+            dossier_id,
+            user_id: user.id,
             action: "notification_sent",
             details: `Email envoyé : ${label} → ${clientEmail}`,
           });
@@ -295,13 +301,17 @@ Deno.serve(async (req: Request) => {
         } catch (emailErr: any) {
           console.error("Email send error:", emailErr);
           await supabase.from("notification_logs").insert({
-            dossier_id, event_type, channel: "email",
-            recipient: clientEmail, status: "FAILED",
+            dossier_id,
+            event_type,
+            channel: "email",
+            recipient: clientEmail,
+            status: "FAILED",
             error_code: "SEND_ERROR",
             error_message: emailErr.message?.slice(0, 500),
           });
           await supabase.from("historique").insert({
-            dossier_id, user_id: user.id,
+            dossier_id,
+            user_id: user.id,
             action: "notification_failed",
             details: `Email non envoyé (${label}) : erreur technique`,
           });
@@ -317,7 +327,9 @@ Deno.serve(async (req: Request) => {
     if (!smsEnabled || !clientPhone) {
       if (clientPhone) {
         await supabase.from("notification_logs").insert({
-          dossier_id, event_type, channel: "sms",
+          dossier_id,
+          event_type,
+          channel: "sms",
           recipient: clientPhone || "MISSING",
           status: "SKIPPED",
           error_code: smsEnabled ? "INVALID_PHONE" : "SMS_DISABLED",
@@ -329,13 +341,17 @@ Deno.serve(async (req: Request) => {
       const normalized = normalizePhone(clientPhone);
       if (!normalized) {
         await supabase.from("notification_logs").insert({
-          dossier_id, event_type, channel: "sms",
-          recipient: clientPhone, status: "SKIPPED",
+          dossier_id,
+          event_type,
+          channel: "sms",
+          recipient: clientPhone,
+          status: "SKIPPED",
           error_code: "INVALID_PHONE",
           error_message: "Numéro invalide",
         });
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id,
+          dossier_id,
+          user_id: user.id,
           action: "notification_skipped",
           details: `SMS non envoyé (${label}) : numéro client invalide`,
         });
@@ -345,8 +361,11 @@ Deno.serve(async (req: Request) => {
         const artisanPhoneNorm = profile?.phone ? normalizePhone(String(profile.phone)) : null;
         if (artisanPhoneNorm && normalized === artisanPhoneNorm) {
           await supabase.from("notification_logs").insert({
-            dossier_id, event_type, channel: "sms",
-            recipient: normalized, status: "FAILED",
+            dossier_id,
+            event_type,
+            channel: "sms",
+            recipient: normalized,
+            status: "FAILED",
             error_code: "WRONG_RECIPIENT",
             error_message: "Le téléphone client est identique au téléphone artisan",
           });
@@ -357,11 +376,15 @@ Deno.serve(async (req: Request) => {
 
           if (smsResult.success) {
             await supabase.from("notification_logs").insert({
-              dossier_id, event_type, channel: "sms",
-              recipient: normalized, status: "SENT",
+              dossier_id,
+              event_type,
+              channel: "sms",
+              recipient: normalized,
+              status: "SENT",
             });
             await supabase.from("historique").insert({
-              dossier_id, user_id: user.id,
+              dossier_id,
+              user_id: user.id,
               action: "notification_sent",
               details: `SMS envoyé : ${label} → ${normalized}`,
             });
@@ -369,14 +392,18 @@ Deno.serve(async (req: Request) => {
           } else {
             const isNotConfigured = smsResult.error === "SMS_NOT_CONFIGURED";
             await supabase.from("notification_logs").insert({
-              dossier_id, event_type, channel: "sms",
-              recipient: normalized, status: isNotConfigured ? "SKIPPED" : "FAILED",
+              dossier_id,
+              event_type,
+              channel: "sms",
+              recipient: normalized,
+              status: isNotConfigured ? "SKIPPED" : "FAILED",
               error_code: smsResult.error,
               error_message: smsResult.error,
             });
             if (!isNotConfigured) {
               await supabase.from("historique").insert({
-                dossier_id, user_id: user.id,
+                dossier_id,
+                user_id: user.id,
                 action: "notification_failed",
                 details: `SMS non envoyé (${label}) : erreur technique`,
               });
