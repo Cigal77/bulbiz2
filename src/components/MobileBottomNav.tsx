@@ -65,9 +65,9 @@ export function MobileBottomNav() {
     },
     {
       id: "rdv", icon: Calendar, label: "RDV",
-      path: "/?rdv=1",
+      path: "/rdv",
       badge: badges.rdvToday > 0 ? badges.rdvToday : undefined,
-      isActive: location.search.includes("rdv=1"),
+      isActive: location.pathname === "/rdv",
     },
     {
       id: "settings", icon: Settings, label: "Réglages",

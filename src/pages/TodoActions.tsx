@@ -1,28 +1,26 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Calendar, FileText, Receipt, Phone, MapPin, ChevronRight, AlertCircle } from "lucide-react";
+import { Calendar, FileText, Receipt, Phone, ChevronRight, CheckCircle2, FolderOpen, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, isToday, isTomorrow, isThisWeek, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
+import { isToday, parseISO } from "date-fns";
 
 interface ActionItem {
   id: string;
   dossierId: string;
   clientName: string;
   clientPhone: string | null;
-  type: "rdv_today" | "rdv_to_fix" | "devis_to_send" | "invoice_to_send" | "invoice_unpaid";
+  type: "rdv_today" | "rdv_to_fix" | "nouveau" | "devis_to_make" | "devis_pending" | "invoice_to_send" | "invoice_unpaid" | "link_to_send";
   label: string;
   sublabel: string;
   icon: React.ReactNode;
   iconBg: string;
-  urgency: number; // higher = more urgent
+  urgency: number;
 }
 
-function clientName(d: Dossier) {
+function getClientName(d: Dossier) {
   return d.client_first_name || d.client_last_name
     ? `${d.client_first_name ?? ""} ${d.client_last_name ?? ""}`.trim()
     : "Client sans nom";
@@ -32,7 +30,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
   const items: ActionItem[] = [];
 
   for (const d of dossiers) {
-    const name = clientName(d);
+    const name = getClientName(d);
 
     // RDV today
     if (d.appointment_date && d.appointment_status === "rdv_confirmed") {
@@ -50,45 +48,61 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
       }
     }
 
-    // RDV to fix
-    if (d.appointment_status === "none" && !["clos_perdu", "invoice_paid", "nouveau"].includes(d.status) && d.status !== "clos_signe") {
-      if (["devis_signe", "en_attente_rdv"].includes(d.status)) {
-        items.push({
-          id: `rdv-fix-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
-          type: "rdv_to_fix",
-          label: "RDV à fixer",
-          sublabel: `Devis signé`,
-          icon: <Calendar className="h-4 w-4" />,
-          iconBg: "bg-warning/15 text-warning",
-          urgency: 8,
-        });
-      }
+    // Nouveaux dossiers à traiter
+    if (d.status === "nouveau" || d.status === "a_qualifier") {
+      items.push({
+        id: `nouveau-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
+        type: "nouveau",
+        label: "Nouveau dossier",
+        sublabel: d.description?.slice(0, 50) ?? "À qualifier",
+        icon: <FolderOpen className="h-4 w-4" />,
+        iconBg: "bg-primary/15 text-primary",
+        urgency: 7,
+      });
     }
 
-    // Devis to send
+    // Lien client à envoyer (pas d'email/téléphone et pas encore envoyé)
+    if (d.status === "nouveau" && !d.client_email && !d.client_phone && !d.client_token) {
+      // Already covered by "nouveau" above
+    }
+
+    // RDV to fix
+    if (["devis_signe", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") {
+      items.push({
+        id: `rdv-fix-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
+        type: "rdv_to_fix",
+        label: "RDV à fixer",
+        sublabel: "Devis signé",
+        icon: <Calendar className="h-4 w-4" />,
+        iconBg: "bg-warning/15 text-warning",
+        urgency: 8,
+      });
+    }
+
+    // Devis to make
     if (d.status === "devis_a_faire") {
       items.push({
-        id: `devis-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
-        type: "devis_to_send",
+        id: `devis-make-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
+        type: "devis_to_make",
         label: "Devis à faire",
-        sublabel: d.description?.slice(0, 60) ?? "Pas de description",
+        sublabel: d.description?.slice(0, 50) ?? "Pas de description",
         icon: <FileText className="h-4 w-4" />,
         iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
         urgency: 6,
       });
     }
 
-    // Devis envoyé (en attente signature)
+    // Devis envoyé (en attente signature > 3j = urgent)
     if (d.status === "devis_envoye") {
       const daysSince = Math.floor((Date.now() - new Date(d.status_changed_at).getTime()) / 86400000);
       items.push({
         id: `devis-wait-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
-        type: "devis_to_send",
-        label: "Devis en attente",
+        type: "devis_pending",
+        label: `Devis en attente${daysSince > 3 ? " ⚠️" : ""}`,
         sublabel: `Envoyé il y a ${daysSince}j`,
         icon: <FileText className="h-4 w-4" />,
-        iconBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-        urgency: daysSince > 3 ? 7 : 4,
+        iconBg: daysSince > 3 ? "bg-warning/15 text-warning" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+        urgency: daysSince > 3 ? 7 : 3,
       });
     }
 
@@ -123,13 +137,18 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
   return items.sort((a, b) => b.urgency - a.urgency);
 }
 
-const SECTION_ORDER: ActionItem["type"][] = ["rdv_today", "rdv_to_fix", "devis_to_send", "invoice_to_send", "invoice_unpaid"];
+const SECTION_ORDER: ActionItem["type"][] = [
+  "rdv_today", "nouveau", "rdv_to_fix", "devis_to_make", "devis_pending", "invoice_to_send", "invoice_unpaid",
+];
 const SECTION_LABELS: Record<ActionItem["type"], string> = {
   rdv_today: "📅 RDV aujourd'hui",
+  nouveau: "🆕 Nouveaux dossiers",
   rdv_to_fix: "📅 RDV à fixer",
-  devis_to_send: "📄 Devis",
+  devis_to_make: "📄 Devis à faire",
+  devis_pending: "📄 Devis en attente",
   invoice_to_send: "💰 Factures à envoyer",
   invoice_unpaid: "💰 Factures impayées",
+  link_to_send: "🔗 Liens client",
 };
 
 export default function TodoActions() {
@@ -174,7 +193,7 @@ export default function TodoActions() {
         ) : actions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-12 w-12 rounded-full bg-success/15 flex items-center justify-center mb-3">
-              <AlertCircle className="h-6 w-6 text-success" />
+              <CheckCircle2 className="h-6 w-6 text-success" />
             </div>
             <p className="text-sm font-medium text-foreground">Tout est à jour !</p>
             <p className="text-xs text-muted-foreground mt-1">Aucune action en attente.</p>
