@@ -5,6 +5,24 @@ import type { Database } from "@/integrations/supabase/types";
 
 type DossierStatus = Database["public"]["Enums"]["dossier_status"];
 
+export interface DossierUpdatePayload {
+  client_first_name?: string | null;
+  client_last_name?: string | null;
+  client_phone?: string | null;
+  client_email?: string | null;
+  address?: string | null;
+  address_line?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  country?: string | null;
+  google_place_id?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  category?: Database["public"]["Enums"]["problem_category"];
+  urgency?: Database["public"]["Enums"]["urgency_level"];
+  description?: string | null;
+}
+
 export function useDossierActions(dossierId: string) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -68,5 +86,21 @@ export function useDossierActions(dossierId: string) {
     onSuccess: invalidate,
   });
 
-  return { changeStatus, addNote, toggleRelance, sendRelance };
+  const updateDossier = useMutation({
+    mutationFn: async ({ updates, changedFields }: { updates: DossierUpdatePayload; changedFields: string[] }) => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", dossierId);
+      if (error) throw error;
+
+      const details = changedFields.length > 0
+        ? changedFields.join(", ")
+        : "Informations mises à jour";
+      await addHistorique("dossier_updated", details);
+    },
+    onSuccess: invalidate,
+  });
+
+  return { changeStatus, addNote, toggleRelance, sendRelance, updateDossier };
 }
