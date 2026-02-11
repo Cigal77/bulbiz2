@@ -23,7 +23,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -41,11 +44,7 @@ Deno.serve(async (req: Request) => {
     if (dErr || !dossier) throw new Error("Dossier introuvable");
 
     // Get profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
 
     const validityDays = profile?.client_link_validity_days || 7;
 
@@ -60,7 +59,9 @@ Deno.serve(async (req: Request) => {
       // Generate new token
       const tokenBytes = new Uint8Array(32);
       crypto.getRandomValues(tokenBytes);
-      token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, "0")).join("");
+      token = Array.from(tokenBytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
       expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
 
       await supabase
@@ -80,7 +81,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build client link
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || Deno.env.get("PUBLIC_URL") || "https://bulbiz.fr";
+    const origin =
+      req.headers.get("origin") ||
+      req.headers.get("referer")?.replace(/\/+$/, "") ||
+      Deno.env.get("PUBLIC_URL") ||
+      "https://bulbiz.fr";
     const clientLink = `${origin}/client?token=${token}`;
 
     // Try to send email
@@ -92,13 +97,14 @@ Deno.serve(async (req: Request) => {
       if (resendKey) {
         try {
           const resend = new Resend(resendKey);
-          const artisanName = profile?.company_name ||
+          const artisanName =
+            profile?.company_name ||
             [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
             "Votre artisan";
           const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
 
           await resend.emails.send({
-            from: `${artisanName} <onboarding@resend.dev>`,
+            from: `${artisanName} <noReply@bulbiz.fr>`,
             to: [dossier.client_email],
             subject: `${artisanName} – Complétez votre demande d'intervention`,
             html: `
@@ -141,18 +147,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      token,
-      expires_at: expiresAt,
-      client_link: clientLink,
-      token_generated: tokenGenerated,
-      email_sent: emailSent,
-      email_error: emailError,
-      no_contact: !dossier.client_email && !dossier.client_phone,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        token,
+        expires_at: expiresAt,
+        client_link: clientLink,
+        token_generated: tokenGenerated,
+        email_sent: emailSent,
+        email_error: emailError,
+        no_contact: !dossier.client_email && !dossier.client_phone,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error: unknown) {
     console.error("Error in send-client-link:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
