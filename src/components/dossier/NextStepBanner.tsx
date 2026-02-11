@@ -175,21 +175,17 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   } | null => {
     const status = dossier.status;
 
-    if (status === "nouveau" || status === "a_qualifier") {
+    if (status === "nouveau" || status === "a_qualifier" || status === "devis_a_faire") {
       return {
-        message: "Prochaine étape : Compléter les infos et créer un devis",
-        primaryLabel: "Créer un devis",
+        message: "Prochaine étape : Importer ou créer un devis",
+        primaryLabel: "Importer devis (PDF)",
         primaryIcon: <FileText className="h-4 w-4" />,
-        primaryAction: () => navigate(`/dossier/${dossier.id}/devis`),
-      };
-    }
-
-    if (status === "devis_a_faire") {
-      return {
-        message: "Prochaine étape : Créer et envoyer le devis",
-        primaryLabel: "Créer un devis",
-        primaryIcon: <FileText className="h-4 w-4" />,
-        primaryAction: () => navigate(`/dossier/${dossier.id}/devis`),
+        primaryAction: () => {
+          // Trigger import dialog via DOM event (handled in DossierDetail)
+          window.dispatchEvent(new CustomEvent("open-import-devis"));
+        },
+        secondaryLabel: "Créer un devis",
+        secondaryAction: () => navigate(`/dossier/${dossier.id}/devis`),
       };
     }
 
@@ -239,11 +235,14 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
 
     if (status === "rdv_termine") {
       return {
-        message: "Prochaine étape : Générer la facture",
-        primaryLabel: "Générer la facture",
+        message: "Prochaine étape : Importer ou générer la facture",
+        primaryLabel: "Importer facture (PDF)",
         primaryIcon: <Receipt className="h-4 w-4" />,
-        primaryAction: handleGenerate,
-        isPending: generateFromQuote.isPending,
+        primaryAction: () => {
+          window.dispatchEvent(new CustomEvent("open-import-facture"));
+        },
+        secondaryLabel: "Générer la facture",
+        secondaryAction: handleGenerate,
       };
     }
 

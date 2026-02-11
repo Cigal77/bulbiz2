@@ -13,11 +13,13 @@ import { QuoteBlock } from "@/components/dossier/QuoteBlock";
 import { AppointmentBlock } from "@/components/dossier/AppointmentBlock";
 import { AppointmentBanner } from "@/components/dossier/AppointmentBanner";
 import { InvoiceBlock } from "@/components/dossier/InvoiceBlock";
+import { ImportDevisDialog } from "@/components/dossier/ImportDevisDialog";
+import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,20 @@ export default function DossierDetail() {
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
   const { data: medias = [], isLoading: mediasLoading } = useDossierMedias(id!);
   const appointmentRef = useRef<HTMLDivElement>(null);
+  const [importDevisOpen, setImportDevisOpen] = useState(false);
+  const [importFactureOpen, setImportFactureOpen] = useState(false);
+
+  // Listen for custom events from NextStepBanner
+  useEffect(() => {
+    const openDevis = () => setImportDevisOpen(true);
+    const openFacture = () => setImportFactureOpen(true);
+    window.addEventListener("open-import-devis", openDevis);
+    window.addEventListener("open-import-facture", openFacture);
+    return () => {
+      window.removeEventListener("open-import-devis", openDevis);
+      window.removeEventListener("open-import-facture", openFacture);
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -114,6 +130,10 @@ export default function DossierDetail() {
           </div>
         </div>
       </main>
+
+      {/* Import dialogs (triggered from NextStepBanner + DossierActions) */}
+      <ImportDevisDialog open={importDevisOpen} onClose={() => setImportDevisOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
+      <ImportFactureDialog open={importFactureOpen} onClose={() => setImportFactureOpen(false)} dossierId={dossier.id} clientEmail={dossier.client_email} />
     </div>
   );
 }
