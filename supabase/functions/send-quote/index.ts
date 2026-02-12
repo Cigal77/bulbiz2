@@ -135,6 +135,8 @@ Deno.serve(async (req: Request) => {
             </p>
             <p style="font-size: 13px; color: #6b7280;">Ce lien est valable 30 jours.</p>
             <p>N'hésitez pas à nous contacter pour toute question.</p>
+            ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+            ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
             <br/>
             <p style="white-space: pre-line;">${signature}</p>
           </div>

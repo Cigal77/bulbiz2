@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, PenLine, Copy, CheckCircle2, ShieldCheck,
+  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, Copy, CheckCircle2, ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -103,9 +103,7 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
     }
   };
 
-  // Show for all statuses where quotes are relevant (hide only for brand new dossiers without quotes)
-  const hideStatuses = ["nouveau", "a_qualifier"];
-  if (hideStatuses.includes(dossier.status) && quotes.length === 0) return null;
+  // Always show quote block - import PDF is always available
 
   return (
     <Card>
@@ -115,15 +113,6 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
           Devis
         </CardTitle>
         <div className="flex gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => navigate(`/dossier/${dossier.id}/devis`)}
-          >
-            <PenLine className="h-3.5 w-3.5" />
-            Créer un devis
-          </Button>
           <input
             ref={fileInputRef}
             type="file"
@@ -132,7 +121,7 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
             onChange={handleImport}
           />
           <Button
-            variant="outline"
+            variant="default"
             size="sm"
             className="gap-1.5"
             onClick={() => fileInputRef.current?.click()}
@@ -154,7 +143,7 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
             <div>
               <p className="text-sm font-medium text-foreground">Aucun devis</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Importez un PDF ou créez un devis directement.
+                Importez un devis au format PDF.
               </p>
             </div>
           </div>

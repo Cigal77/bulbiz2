@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
+import { useQueryClient } from "@tanstack/react-query";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Calendar, FileText, Receipt, Phone, ChevronRight, CheckCircle2, FolderOpen, Link2 } from "lucide-react";
@@ -153,7 +154,21 @@ const SECTION_LABELS: Record<ActionItem["type"], string> = {
 
 export default function TodoActions() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: dossiers, isLoading } = useDossiers();
+
+  // Refetch dossiers when page becomes visible (for mobile tab switching)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    // Also refetch on mount
+    queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [queryClient]);
 
   const actions = useMemo(() => {
     if (!dossiers) return [];

@@ -159,6 +159,9 @@ Deno.serve(async (req) => {
               <p>Bonjour ${clientName},</p>
               <p>Suite à la validation de votre devis, <strong>${artisanName}</strong> souhaite convenir d'un rendez-vous pour l'intervention.</p>
               <p>Merci de le contacter${profile?.phone ? ` au ${profile.phone}` : ""}${profile?.email ? ` ou par email à ${profile.email}` : ""} pour fixer une date.</p>
+              <p>N'hésitez pas à nous contacter pour toute question.</p>
+              ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+              ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
               <br/>
               <p>Cordialement,<br/>${artisanName}</p>
             </div>`,
@@ -251,6 +254,24 @@ Deno.serve(async (req) => {
             subject,
             html: body,
           });
+        }
+
+        // SMS notification to artisan
+        if (profile?.phone && profile?.sms_enabled !== false) {
+          const cleaned = profile.phone.replace(/[\s\-().]/g, "");
+          if (/^\+?\d{10,15}$/.test(cleaned)) {
+            let phone = cleaned;
+            if (phone.startsWith("0") && phone.length === 10) phone = "+33" + phone.slice(1);
+            if (!phone.startsWith("+")) phone = "+" + phone;
+
+            const clientName =
+              [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
+            const isAccepted = action === "accept";
+            const smsBody = isAccepted
+              ? `${clientName} a validé le devis ${quote.quote_number}. RDV à fixer. — Bulbiz`
+              : `${clientName} a refusé le devis ${quote.quote_number}.${reason ? ` Motif : ${reason}` : ""} — Bulbiz`;
+            await sendSms(phone, smsBody);
+          }
         }
       }
     } catch (emailErr) {

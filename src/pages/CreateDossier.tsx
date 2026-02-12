@@ -166,22 +166,23 @@ export default function CreateDossier() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!file.name.endsWith(".eml") && !file.name.endsWith(".msg") && !file.name.endsWith(".txt")) {
-      toast({ title: "Format non supporté", description: "Glissez un fichier .eml, .msg ou .txt", variant: "destructive" });
-      return;
+    // Accept all text-based formats
+    try {
+      const text = await file.text();
+      setEmailText(text);
+      const parsed = parseEmailContent(text);
+      if (parsed.client_first_name) form.setValue("client_first_name", parsed.client_first_name);
+      if (parsed.client_last_name) form.setValue("client_last_name", parsed.client_last_name);
+      if (parsed.client_phone) form.setValue("client_phone", parsed.client_phone);
+      if (parsed.client_email) form.setValue("client_email", parsed.client_email);
+      if (parsed.address) form.setValue("address", parsed.address);
+      if (parsed.category) form.setValue("category", parsed.category);
+      if (parsed.urgency) form.setValue("urgency", parsed.urgency);
+      if (parsed.description) form.setValue("description", parsed.description);
+      toast({ title: "Fichier importé", description: "Les champs ont été pré-remplis." });
+    } catch {
+      toast({ title: "Fichier importé", description: `${file.name} ajouté comme pièce jointe.` });
     }
-    const text = await file.text();
-    setEmailText(text);
-    const parsed = parseEmailContent(text);
-    if (parsed.client_first_name) form.setValue("client_first_name", parsed.client_first_name);
-    if (parsed.client_last_name) form.setValue("client_last_name", parsed.client_last_name);
-    if (parsed.client_phone) form.setValue("client_phone", parsed.client_phone);
-    if (parsed.client_email) form.setValue("client_email", parsed.client_email);
-    if (parsed.address) form.setValue("address", parsed.address);
-    if (parsed.category) form.setValue("category", parsed.category);
-    if (parsed.urgency) form.setValue("urgency", parsed.urgency);
-    if (parsed.description) form.setValue("description", parsed.description);
-    toast({ title: "Fichier importé", description: "Les champs ont été pré-remplis." });
   };
 
   return (
@@ -217,14 +218,14 @@ export default function CreateDossier() {
             >
               <Mail className="h-8 w-8 text-muted-foreground mx-auto" />
               <p className="text-sm font-medium text-foreground">
-                Collez le contenu d'un email ci-dessous
+                Insérez les pièces jointes de votre mail ici
               </p>
               <p className="text-xs text-muted-foreground">
-                Ou glissez-déposez un fichier .eml / .msg / .txt
+                Glissez-déposez vos fichiers (tous formats acceptés)
               </p>
             </div>
             <Textarea
-              placeholder="Collez ici le contenu de l'email du client…"
+              placeholder="Ou collez ici le contenu de l'email du client..."
               value={emailText}
               onChange={(e) => setEmailText(e.target.value)}
               className="min-h-[160px]"
@@ -326,6 +327,34 @@ export default function CreateDossier() {
                     </FormItem>
                   )}
                 />
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="postal_code"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Code postal</FormLabel>
+                        <FormControl>
+                          <Input placeholder="75001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ville</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Paris" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {/* Category quick select */}
                 <FormField

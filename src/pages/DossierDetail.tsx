@@ -20,7 +20,13 @@ import { DeleteDossierDialog } from "@/components/dashboard/DeleteDossierDialog"
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Trash2, Phone, MapPin, ChevronDown } from "lucide-react";
+import { ArrowLeft, Trash2, Phone, MapPin, ChevronDown, Navigation } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useRef, useState, useEffect } from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
@@ -101,8 +107,16 @@ export default function DossierDetail() {
     ? `${dossier.client_first_name ?? ""} ${dossier.client_last_name ?? ""}`.trim()
     : "Dossier sans nom";
 
-  const mapsUrl = dossier.address
+  const mapsUrl = dossier.google_place_id
+    ? `https://www.google.com/maps/search/?api=1&query_place_id=${dossier.google_place_id}`
+    : dossier.address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dossier.address)}`
+    : null;
+
+  const wazeUrl = dossier.lat && dossier.lng
+    ? `https://waze.com/ul?ll=${dossier.lat},${dossier.lng}&navigate=yes`
+    : dossier.address
+    ? `https://waze.com/ul?q=${encodeURIComponent(dossier.address)}&navigate=yes`
     : null;
 
   return (
@@ -127,12 +141,32 @@ export default function DossierDetail() {
                 </a>
               </Button>
             )}
-            {mapsUrl && (
-              <Button variant="ghost" size="icon" asChild className="h-9 w-9">
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                  <MapPin className="h-4 w-4 text-primary" />
-                </a>
-              </Button>
+            {(mapsUrl || wazeUrl) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {mapsUrl && (
+                    <DropdownMenuItem asChild>
+                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Google Maps
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                  {wazeUrl && (
+                    <DropdownMenuItem asChild>
+                      <a href={wazeUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                        <Navigation className="h-4 w-4" />
+                        Waze
+                      </a>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         )}

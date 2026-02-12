@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  FileText, Plus, Eye, Send, CheckCircle2, Loader2,
+  FileText, Upload, Eye, Send, CheckCircle2, Loader2,
 } from "lucide-react";
 
 interface InvoiceBlockProps {
@@ -21,20 +22,15 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
   const { toast } = useToast();
   const appointmentStatus = ((dossier as any).appointment_status || "none") as AppointmentStatus;
   const { data: invoices = [], isLoading } = useInvoices(dossier.id);
-  const { generateFromQuote } = useInvoiceActions(dossier.id);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Show if RDV terminé, or invoice statuses, or invoices exist
   const showStatuses = ["rdv_termine", "invoice_pending", "invoice_paid"];
   if (appointmentStatus !== "done" && !showStatuses.includes(dossier.status) && invoices.length === 0) return null;
 
-  const handleGenerate = () => {
-    generateFromQuote.mutate(undefined, {
-      onSuccess: (invoice: any) => {
-        toast({ title: "Facture générée ✅", description: `N° ${invoice.invoice_number}` });
-        navigate(`/dossier/${dossier.id}/facture/${invoice.id}`);
-      },
-      onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-    });
+  const handleImportPdf = () => {
+    window.dispatchEvent(new CustomEvent("open-import-facture"));
   };
 
   return (
@@ -81,21 +77,16 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
         </div>
       ))}
 
-      {/* Generate button */}
+      {/* Import button */}
       {invoices.length === 0 && (
         <Button
           variant="default"
           size="sm"
           className="w-full gap-1.5"
-          onClick={handleGenerate}
-          disabled={generateFromQuote.isPending}
+          onClick={handleImportPdf}
         >
-          {generateFromQuote.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Plus className="h-3.5 w-3.5" />
-          )}
-          Générer la facture
+          <Upload className="h-3.5 w-3.5" />
+          Importer une facture (PDF)
         </Button>
       )}
     </div>

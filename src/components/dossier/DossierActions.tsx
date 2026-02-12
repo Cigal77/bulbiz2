@@ -82,8 +82,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   };
 
   // Status-aware visibility for contextual actions
-  const showImportDevis = ["nouveau", "a_qualifier", "devis_a_faire"].includes(status);
-  const showImportFacture = ["rdv_termine"].includes(status);
   const showRelancerNow = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
   const showToggleRelance = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
 
@@ -186,21 +184,17 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           </Button>
         )}
 
-        {/* 7. Importer devis (contextual) */}
-        {showImportDevis && (
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportDevisOpen(true)}>
-            <FileText className="h-4 w-4 text-primary" />
-            Importer devis (PDF)
-          </Button>
-        )}
+        {/* 7. Importer devis (always available) */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportDevisOpen(true)}>
+          <FileText className="h-4 w-4 text-primary" />
+          Importer devis (PDF)
+        </Button>
 
-        {/* 8. Importer facture (contextual) */}
-        {showImportFacture && (
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportFactureOpen(true)}>
-            <Receipt className="h-4 w-4 text-primary" />
-            Importer facture (PDF)
-          </Button>
-        )}
+        {/* 8. Importer facture (always available) */}
+        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportFactureOpen(true)}>
+          <Receipt className="h-4 w-4 text-primary" />
+          Importer facture (PDF)
+        </Button>
 
         {/* 9. Toggle relances (contextual) */}
         {showToggleRelance && (
