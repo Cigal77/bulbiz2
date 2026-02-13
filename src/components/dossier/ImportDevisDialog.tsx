@@ -51,11 +51,8 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
       // Generate quote number if not provided
       let finalNumber = quoteNumber.trim();
       if (!finalNumber) {
-        const { data: numData, error: numError } = await supabase.rpc("generate_quote_number", {
-          p_user_id: user.id,
-        });
-        if (numError) throw numError;
-        finalNumber = numData as string;
+        const y = new Date().getFullYear();
+        finalNumber = `DEV-${y}-${String(Date.now()).slice(-6)}`; // ex DEV-2026-123456
       }
 
       // Upload PDF
@@ -144,11 +141,13 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
             <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             <Button
               variant="outline"
-              className="w-full justify-start gap-2"
+              className="w-full justify-start gap-2 overflow-hidden"
               onClick={() => fileRef.current?.click()}
             >
-              <Upload className="h-4 w-4" />
-              {file ? file.name : "Choisir un fichier PDF"}
+              <Upload className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-left">
+                {file ? file.name : "Choisir un fichier PDF"}
+              </span>
             </Button>
           </div>
 

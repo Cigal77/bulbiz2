@@ -161,12 +161,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           Ajouter photo / vidéo
         </Button>
 
-        {/* 5. Plan */}
-        <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setPlanOpen(true)}>
-          <Map className="h-4 w-4 text-primary" />
-          Ajouter plan
-        </Button>
-
         {/* 6. Relancer maintenant (contextual) */}
         {showRelancerNow && (
           <Button

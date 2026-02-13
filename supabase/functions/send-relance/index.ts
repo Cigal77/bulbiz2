@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: `${artisanName} <noreply@bulbiz.fr`,
+        from: `${artisanName} <noreply@bulbiz.fr>`,
         to: [dossier.client_email],
         subject,
         html: htmlBody,

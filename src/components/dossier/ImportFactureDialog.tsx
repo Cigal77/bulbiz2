@@ -49,11 +49,8 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
       // Generate invoice number if not provided
       let finalNumber = invoiceNumber.trim();
       if (!finalNumber) {
-        const { data: numData, error: numError } = await supabase.rpc("generate_invoice_number", {
-          p_user_id: user.id,
-        });
-        if (numError) throw numError;
-        finalNumber = numData as string;
+        const y = new Date().getFullYear();
+        finalNumber = `DEV-${y}-${String(Date.now()).slice(-6)}`; // ex DEV-2026-123456
       }
 
       // Upload PDF
@@ -151,20 +148,26 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* File upload */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Fichier PDF *</Label>
-            <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2"
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="h-4 w-4" />
-              {file ? file.name : "Choisir un fichier PDF"}
-            </Button>
-          </div>
-
+{/* File upload */}
+<div className="space-y-1.5">
+  <Label className="text-xs">Fichier PDF *</Label>
+  <input 
+    ref={fileRef} 
+    type="file" 
+    accept=".pdf" 
+    className="hidden" 
+    onChange={(e) => setFile(e.target.files?.[0] || null)} 
+  />
+  <div
+    onClick={() => fileRef.current?.click()}
+    className="flex items-center gap-2 w-full min-h-[40px] px-3 py-2 text-sm border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer overflow-hidden"
+  >
+    <Upload className="h-4 w-4 flex-shrink-0" />
+    <span className="flex-1 text-left break-words overflow-hidden">
+      {file ? file.name : "Choisir un fichier PDF"}
+    </span>
+  </div>
+</div>
           {/* Invoice number */}
           <div className="space-y-1.5">
             <Label className="text-xs">Numéro de facture</Label>
