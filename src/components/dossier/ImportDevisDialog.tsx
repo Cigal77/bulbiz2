@@ -139,16 +139,15 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
           <div className="space-y-1.5">
             <Label className="text-xs">Fichier PDF *</Label>
             <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2 overflow-hidden"
+            <div
               onClick={() => fileRef.current?.click()}
+              className="flex items-center gap-2 w-full h-10 px-4 py-2 text-sm border border-input bg-background rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer overflow-hidden"
             >
               <Upload className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">
                 {file ? file.name : "Choisir un fichier PDF"}
               </span>
-            </Button>
+            </div>
           </div>
 
           {/* Quote number (optional) */}
