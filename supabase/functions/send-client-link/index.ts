@@ -7,6 +7,48 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+  if (!accountSid || !authToken || !fromPhone) {
+    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
+    return { success: false, error: "SMS provider not configured" };
+  }
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      },
+      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      console.error("Twilio error:", err);
+      return { success: false, error: `Twilio ${resp.status}` };
+    }
+    await resp.json();
+    return { success: true };
+  } catch (e) {
+    console.error("SMS error:", e);
+    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
+  }
+}
+
+function normalizePhone(phone: string): string {
+  let cleaned = phone.replace(/[\s\-().]/g, "");
+  if (cleaned.startsWith("0") && cleaned.length === 10) cleaned = "+33" + cleaned.slice(1);
+  if (!cleaned.startsWith("+")) cleaned = "+" + cleaned;
+  return cleaned;
+}
+
+function isValidPhone(phone: string): boolean {
+  return /^\+?\d{10,15}$/.test(phone.replace(/[\s\-().]/g, ""));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -117,6 +159,9 @@ Deno.serve(async (req: Request) => {
                   </a>
                 </p>
                 <p style="font-size: 13px; color: #6b7280;">Ce lien est valable ${validityDays} jours.</p>
+                <p>N'hésitez pas à nous contacter pour toute question.</p>
+                ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+                ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
                 <br/>
                 <p style="white-space: pre-line;">${signature}</p>
               </div>
@@ -133,6 +178,30 @@ Deno.serve(async (req: Request) => {
         } catch (err: any) {
           emailError = err.message;
           console.error("Email send error:", err);
+        }
+      }
+    }
+
+    // Send SMS
+    let smsSent = false;
+    if (dossier.client_phone && isValidPhone(dossier.client_phone)) {
+      const artisanName =
+        profile?.company_name ||
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+        "Votre artisan";
+      const smsEnabled = profile?.sms_enabled !== false;
+      if (smsEnabled) {
+        const phone = normalizePhone(dossier.client_phone);
+        const smsBody = `Bonjour, complétez votre demande d'intervention ici : ${clientLink} — ${artisanName}`;
+        const smsResult = await sendSms(phone, smsBody);
+        if (smsResult.success) {
+          smsSent = true;
+          await supabase.from("historique").insert({
+            dossier_id,
+            user_id: user.id,
+            action: "client_link_sent_sms",
+            details: `Lien client envoyé par SMS au ${dossier.client_phone}`,
+          });
         }
       }
     }
@@ -156,6 +225,7 @@ Deno.serve(async (req: Request) => {
         token_generated: tokenGenerated,
         email_sent: emailSent,
         email_error: emailError,
+        sms_sent: smsSent,
         no_contact: !dossier.client_email && !dossier.client_phone,
       }),
       {

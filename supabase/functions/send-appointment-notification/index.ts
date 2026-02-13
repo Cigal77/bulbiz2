@@ -32,6 +32,9 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
           <p>Bonjour ${clientName},</p>
           <p>Suite à la validation de votre devis, <strong>${artisanName}</strong> souhaite convenir d'un rendez-vous pour l'intervention.</p>
           <p>Merci de le contacter${artisanPhone}${artisanEmail} pour fixer une date.</p>
+          <p>N'hésitez pas à nous contacter pour toute question.</p>
+          ${payload.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${payload.artisan_email}</p>` : ""}
+          ${payload.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${payload.artisan_phone}</p>` : ""}
           <br/>
           <p>Cordialement,<br/>${artisanName}</p>
         </div>`,
@@ -49,6 +52,9 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
           ${slotsHtml}
           ${link ? `<p style="margin:24px 0;"><a href="${link}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Choisir mon créneau</a></p>` : ""}
           <p>Si aucun créneau ne vous convient, contactez-nous${artisanPhone}.</p>
+          <p>N'hésitez pas à nous contacter pour toute question.</p>
+          ${payload.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${payload.artisan_email}</p>` : ""}
+          ${payload.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${payload.artisan_phone}</p>` : ""}
           <br/>
           <p>Cordialement,<br/>${artisanName}</p>
         </div>`,
@@ -66,6 +72,9 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
           <p>Votre rendez-vous avec <strong>${artisanName}</strong> est confirmé :</p>
           <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${dateStr}${timeStr ? ` — 🕐 ${timeStr}` : ""}</p>
           <p>En cas d'empêchement, merci de nous prévenir${artisanPhone}.</p>
+          <p>N'hésitez pas à nous contacter pour toute question.</p>
+          ${payload.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${payload.artisan_email}</p>` : ""}
+          ${payload.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${payload.artisan_phone}</p>` : ""}
           <br/>
           <p>Cordialement,<br/>${artisanName}</p>
         </div>`,

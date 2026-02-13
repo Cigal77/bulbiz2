@@ -285,12 +285,10 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     // ──── Early statuses with complete info → Import/Create devis ────
     if (["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
       return {
-        message: "Prochaine étape : Importer ou créer un devis",
+        message: "Prochaine étape : Importer un devis",
         primaryLabel: "Importer devis (PDF)",
         primaryIcon: <FileText className="h-4 w-4" />,
         primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
-        secondaryLabel: "Créer un devis",
-        secondaryAction: () => navigate(`/dossier/${dossier.id}/devis`),
       };
     }
 
@@ -347,13 +345,11 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     // ──── PRIORITY 4: RDV terminé → Facturer ────
     if (status === "rdv_termine") {
       return {
-        message: "Prochaine étape : Importer ou générer la facture",
+        message: "Prochaine étape : Importer la facture",
         hint: "L'intervention est terminée. Envoyez la facture au client.",
         primaryLabel: "Importer facture (PDF)",
         primaryIcon: <Receipt className="h-4 w-4" />,
         primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-facture")),
-        secondaryLabel: "Générer la facture",
-        secondaryAction: handleGenerate,
       };
     }
 

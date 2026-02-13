@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.send-appointment-notification]
 verify_jwt = false
+
+[functions.submit-client-form]
+verify_jwt = false

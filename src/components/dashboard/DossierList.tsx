@@ -160,10 +160,11 @@ export function DossierList({ dossiers, onSelect, isTrash, onDelete, onPermanent
       {dossiers.map((dossier) => (
         <div
           key={dossier.id}
-          className="w-full text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm group relative"
+          onClick={() => onSelect(dossier)}
+          className="w-full text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:shadow-sm group relative cursor-pointer touch-manipulation"
         >
           <div className="flex items-start justify-between gap-3">
-            <button onClick={() => onSelect(dossier)} className="flex-1 min-w-0 space-y-1.5 text-left">
+            <div className="flex-1 min-w-0 space-y-1.5 text-left">
               {/* Client name + urgency */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-foreground truncate">
@@ -218,10 +219,10 @@ export function DossierList({ dossiers, onSelect, isTrash, onDelete, onPermanent
                   {formatDistanceToNow(new Date(dossier.created_at), { addSuffix: true, locale: fr })}
                 </span>
               </div>
-            </button>
+            </div>
 
             {/* Right: Status + actions menu */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
               <div className={cn("rounded-md px-2.5 py-1 text-xs font-medium", STATUS_COLORS[dossier.status])}>
                 {STATUS_LABELS[dossier.status]}
               </div>

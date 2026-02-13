@@ -9,8 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-type AuthMode = "login" | "signup" | "magic" | "reset";
+type AuthMode = "login" | "signup" | "reset";
 
 export default function Auth() {
   const { user, loading } = useAuth();
@@ -70,31 +71,6 @@ export default function Auth() {
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin },
-      });
-      if (error) throw error;
-      toast({
-        title: "Lien envoyé",
-        description: "Vérifiez votre boîte mail pour vous connecter.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen">
       {/* Left panel - branding */}
@@ -118,7 +94,10 @@ export default function Auth() {
       </div>
 
       {/* Right panel - form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-12">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-12 relative">
+        <div className="absolute top-4 right-4">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-sm space-y-8">
           <div className="lg:hidden flex items-center justify-center mb-4">
             <BulbizLogo size={28} />
@@ -126,13 +105,11 @@ export default function Auth() {
 
           <div className="space-y-2 text-center lg:text-left">
             <h2 className="text-2xl font-bold text-foreground">
-              {mode === "signup" ? "Créer un compte" : mode === "magic" ? "Connexion par lien" : mode === "reset" ? "Mot de passe oublié" : "Se connecter"}
+              {mode === "signup" ? "Créer un compte" : mode === "reset" ? "Mot de passe oublié" : "Se connecter"}
             </h2>
             <p className="text-sm text-muted-foreground">
               {mode === "signup"
                 ? "Commencez à centraliser vos demandes"
-                : mode === "magic"
-                ? "Recevez un lien de connexion par email"
                 : mode === "reset"
                 ? "Recevez un lien pour réinitialiser votre mot de passe"
                 : "Accédez à vos dossiers"}
@@ -178,28 +155,6 @@ export default function Auth() {
               </div>
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? "Envoi..." : "Envoyer le lien de réinitialisation"}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </form>
-          ) : mode === "magic" ? (
-            <form onSubmit={handleMagicLink} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="magic-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="magic-email"
-                    type="email"
-                    placeholder="votre@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? "Envoi..." : "Envoyer le lien"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </form>
@@ -279,27 +234,6 @@ export default function Auth() {
           )}
 
           <div className="space-y-3 pt-2">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">ou</span>
-              </div>
-            </div>
-
-            {mode !== "magic" && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setMode("magic")}
-                type="button"
-              >
-                <Mail className="mr-2 h-4 w-4" />
-                Connexion sans mot de passe
-              </Button>
-            )}
-
             <p className="text-center text-sm text-muted-foreground">
               {mode === "signup" ? (
                 <>
@@ -313,14 +247,6 @@ export default function Auth() {
                   Pas encore de compte ?{" "}
                   <button onClick={() => setMode("signup")} className="text-primary hover:underline font-medium">
                     S'inscrire
-                  </button>
-                </>
-              )}
-              {mode === "magic" && (
-                <>
-                  {" · "}
-                  <button onClick={() => setMode("login")} className="text-primary hover:underline font-medium">
-                    Connexion classique
                   </button>
                 </>
               )}

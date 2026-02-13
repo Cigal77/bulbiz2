@@ -134,10 +134,13 @@ Deno.serve(async (req: Request) => {
             <a href="${clientLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">Compléter mon dossier</a>
           </p>
           <p style="font-size: 13px; color: #6b7280;">Vous pourrez ajouter des photos, vidéos et préciser votre demande.</p>
+          <p>N'hésitez pas à nous contacter pour toute question.</p>
+          ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+          ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
           <br/><p style="white-space: pre-line;">${signature}</p>
         </div>
       `;
-      smsBody = `Bonjour ${dossier.client_first_name || ""}, pour traiter votre demande, complétez ces infos (2 min) : ${clientLink} — ${artisanName}`;
+      smsBody = `Bonjour ${dossier.client_first_name || ""}, pour traiter votre demande, complétez ces infos (2 min) : ${clientLink} — ${artisanName}${profile?.phone ? ` (${profile.phone})` : ""}`;
     } else {
       subject = `${artisanName} – Suivi de votre devis`;
       htmlBody = `
@@ -145,17 +148,20 @@ Deno.serve(async (req: Request) => {
           <p>Bonjour ${dossier.client_first_name || ""},</p>
           <p>Nous vous avons récemment envoyé un devis pour votre demande d'intervention.</p>
           <p>Souhaitez-vous que nous en discutions ? Nous restons à votre disposition pour toute question.</p>
+          <p>N'hésitez pas à nous contacter pour toute question.</p>
+          ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+          ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
           <br/><p style="white-space: pre-line;">${signature}</p>
         </div>
       `;
-      smsBody = `Rappel : votre devis est en attente de validation. N'hésitez pas à nous contacter. — ${artisanName}`;
+      smsBody = `Rappel : votre devis est en attente de validation. N'hésitez pas à nous contacter. — ${artisanName}${profile?.phone ? ` (${profile.phone})` : ""}`;
     }
 
     // Send email
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
-        from: `${artisanName} <noreply@bulbiz.fr`,
+        from: `${artisanName} <noreply@bulbiz.fr>`,
         to: [dossier.client_email],
         subject,
         html: htmlBody,
