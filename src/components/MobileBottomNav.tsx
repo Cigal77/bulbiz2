@@ -78,7 +78,7 @@ export function MobileBottomNav() {
 
   const handleNav = (item: typeof NAV_ITEMS[number]) => {
     if (item.isAction) {
-      setQuickMenuOpen(true);
+      navigate("/nouveau");
     } else {
       navigate(item.path);
     }

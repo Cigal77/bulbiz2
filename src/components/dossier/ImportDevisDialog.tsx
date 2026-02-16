@@ -65,7 +65,7 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
       const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
 
       // Create quote record as "envoye" (imported = already sent)
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("quotes")
         .insert({
           dossier_id: dossierId,
@@ -78,8 +78,13 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
           total_ht: totalHt ? parseFloat(totalHt) : 0,
           total_tva: totalTva ? parseFloat(totalTva) : 0,
           total_ttc: totalTtc ? parseFloat(totalTtc) : 0,
-        });
+        })
+        .select("id")
+        .single();
+
       if (insertError) throw insertError;
+
+      const quoteId = inserted.id;
 
       // Update dossier status → devis_envoye
       await supabase
@@ -102,8 +107,16 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
       // Send quote notification to client
       if (clientEmail) {
         try {
-          await supabase.functions.invoke("send-quote", {
-            body: { dossier_id: dossierId },
+          // 1. Récupère la session pour être sûr qu'elle est fraîche
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (!session) {
+            throw new Error("Session expirée ou inexistante");
+          }
+          // 2. Utilise invoke SANS headers personnalisés
+          // Le client 'supabase' injecte automatiquement l'Authorization et l'apikey
+          const { data, error } = await supabase.functions.invoke("send-quote", {
+            body: { quote_id: quoteId },
           });
         } catch (e) {
           console.error("Notification error:", e);

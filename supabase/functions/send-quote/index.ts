@@ -60,18 +60,33 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing bearer token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Missing authorization header");
-
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
+    // ✅ Vérifie l'utilisateur via GoTrue avec le token (pas besoin d'anon key)
+    const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseServiceKey,               // service role ok pour appeler /auth
+        "Authorization": authHeader,
+      },
     });
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseUser.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+
+    if (!userResp.ok) {
+      const t = await userResp.text();
+      console.error("auth/v1/user failed:", userResp.status, t);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const user = await userResp.json(); // contient id, email, etc.
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
