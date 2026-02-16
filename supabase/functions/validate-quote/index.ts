@@ -222,12 +222,19 @@ Deno.serve(async (req) => {
           .eq("user_id", dossier.user_id)
           .maybeSingle();
 
-        if (profile?.email) {
+        // Fallback: use auth user email if profile email is not set
+        let artisanEmail = profile?.email;
+        if (!artisanEmail) {
+          const { data: authUser } = await supabase.auth.admin.getUserById(dossier.user_id);
+          artisanEmail = authUser?.user?.email || null;
+        }
+
+        if (artisanEmail) {
           const resendClient = new Resend(resendKey);
           const clientName =
             [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
           const artisanName =
-            profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Artisan";
+            profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Artisan";
           const isAccepted = action === "accept";
           const subject = isAccepted
             ? `✅ Devis ${quote.quote_number} validé par ${clientName}`
@@ -250,7 +257,7 @@ Deno.serve(async (req) => {
 
           await resendClient.emails.send({
             from: `Bulbiz <noreply@bulbiz.fr>`,
-            to: [profile.email],
+            to: [artisanEmail],
             subject,
             html: body,
           });

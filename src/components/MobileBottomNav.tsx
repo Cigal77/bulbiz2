@@ -3,15 +3,8 @@ import { ClipboardList, FolderOpen, Plus, Calendar, Settings } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDossiers } from "@/hooks/useDossiers";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { isToday, parseISO } from "date-fns";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FileText, Receipt, CalendarPlus } from "lucide-react";
 
 function useActionBadges() {
   const { data: dossiers } = useDossiers();
@@ -40,8 +33,6 @@ export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const badges = useActionBadges();
-  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
-
   if (!isMobile) return null;
 
   const publicPaths = ["/auth", "/client", "/devis/validation", "/facture/view"];
@@ -84,12 +75,6 @@ export function MobileBottomNav() {
     }
   };
 
-  const quickActions = [
-    { icon: FolderOpen, label: "Nouveau dossier", action: () => { setQuickMenuOpen(false); navigate("/nouveau"); } },
-    { icon: FileText, label: "Importer un devis", action: () => { setQuickMenuOpen(false); navigate("/?import=devis"); } },
-    { icon: Receipt, label: "Importer une facture", action: () => { setQuickMenuOpen(false); navigate("/?import=facture"); } },
-  ];
-
   return (
     <>
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 safe-area-bottom">
@@ -131,26 +116,6 @@ export function MobileBottomNav() {
           ))}
         </div>
       </nav>
-
-      <Dialog open={quickMenuOpen} onOpenChange={setQuickMenuOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Action rapide</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 pt-2">
-            {quickActions.map(qa => (
-              <button
-                key={qa.label}
-                onClick={qa.action}
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-border bg-card hover:bg-accent/50 transition-colors text-left min-h-[48px]"
-              >
-                <qa.icon className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium">{qa.label}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

@@ -149,7 +149,7 @@ export default function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone</Label>
-                <Input id="phone" {...register("phone")} />
+                <Input id="phone" type="tel" {...register("phone")} />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="email">Email professionnel</Label>
