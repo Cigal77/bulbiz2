@@ -353,11 +353,18 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
               </>
             )}
             {!hasCoords && address && (
-              <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer">
-                  <MapPin className="h-3.5 w-3.5" /> Itinéraire
-                </a>
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href={`https://waze.com/ul?q=${encodeURIComponent(address)}&navigate=yes`} target="_blank" rel="noopener noreferrer">
+                    <Navigation className="h-3.5 w-3.5" /> Waze
+                  </a>
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`} target="_blank" rel="noopener noreferrer">
+                    <MapPin className="h-3.5 w-3.5" /> Maps
+                  </a>
+                </Button>
+              </>
             )}
             {dossier.client_phone && (
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>

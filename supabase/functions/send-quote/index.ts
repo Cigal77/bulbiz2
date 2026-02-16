@@ -112,22 +112,17 @@ Deno.serve(async (req: Request) => {
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
     const validationUrl = `${origin}/devis/validation?token=${signatureToken}`;
 
-    const pdfLink = quote.pdf_url
-      ? `<p style="margin: 16px 0;"><a href="${quote.pdf_url}" style="color: #2563eb; text-decoration: underline; font-weight: 500;">📄 Télécharger le devis (PDF)</a></p>`
-      : "";
-
     // Send email
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
         from: `${artisanName} <noreply@bulbiz.fr>`,
         to: [dossier.client_email],
-        subject: `${artisanName} – Votre devis ${quote.quote_number}`,
+        subject: `${artisanName} – Votre devis`,
         html: `
           <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <p>Bonjour ${dossier.client_first_name || ""},</p>
-            <p>Veuillez trouver votre devis <strong>${quote.quote_number}</strong>.</p>
-            ${pdfLink}
+            <p>Veuillez trouver ci-joint votre devis.</p>
             <p style="margin: 24px 0;">
               <a href="${validationUrl}" style="background-color: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
                 ✅ Voir et valider le devis
@@ -154,7 +149,7 @@ Deno.serve(async (req: Request) => {
     // Send SMS
     if (dossier.client_phone && isValidPhone(dossier.client_phone) && smsEnabled) {
       const phone = normalizePhone(dossier.client_phone);
-      const smsBody = `Votre devis ${quote.quote_number} est disponible. Pour valider : ${validationUrl} — ${artisanName}`;
+      const smsBody = `Votre devis est disponible. Pour le consulter : ${validationUrl} — ${artisanName}`;
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         await supabase.from("historique").insert({

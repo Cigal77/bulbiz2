@@ -188,6 +188,14 @@ export default function DossierDetail() {
               onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
 
+            {/* Actions — open by default on mobile, placed before devis */}
+            <CollapsibleSection title="⚙️ Actions" defaultOpen={true}>
+              <div className="space-y-3">
+                <DossierActions dossier={dossier} />
+                <ClientLinkBlock dossier={dossier} />
+              </div>
+            </CollapsibleSection>
+
             {/* RDV block — always visible, priority */}
             <div ref={appointmentRef}>
               <AppointmentBlock dossier={dossier} />
@@ -222,23 +230,17 @@ export default function DossierDetail() {
               <HistoriqueTimeline historique={historique} isLoading={histLoading} />
             </CollapsibleSection>
 
-            {/* Actions + Client link + Delete */}
-            <CollapsibleSection title="⚙️ Actions">
-              <div className="space-y-3">
-                <DossierActions dossier={dossier} />
-                <ClientLinkBlock dossier={dossier} />
-                <div className="rounded-xl border border-destructive/20 bg-card p-4">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-                    onClick={() => setDeleteOpen(true)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Supprimer le dossier
-                  </Button>
-                </div>
-              </div>
-            </CollapsibleSection>
+            {/* Delete */}
+            <div className="rounded-xl border border-destructive/20 bg-card p-4">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer le dossier
+              </Button>
+            </div>
           </div>
         ) : (
           /* ═══ DESKTOP LAYOUT ═══ */
