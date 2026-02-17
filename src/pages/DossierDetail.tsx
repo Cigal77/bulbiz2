@@ -206,11 +206,11 @@ export default function DossierDetail() {
             />
 
             {/* Accordion sections */}
-            <CollapsibleSection title="📝 Devis" defaultOpen={["nouveau", "a_qualifier", "devis_a_faire", "devis_envoye"].includes(dossier.status)}>
+            <CollapsibleSection title="📝 Devis" defaultOpen={["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe"].includes(dossier.status)}>
               <QuoteBlock dossier={dossier} />
             </CollapsibleSection>
 
-            <CollapsibleSection title="🧾 Facture" defaultOpen={["rdv_termine", "invoice_pending", "invoice_paid"].includes(dossier.status)}>
+            <CollapsibleSection title="🧾 Facture" defaultOpen={["devis_signe", "invoice_pending", "invoice_paid"].includes(dossier.status)}>
               <InvoiceBlock dossier={dossier} />
             </CollapsibleSection>
 

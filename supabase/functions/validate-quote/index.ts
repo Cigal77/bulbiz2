@@ -106,13 +106,14 @@ Deno.serve(async (req) => {
         })
         .eq("id", quote.id);
 
+      // New flow: RDV → Intervention → Devis → Facture
+      // When quote is validated, transition to devis_signe (RDV is already done)
       await supabase
         .from("dossiers")
         .update({
-          status: "en_attente_rdv",
+          status: "devis_signe",
           status_changed_at: now,
           relance_active: false,
-          appointment_status: "rdv_pending",
         })
         .eq("id", dossier.id);
 
@@ -122,17 +123,6 @@ Deno.serve(async (req) => {
         action: "quote_validated_by_client",
         details: `Devis ${quote.quote_number} validé par ${acceptedBy} (IP: ${ip})`,
       });
-
-      await supabase.from("historique").insert({
-        dossier_id: dossier.id,
-        user_id: dossier.user_id,
-        action: "appointment_status_change",
-        details: "Prise de rendez-vous en attente",
-      });
-
-      // NOTE: APPOINTMENT_REQUESTED email to client removed —
-      // the artisan will propose slots or fix the RDV manually,
-      // which triggers the appropriate notification at that point.
     } else {
       await supabase
         .from("quotes")

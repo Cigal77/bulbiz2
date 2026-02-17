@@ -23,14 +23,14 @@ function useActionBadges() {
     let todo = 0;
     let rdvToday = 0;
     for (const d of dossiers) {
-      if (d.status === "devis_a_faire" || d.status === "devis_envoye") todo++;
-      if (d.status === "rdv_termine") todo++;
+      // New flow: RDV → Intervention → Devis → Facture
+      if (["nouveau", "a_qualifier", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") todo++;
+      if (d.status === "rdv_termine" || d.status === "devis_a_faire") todo++;
+      if (d.status === "devis_envoye") todo++;
+      if (d.status === "devis_signe") todo++;
       if (d.status === "invoice_pending") todo++;
       if (d.appointment_date && d.appointment_status === "rdv_confirmed" && isToday(parseISO(d.appointment_date))) {
         rdvToday++;
-        todo++;
-      }
-      if (["devis_signe", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") {
         todo++;
       }
     }

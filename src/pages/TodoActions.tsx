@@ -67,29 +67,29 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
       // Already covered by "nouveau" above
     }
 
-    // RDV to fix
-    if (["devis_signe", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") {
+    // RDV to fix (early stage — before intervention)
+    if (["nouveau", "a_qualifier", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") {
       items.push({
         id: `rdv-fix-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
         type: "rdv_to_fix",
         label: "RDV à fixer",
-        sublabel: "Devis signé",
+        sublabel: "En attente de RDV",
         icon: <Calendar className="h-4 w-4" />,
         iconBg: "bg-warning/15 text-warning",
         urgency: 8,
       });
     }
 
-    // Devis to make
-    if (d.status === "devis_a_faire") {
+    // Devis to make (after intervention)
+    if (d.status === "rdv_termine" || d.status === "devis_a_faire") {
       items.push({
         id: `devis-make-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
         type: "devis_to_make",
         label: "Devis à faire",
-        sublabel: d.description?.slice(0, 50) ?? "Pas de description",
+        sublabel: "Intervention terminée",
         icon: <FileText className="h-4 w-4" />,
         iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-        urgency: 6,
+        urgency: 7,
       });
     }
 
@@ -107,13 +107,13 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
       });
     }
 
-    // Invoice to send
-    if (d.status === "rdv_termine") {
+    // Invoice to send (after devis signed)
+    if (d.status === "devis_signe") {
       items.push({
         id: `invoice-send-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
         type: "invoice_to_send",
         label: "Facture à envoyer",
-        sublabel: "Intervention terminée",
+        sublabel: "Devis signé",
         icon: <Receipt className="h-4 w-4" />,
         iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
         urgency: 7,
@@ -139,7 +139,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
 }
 
 const SECTION_ORDER: ActionItem["type"][] = [
-  "rdv_today", "nouveau", "rdv_to_fix", "devis_to_make", "devis_pending", "invoice_to_send", "invoice_unpaid",
+  "rdv_today", "nouveau", "rdv_to_fix", "devis_to_make", "devis_pending", "invoice_to_send", "invoice_unpaid", "link_to_send",
 ];
 const SECTION_LABELS: Record<ActionItem["type"], string> = {
   rdv_today: "📅 RDV aujourd'hui",

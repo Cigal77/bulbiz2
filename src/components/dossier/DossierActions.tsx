@@ -83,8 +83,8 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   };
 
   // Status-aware visibility for contextual actions
-  const showRelancerNow = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
-  const showToggleRelance = ["devis_envoye", "en_attente_rdv", "invoice_pending"].includes(status);
+  const showRelancerNow = ["devis_envoye", "invoice_pending"].includes(status);
+  const showToggleRelance = ["devis_envoye", "invoice_pending"].includes(status);
 
   return (
     <div className="space-y-4">
