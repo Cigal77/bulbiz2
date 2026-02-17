@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", dossier_id);
     }
 
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://app.bulbiz.fr";
     const clientLink = `${origin}/client?token=${clientToken}`;
 
     let subject: string;

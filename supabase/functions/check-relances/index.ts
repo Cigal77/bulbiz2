@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
             .update({ client_token: clientToken, client_token_expires_at: expiresAt })
             .eq("id", dossier.id);
         }
-        const siteUrl = Deno.env.get("SITE_URL") || "https://bulbiz.fr";
+        const siteUrl = Deno.env.get("SITE_URL") || "https://app.bulbiz.fr";
         const clientLink = `${siteUrl}/client?token=${clientToken}`;
 
         try {

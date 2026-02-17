@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
       .join("");
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://app.bulbiz.fr";
     const validationUrl = `${origin}/devis/validation?token=${signatureToken}`;
 
     // Send email

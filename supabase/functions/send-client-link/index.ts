@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
       req.headers.get("origin") ||
       req.headers.get("referer")?.replace(/\/+$/, "") ||
       Deno.env.get("PUBLIC_URL") ||
-      "https://bulbiz.fr";
+      "https://app.bulbiz.fr";
     const clientLink = `${origin}/client?token=${token}`;
 
     // Try to send email
