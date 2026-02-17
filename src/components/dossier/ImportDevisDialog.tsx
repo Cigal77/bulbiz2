@@ -65,7 +65,7 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
       const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
 
       // Create quote record as "envoye" (imported = already sent)
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("quotes")
         .insert({
           dossier_id: dossierId,
@@ -78,8 +78,13 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
           total_ht: totalHt ? parseFloat(totalHt) : 0,
           total_tva: totalTva ? parseFloat(totalTva) : 0,
           total_ttc: totalTtc ? parseFloat(totalTtc) : 0,
-        });
+        })
+        .select("id")
+        .single();
+
       if (insertError) throw insertError;
+
+      const quoteId = inserted.id;
 
       // Update dossier status → devis_envoye
       await supabase
@@ -96,14 +101,22 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
         dossier_id: dossierId,
         user_id: user.id,
         action: "quote_imported",
-        details: `Devis ${finalNumber} importé (PDF) — ${totalTtc ? totalTtc + " € TTC" : "montant non renseigné"}`,
+        details: `Devis ${finalNumber} importé (PDF)}`,
       });
 
       // Send quote notification to client
       if (clientEmail) {
         try {
-          await supabase.functions.invoke("send-quote", {
-            body: { dossier_id: dossierId },
+          // 1. Récupère la session pour être sûr qu'elle est fraîche
+          const { data: { session } } = await supabase.auth.getSession();
+
+          if (!session) {
+            throw new Error("Session expirée ou inexistante");
+          }
+          // 2. Utilise invoke SANS headers personnalisés
+          // Le client 'supabase' injecte automatiquement l'Authorization et l'apikey
+          const { data, error } = await supabase.functions.invoke("send-quote", {
+            body: { quote_id: quoteId },
           });
         } catch (e) {
           console.error("Notification error:", e);
@@ -159,43 +172,6 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
               onChange={(e) => setQuoteNumber(e.target.value)}
               className="h-9 text-sm"
             />
-          </div>
-
-          {/* Amounts */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Montant HT</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={totalHt}
-                onChange={(e) => setTotalHt(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">TVA</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={totalTva}
-                onChange={(e) => setTotalTva(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Montant TTC</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={totalTtc}
-                onChange={(e) => setTotalTtc(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
           </div>
 
           {/* Issue date */}

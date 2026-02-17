@@ -99,7 +99,8 @@ export default function Settings() {
         payment_terms_default: data.payment_terms_default || null,
       });
       toast.success("Paramètres sauvegardés");
-    } catch {
+    } catch (e) {
+      console.error("Settings save error:", e);
       toast.error("Erreur lors de la sauvegarde");
     }
   };
@@ -149,7 +150,7 @@ export default function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone</Label>
-                <Input id="phone" {...register("phone")} />
+                <Input id="phone" type="tel" {...register("phone")} />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="email">Email professionnel</Label>

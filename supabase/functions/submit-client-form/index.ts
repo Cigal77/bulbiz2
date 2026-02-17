@@ -66,6 +66,8 @@ Deno.serve(async (req) => {
         appointment_status: dossier.appointment_status,
         appointment_slots: slots || [],
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      
     }
 
     // ACTION: submit client data (update ALL provided fields, track changes)

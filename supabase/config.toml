@@ -1,15 +1,6 @@
-project_id = "egmhythtnroyyiicuikv"
+project_id = "tzacprufrlpeeppozehp"
 
-[functions.generate-labour-summary]
-verify_jwt = false
-
-[functions.validate-quote]
-verify_jwt = false
-
-[functions.send-client-link]
-verify_jwt = false
-
-[functions.send-invoice]
+[functions.check-relances]
 verify_jwt = false
 
 [functions.generate-invoice-pdf]
@@ -18,8 +9,38 @@ verify_jwt = false
 [functions.generate-invoice-token]
 verify_jwt = false
 
+[functions.generate-labour-summary]
+verify_jwt = false
+
+[functions.generate-quote-pdf]
+verify_jwt = false
+
+[functions.import-catalog]
+verify_jwt = false
+
 [functions.send-appointment-notification]
 verify_jwt = false
 
+[functions.send-client-link]
+verify_jwt = false
+
+[functions.send-invoice]
+verify_jwt = false
+
+[functions.send-quote]
+verify_jwt = false
+
+[functions.send-relance]
+verify_jwt = false
+
 [functions.submit-client-form]
+verify_jwt = false
+
+[functions.test-sms]
+verify_jwt = false
+
+[functions.validate-quote]
+verify_jwt = false
+
+[functions.notify-new-signup]
 verify_jwt = false

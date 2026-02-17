@@ -60,18 +60,33 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing bearer token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("Missing authorization header");
-
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
+    // ✅ Vérifie l'utilisateur via GoTrue avec le token (pas besoin d'anon key)
+    const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseServiceKey,               // service role ok pour appeler /auth
+        "Authorization": authHeader,
+      },
     });
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseUser.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+
+    if (!userResp.ok) {
+      const t = await userResp.text();
+      console.error("auth/v1/user failed:", userResp.status, t);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const user = await userResp.json(); // contient id, email, etc.
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -112,22 +127,17 @@ Deno.serve(async (req: Request) => {
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
     const validationUrl = `${origin}/devis/validation?token=${signatureToken}`;
 
-    const pdfLink = quote.pdf_url
-      ? `<p style="margin: 16px 0;"><a href="${quote.pdf_url}" style="color: #2563eb; text-decoration: underline; font-weight: 500;">📄 Télécharger le devis (PDF)</a></p>`
-      : "";
-
     // Send email
     if (dossier.client_email) {
       const resend = new Resend(resendKey);
       await resend.emails.send({
         from: `${artisanName} <noreply@bulbiz.fr>`,
         to: [dossier.client_email],
-        subject: `${artisanName} – Votre devis ${quote.quote_number}`,
+        subject: `${artisanName} – Votre devis`,
         html: `
           <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <p>Bonjour ${dossier.client_first_name || ""},</p>
-            <p>Veuillez trouver votre devis <strong>${quote.quote_number}</strong>.</p>
-            ${pdfLink}
+            <p>Veuillez trouver ci-joint votre devis.</p>
             <p style="margin: 24px 0;">
               <a href="${validationUrl}" style="background-color: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
                 ✅ Voir et valider le devis
@@ -154,7 +164,7 @@ Deno.serve(async (req: Request) => {
     // Send SMS
     if (dossier.client_phone && isValidPhone(dossier.client_phone) && smsEnabled) {
       const phone = normalizePhone(dossier.client_phone);
-      const smsBody = `Votre devis ${quote.quote_number} est disponible. Pour valider : ${validationUrl} — ${artisanName}`;
+      const smsBody = `Votre devis est disponible. Pour le consulter : ${validationUrl} — ${artisanName}`;
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         await supabase.from("historique").insert({

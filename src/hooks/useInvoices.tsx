@@ -10,14 +10,17 @@ export interface Invoice {
   user_id: string;
   invoice_number: string;
   status: InvoiceStatus;
+
   issue_date: string;
   service_date: string | null;
+
   client_first_name: string | null;
   client_last_name: string | null;
   client_email: string | null;
   client_phone: string | null;
   client_address: string | null;
   client_company: string | null;
+
   artisan_name: string | null;
   artisan_company: string | null;
   artisan_address: string | null;
@@ -25,17 +28,22 @@ export interface Invoice {
   artisan_email: string | null;
   artisan_siret: string | null;
   artisan_tva_intracom: string | null;
+
   vat_mode: "normal" | "no_vat_293b";
   client_type: "individual" | "business";
+
   total_ht: number;
   total_tva: number;
   total_ttc: number;
+
   payment_terms: string | null;
   late_fees_text: string | null;
   notes: string | null;
+
   pdf_url: string | null;
   sent_at: string | null;
   paid_at: string | null;
+
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +86,10 @@ export function useInvoices(dossierId: string) {
       return data as unknown as Invoice[];
     },
     enabled: !!dossierId,
+
+    // ✅ évite le "flash" vide pendant invalidate/refetch
+    placeholderData: (prev) => prev,
+    staleTime: 10_000,
   });
 }
 
@@ -94,6 +106,8 @@ export function useInvoice(invoiceId: string) {
       return data as unknown as Invoice | null;
     },
     enabled: !!invoiceId,
+    placeholderData: (prev) => prev,
+    staleTime: 10_000,
   });
 }
 
@@ -110,6 +124,8 @@ export function useInvoiceLines(invoiceId: string) {
       return data as unknown as InvoiceLine[];
     },
     enabled: !!invoiceId,
+    placeholderData: (prev) => prev,
+    staleTime: 10_000,
   });
 }
 
@@ -119,123 +135,187 @@ export function useInvoiceActions(dossierId: string) {
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["invoices", dossierId] });
-    queryClient.invalidateQueries({ queryKey: ["historique", dossierId] });
+    queryClient.invalidateQueries({ queryKey: ["dossier-historique", dossierId] });
   };
 
-  const generateFromQuote = useMutation({
-    mutationFn: async () => {
+  const importPdf = useMutation({
+    mutationFn: async (file: File) => {
       if (!user) throw new Error("Non authentifié");
 
-      // Get signed/sent quote
-      const { data: quotes } = await supabase
-        .from("quotes")
-        .select("*")
-        .eq("dossier_id", dossierId)
-        .in("status", ["signe", "envoye"])
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Génère le numéro
+      //const { data: numData, error: numError } = await supabase.rpc("generate_invoice_number", {
+      //  p_user_id: user.id,
+      //});
+      //if (numError) throw numError;
 
-      const quote = quotes?.[0];
-
-      // Get dossier
-      const { data: dossier } = await supabase
+      // Récupère dossier (pour infos client)
+      const { data: dossier, error: dErr } = await supabase
         .from("dossiers")
         .select("*")
         .eq("id", dossierId)
         .single();
+      if (dErr) throw dErr;
 
-      // Get profile
-      const { data: profile } = await supabase
+      // Récupère profile (pour infos artisan)
+      const { data: profile, error: pErr } = await supabase
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
+      if (pErr) throw pErr;
 
-      // Generate invoice number
-      const { data: invoiceNumber, error: numErr } = await supabase.rpc("generate_invoice_number", {
-        p_user_id: user.id,
+      const year = new Date().getFullYear();
+      const { count, error: cErr } = await supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .gte("created_at", `${year}-01-01T00:00:00.000Z`)
+      .lt("created_at", `${year + 1}-01-01T00:00:00.000Z`);
+      if (cErr) throw cErr;
+      const seq = (count ?? 0) + 1;
+      const invoiceNumber = `FAC-${year}-${String(seq).padStart(4, "0")}`;
+
+      // Upload PDF (même bucket que devis)
+      const filePath = `${dossierId}/facture_${Date.now()}.pdf`;
+      const { error: uploadError } = await supabase.storage
+        .from("dossier-medias")
+        .upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
+
+      // Crée la facture
+      const { data: invoice, error: insertError } = await supabase
+      .from("invoices")
+      .insert({
+        dossier_id: dossierId,
+        user_id: user.id,
+        invoice_number: invoiceNumber as string,
+        pdf_url: urlData.publicUrl,
+        status: "draft" as InvoiceStatus,
+        issue_date: new Date().toISOString().split("T")[0],
+
+        // ✅ Client (copié du dossier)
+        client_first_name: dossier?.client_first_name || null,
+        client_last_name: dossier?.client_last_name || null,
+        client_email: dossier?.client_email || null,
+        client_phone: dossier?.client_phone || null,
+        client_company: (dossier as any)?.client_company || null,
+        client_address:
+          [dossier?.address_line, dossier?.postal_code, dossier?.city].filter(Boolean).join(", ") ||
+          dossier?.address ||
+          null,
+
+        // ✅ Artisan (copié du profil)
+        artisan_name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
+        artisan_company: profile?.company_name || null,
+        artisan_address: profile?.address || null,
+        artisan_phone: profile?.phone || null,
+        artisan_email: profile?.email || null,
+        artisan_siret: profile?.siret || null,
+        artisan_tva_intracom: (profile as any)?.tva_intracom || null,
+
+        // ✅ TVA / paramètres
+        vat_mode: (profile as any)?.vat_applicable === false ? "no_vat_293b" : "normal",
+        payment_terms: (profile as any)?.payment_terms_default || null,
+      } as any)
+      .select()
+      .single();
+
+      if (insertError) throw insertError;
+      const { error: sendErr } = await supabase.functions.invoke("send-invoice", {
+        body: { invoice_id: invoice.id },
       });
-      if (numErr) throw numErr;
+      if (sendErr) throw sendErr;
 
-      // Get quote lines if quote exists
-      let quoteLines: any[] = [];
-      if (quote) {
-        const { data: ql } = await supabase
-          .from("quote_lines")
-          .select("*")
-          .eq("quote_id", quote.id)
-          .order("sort_order");
-        quoteLines = ql || [];
-      }
-
-      // Create invoice
-      const { data: invoice, error: invErr } = await supabase
-        .from("invoices")
-        .insert({
-          dossier_id: dossierId,
-          user_id: user.id,
-          invoice_number: invoiceNumber as string,
-          issue_date: new Date().toISOString().split("T")[0],
-          service_date: (dossier as any)?.appointment_date || null,
-          client_first_name: dossier?.client_first_name || null,
-          client_last_name: dossier?.client_last_name || null,
-          client_email: dossier?.client_email || null,
-          client_phone: dossier?.client_phone || null,
-          client_address: [dossier?.address_line, dossier?.postal_code, dossier?.city].filter(Boolean).join(", ") || dossier?.address || null,
-          artisan_name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
-          artisan_company: profile?.company_name || null,
-          artisan_address: profile?.address || null,
-          artisan_phone: profile?.phone || null,
-          artisan_email: profile?.email || null,
-          artisan_siret: profile?.siret || null,
-          artisan_tva_intracom: (profile as any)?.tva_intracom || null,
-          vat_mode: (profile as any)?.vat_applicable === false ? "no_vat_293b" : "normal",
-          payment_terms: (profile as any)?.payment_terms_default || null,
-          total_ht: quote?.total_ht || 0,
-          total_tva: quote?.total_tva || 0,
-          total_ttc: quote?.total_ttc || 0,
-        } as any)
-        .select()
-        .single();
-      if (invErr) throw invErr;
-
-      // Copy quote lines to invoice lines
-      if (quoteLines.length > 0 && invoice) {
-        const invoiceLines = quoteLines.map((ql: any) => ({
-          invoice_id: invoice.id,
-          label: ql.label,
-          description: ql.description,
-          qty: ql.qty,
-          unit: ql.unit,
-          unit_price: ql.unit_price,
-          tva_rate: ql.tva_rate,
-          discount: ql.discount || 0,
-          sort_order: ql.sort_order,
-        }));
-        await supabase.from("invoice_lines").insert(invoiceLines);
-      }
-
-      // Update dossier status to invoice_pending
-      await supabase
-        .from("dossiers")
-        .update({
-          status: "invoice_pending",
-          status_changed_at: new Date().toISOString(),
-        })
-        .eq("id", dossierId);
-
-      // Historique
       await supabase.from("historique").insert({
         dossier_id: dossierId,
         user_id: user.id,
-        action: "invoice_created",
-        details: `Facture ${invoiceNumber} générée (brouillon)`,
+        action: "invoice_imported",
+        details: `Facture ${invoiceNumber} importée (PDF)`,
       });
 
-      return invoice;
+      return invoice as unknown as Invoice;
     },
     onSuccess: invalidate,
   });
 
-  return { generateFromQuote };
+  const updateStatus = useMutation({
+    mutationFn: async ({ invoiceId, status }: { invoiceId: string; status: InvoiceStatus }) => {
+      if (!user) throw new Error("Non authentifié");
+
+      const updates: Record<string, unknown> = { status };
+
+      if (status === "sent") updates.sent_at = new Date().toISOString();
+      if (status === "paid") updates.paid_at = new Date().toISOString();
+
+      const { error } = await supabase.from("invoices").update(updates).eq("id", invoiceId);
+      if (error) throw error;
+
+      // Sync dossier status (comme ton ancien code)
+      if (status === "sent") {
+        await supabase
+          .from("dossiers")
+          .update({ status: "invoice_pending", status_changed_at: new Date().toISOString() })
+          .eq("id", dossierId);
+      }
+      if (status === "paid") {
+        await supabase
+          .from("dossiers")
+          .update({ status: "invoice_paid", status_changed_at: new Date().toISOString() })
+          .eq("id", dossierId);
+      }
+
+      await supabase.from("historique").insert({
+        dossier_id: dossierId,
+        user_id: user.id,
+        action: "invoice_status_change",
+        details: `Facture passée à "${INVOICE_STATUS_LABELS[status]}"`,
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["dossier"] });
+    },
+  });
+
+  const deleteInvoice = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      if (!user) throw new Error("Non authentifié");
+
+      // Si pas de cascade FK, on supprime les lignes d’abord
+      await supabase.from("invoice_lines").delete().eq("invoice_id", invoiceId);
+
+      const { error } = await supabase.from("invoices").delete().eq("id", invoiceId);
+      if (error) throw error;
+
+      await supabase.from("historique").insert({
+        dossier_id: dossierId,
+        user_id: user.id,
+        action: "invoice_deleted",
+        details: "Facture supprimée",
+      });
+    },
+    onSuccess: invalidate,
+  });
+
+  // ✅ Envoi (edge function send-invoice)
+  const sendInvoice = useMutation({
+    mutationFn: async ({ invoiceId }: { invoiceId: string }) => {
+      if (!user) throw new Error("Non authentifié");
+
+      const { error } = await supabase.functions.invoke("send-invoice", {
+        body: { invoice_id: invoiceId },
+      });
+      if (error) throw error;
+
+      // pas besoin de log ici : ta function log déjà dans historique
+    },
+    onSuccess: () => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["dossier"] });
+    },
+  });
+
+  return { importPdf, updateStatus, deleteInvoice, sendInvoice };
 }

@@ -138,15 +138,22 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : quotes.length === 0 ? (
-          <div className="text-center py-8 space-y-3">
-            <FilePlus className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-            <div>
-              <p className="text-sm font-medium text-foreground">Aucun devis</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Importez un devis au format PDF.
-              </p>
+          <div 
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "text-center py-8 space-y-3 cursor-pointer rounded-lg border-2 border-dashed border-transparent transition-all",
+                "hover:bg-accent/50 hover:border-muted-foreground/20",
+                uploading && "opacity-50 pointer-events-none"
+              )}
+            >
+              <FilePlus className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Aucun devis</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {uploading ? "Importation en cours..." : "Cliquez ici pour importer un devis au format PDF."}
+                </p>
+              </div>
             </div>
-          </div>
         ) : (
           quotes.map((quote) => (
             <QuoteRow

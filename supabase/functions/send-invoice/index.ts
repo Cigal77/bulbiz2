@@ -135,15 +135,11 @@ Deno.serve(async (req: Request) => {
           await resend.emails.send({
             from: `${artisanName} <noreply@bulbiz.fr>`,
             to: [invoice.client_email],
-            subject: `Votre facture ${invoice.invoice_number}`,
+            subject: `Votre facture`,
             html: `
               <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                 <p>Bonjour ${invoice.client_first_name || ""},</p>
-                <p>Suite à notre intervention, veuillez trouver votre facture <strong>${invoice.invoice_number}</strong>.</p>
-                <p style="margin: 24px 0;">
-                  <strong>Montant total : ${Number(invoice.total_ttc || 0).toFixed(2)} € TTC</strong>
-                </p>
-                ${invoice.payment_terms ? `<p style="font-size: 13px; color: #6b7280;">${invoice.payment_terms}</p>` : ""}
+                <p>Suite à notre intervention, veuillez trouver ci-joint votre facture.</p>
                 ${pdfUrl ? `<p style="margin: 16px 0;"><a href="${pdfUrl}" style="color: #2563eb; text-decoration: underline;">Télécharger le PDF de votre facture</a></p>` : ""}
                 <p>N'hésitez pas à nous contacter pour toute question.</p>
                 ${invoice.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${invoice.artisan_email}</p>` : ""}
@@ -165,7 +161,7 @@ Deno.serve(async (req: Request) => {
     let smsSent = false;
     if (invoice.client_phone && isValidPhone(invoice.client_phone)) {
       const phone = normalizePhone(invoice.client_phone);
-      const smsBody = `Votre facture ${invoice.invoice_number} — ${Number(invoice.total_ttc || 0).toFixed(2)} € TTC. N'hésitez pas à nous contacter. — ${artisanName}${invoice.artisan_phone ? ` (${invoice.artisan_phone})` : ""}`;
+      const smsBody = `Votre facture est disponible. N'hésitez pas à nous contacter. — ${artisanName}${invoice.artisan_phone ? ` (${invoice.artisan_phone})` : ""}`;
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         smsSent = true;

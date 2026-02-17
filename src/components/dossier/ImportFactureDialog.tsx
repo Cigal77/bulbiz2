@@ -63,27 +63,46 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
       const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
 
       // Get dossier + profile info
-      const { data: dossier } = await supabase.from("dossiers").select("*").eq("id", dossierId).single();
-      const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
+      const { data: dossier, error: dErr } = await supabase
+        .from("dossiers")
+        .select("*")
+        .eq("id", dossierId)
+        .single();
+      if (dErr) throw dErr;
 
-      // Create invoice record
-      const { error: insertError } = await supabase
+      const { data: profile, error: pErr } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (pErr) throw pErr;
+
+      // Create invoice record (✅ on récupère invoice.id)
+      const { data: invoice, error: insertError } = await supabase
         .from("invoices")
         .insert({
           dossier_id: dossierId,
           user_id: user.id,
           invoice_number: finalNumber,
-          status: "sent" as const,
-          sent_at: new Date().toISOString(),
+
+          // ✅ pas "sent" ici, c’est send-invoice qui le fait
+          status: "draft" as const,
+          sent_at: null,
+
           issue_date: issueDate,
           pdf_url: urlData.publicUrl,
           total_ttc: totalTtc ? parseFloat(totalTtc) : 0,
+
           client_first_name: dossier?.client_first_name || null,
           client_last_name: dossier?.client_last_name || null,
           client_email: dossier?.client_email || null,
           client_phone: dossier?.client_phone || null,
-          client_address: [dossier?.address_line, dossier?.postal_code, dossier?.city].filter(Boolean).join(", ") || dossier?.address || null,
-          artisan_name: [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null,
+          client_address:
+            [dossier?.address_line, dossier?.postal_code, dossier?.city].filter(Boolean).join(", ") ||
+            dossier?.address ||
+            null,
+
+          artisan_name: profile ? [profile.first_name, profile.last_name].filter(Boolean).join(" ") : null,
           artisan_company: profile?.company_name || null,
           artisan_address: profile?.address || null,
           artisan_phone: profile?.phone || null,
@@ -91,8 +110,16 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
           artisan_siret: profile?.siret || null,
           artisan_tva_intracom: (profile as any)?.tva_intracom || null,
           payment_terms: (profile as any)?.payment_terms_default || null,
-        } as any);
+        } as any)
+        .select()
+        .single();
       if (insertError) throw insertError;
+
+      // ✅ Envoi immédiat (payload correct)
+      const { error: sendErr } = await supabase.functions.invoke("send-invoice", {
+        body: { invoice_id: invoice.id },
+      });
+      if (sendErr) throw sendErr;
 
       // Update dossier status → invoice_pending
       await supabase
@@ -109,19 +136,8 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
         dossier_id: dossierId,
         user_id: user.id,
         action: "invoice_imported",
-        details: `Facture ${finalNumber} importée (PDF) — ${totalTtc ? totalTtc + " € TTC" : "montant non renseigné"}`,
+        details: `Facture ${finalNumber} importée (PDF)}`,
       });
-
-      // Send invoice notification to client
-      if (clientEmail) {
-        try {
-          await supabase.functions.invoke("send-invoice", {
-            body: { dossier_id: dossierId },
-          });
-        } catch (e) {
-          console.error("Notification error:", e);
-        }
-      }
 
       toast({ title: "Facture importée ✅", description: `N° ${finalNumber} — Statut → Facture en attente` });
       queryClient.invalidateQueries({ queryKey: ["invoices", dossierId] });
@@ -177,30 +193,6 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
               onChange={(e) => setInvoiceNumber(e.target.value)}
               className="h-9 text-sm"
             />
-          </div>
-
-          {/* Amount + dates */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Montant TTC *</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={totalTtc}
-                onChange={(e) => setTotalTtc(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Date d'émission</Label>
-              <Input
-                type="date"
-                value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
-                className="h-9 text-sm"
-              />
-            </div>
           </div>
 
           <div className="space-y-1.5">

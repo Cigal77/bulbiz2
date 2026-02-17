@@ -12,23 +12,29 @@ export function useProfile() {
   const query = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
+      // maybeSingle() retourne null au lieu de 406 si la ligne n'existe pas encore
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("user_id", user!.id)
-        .single();
+        .maybeSingle();
       if (error) throw error;
-      return data as Profile;
+      return data as Profile | null;
     },
     enabled: !!user?.id,
   });
 
   const update = useMutation({
     mutationFn: async (values: Partial<TablesUpdate<"profiles">>) => {
+      // Exclude auto-managed columns that Postgres rejects in an upsert payload
+      const { id, created_at, updated_at, ...safeValues } = values as any;
+
       const { error } = await supabase
         .from("profiles")
-        .update(values)
-        .eq("user_id", user!.id);
+        .upsert(
+          { ...safeValues, user_id: user!.id, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" }
+        );
       if (error) throw error;
     },
     onSuccess: () => {

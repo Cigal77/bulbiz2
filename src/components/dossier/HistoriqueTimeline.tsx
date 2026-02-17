@@ -5,7 +5,7 @@ import { fr } from "date-fns/locale";
 import {
   FolderPlus, Send, FileText, Bell, ArrowRightLeft,
   FilePenLine, FileCheck, FileX, Download, Trash2, UserCheck, Link2, Smartphone,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -278,6 +278,59 @@ function mapEntry(entry: Historique): DisplayEntry {
       icon: <FolderPlus className="h-3.5 w-3.5" />,
       iconColor: "bg-success/15 text-success",
       title: "Dossier restauré",
+      detail: details || null,
+    };
+  }
+
+  // Notes (text notes added by artisan)
+  if (action === "note") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <MessageSquare className="h-3.5 w-3.5" />,
+      iconColor: "bg-primary/15 text-primary",
+      title: "Note",
+      detail: details || null,
+    };
+  }
+
+  // Invoice
+  if (action === "invoice_sent") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Send className="h-3.5 w-3.5" />,
+      iconColor: "bg-success/15 text-success",
+      title: "Facture envoyée",
+      detail: details || null,
+    };
+  }
+  if (action === "invoice_sent_sms") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Smartphone className="h-3.5 w-3.5" />,
+      iconColor: "bg-success/15 text-success",
+      title: "Facture envoyée par SMS",
+      detail: details || null,
+    };
+  }
+
+  // Notification sent
+  if (action === "notification_sent") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <Send className="h-3.5 w-3.5" />,
+      iconColor: "bg-primary/15 text-primary",
+      title: "Notification envoyée",
+      detail: details || null,
+    };
+  }
+
+  // Appointment
+  if (action === "appointment_status_change") {
+    return {
+      id: entry.id, timestamp: ts,
+      icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
+      iconColor: "bg-muted text-muted-foreground",
+      title: "Statut rendez-vous mis à jour",
       detail: details || null,
     };
   }
