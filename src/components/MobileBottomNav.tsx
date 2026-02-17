@@ -1,10 +1,20 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, FolderOpen, Plus, Calendar, Settings } from "lucide-react";
+import { ClipboardList, FolderOpen, Plus, Calendar, Settings, FileText, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useDossiers } from "@/hooks/useDossiers";
-import { useMemo } from "react";
+import { useDossiers, type Dossier } from "@/hooks/useDossiers";
+import { useMemo, useState } from "react";
 import { isToday, parseISO } from "date-fns";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from "@/components/ui/drawer";
+import { DossierPickerSheet } from "@/components/DossierPickerSheet";
+import { ImportDevisDialog } from "@/components/dossier/ImportDevisDialog";
+import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
 
 function useActionBadges() {
   const { data: dossiers } = useDossiers();
@@ -33,6 +43,19 @@ export function MobileBottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const badges = useActionBadges();
+
+  // Action sheet state
+  const [actionSheetOpen, setActionSheetOpen] = useState(false);
+
+  // Dossier picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [importType, setImportType] = useState<"devis" | "facture" | null>(null);
+
+  // Import dialog state
+  const [importDevisOpen, setImportDevisOpen] = useState(false);
+  const [importFactureOpen, setImportFactureOpen] = useState(false);
+  const [selectedDossier, setSelectedDossier] = useState<Dossier | null>(null);
+
   if (!isMobile) return null;
 
   const publicPaths = ["/auth", "/client", "/devis/validation", "/facture/view"];
@@ -69,11 +92,48 @@ export function MobileBottomNav() {
 
   const handleNav = (item: typeof NAV_ITEMS[number]) => {
     if (item.isAction) {
-      navigate("/nouveau");
+      setActionSheetOpen(true);
     } else {
       navigate(item.path);
     }
   };
+
+  const handleImportDevis = () => {
+    setActionSheetOpen(false);
+    setImportType("devis");
+    setPickerOpen(true);
+  };
+
+  const handleImportFacture = () => {
+    setActionSheetOpen(false);
+    setImportType("facture");
+    setPickerOpen(true);
+  };
+
+  const handleNouveauDossier = () => {
+    setActionSheetOpen(false);
+    navigate("/nouveau");
+  };
+
+  const handleDossierSelected = (dossier: Dossier) => {
+    setPickerOpen(false);
+    setSelectedDossier(dossier);
+    if (importType === "devis") {
+      setImportDevisOpen(true);
+    } else if (importType === "facture") {
+      setImportFactureOpen(true);
+    }
+  };
+
+  const handlePickerCreateNew = () => {
+    setPickerOpen(false);
+    navigate("/nouveau");
+  };
+
+  const pickerTitle =
+    importType === "devis"
+      ? "Importer un devis — Choisir un dossier"
+      : "Importer une facture — Choisir un dossier";
 
   return (
     <>
@@ -116,6 +176,102 @@ export function MobileBottomNav() {
           ))}
         </div>
       </nav>
+
+      {/* Action Sheet - main menu when clicking "+" */}
+      <Drawer open={actionSheetOpen} onOpenChange={setActionSheetOpen}>
+        <DrawerContent>
+          <DrawerHeader className="pb-2">
+            <DrawerTitle>Nouveau</DrawerTitle>
+            <DrawerDescription>Que souhaitez-vous faire ?</DrawerDescription>
+          </DrawerHeader>
+          <div className="px-4 pb-6 space-y-2">
+            <button
+              onClick={handleNouveauDossier}
+              className="w-full flex items-center gap-3 p-3.5 rounded-lg hover:bg-accent text-left transition-colors"
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 shrink-0">
+                <FolderOpen className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Nouveau dossier</div>
+                <div className="text-xs text-muted-foreground">
+                  Créer un dossier client de zéro
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={handleImportDevis}
+              className="w-full flex items-center gap-3 p-3.5 rounded-lg hover:bg-accent text-left transition-colors"
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-500/10 shrink-0">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Importer un devis (PDF)</div>
+                <div className="text-xs text-muted-foreground">
+                  Ajouter un devis à un dossier existant ou nouveau
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={handleImportFacture}
+              className="w-full flex items-center gap-3 p-3.5 rounded-lg hover:bg-accent text-left transition-colors"
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-orange-500/10 shrink-0">
+                <Receipt className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Importer une facture (PDF)</div>
+                <div className="text-xs text-muted-foreground">
+                  Ajouter une facture à un dossier existant ou nouveau
+                </div>
+              </div>
+            </button>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Dossier picker */}
+      <DossierPickerSheet
+        open={pickerOpen}
+        onClose={() => {
+          setPickerOpen(false);
+          setImportType(null);
+        }}
+        onSelect={handleDossierSelected}
+        onCreateNew={handlePickerCreateNew}
+        title={pickerTitle}
+      />
+
+      {/* Import Devis Dialog */}
+      {selectedDossier && (
+        <ImportDevisDialog
+          open={importDevisOpen}
+          onClose={() => {
+            setImportDevisOpen(false);
+            setSelectedDossier(null);
+            setImportType(null);
+          }}
+          dossierId={selectedDossier.id}
+          clientEmail={selectedDossier.client_email}
+        />
+      )}
+
+      {/* Import Facture Dialog */}
+      {selectedDossier && (
+        <ImportFactureDialog
+          open={importFactureOpen}
+          onClose={() => {
+            setImportFactureOpen(false);
+            setSelectedDossier(null);
+            setImportType(null);
+          }}
+          dossierId={selectedDossier.id}
+          clientEmail={selectedDossier.client_email}
+        />
+      )}
     </>
   );
 }
