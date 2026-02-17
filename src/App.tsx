@@ -18,6 +18,7 @@ import QuoteEditor from "./pages/QuoteEditor";
 import QuoteValidation from "./pages/QuoteValidation";
 import InvoiceEditor from "./pages/InvoiceEditor";
 import InvoiceView from "./pages/InvoiceView";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
           <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/client" element={<ClientForm />} />
               <Route path="/devis/validation" element={<QuoteValidation />} />
               <Route path="/facture/view" element={<InvoiceView />} />
