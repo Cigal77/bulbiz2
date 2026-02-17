@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-type MediaCategory = "image" | "video" | "audio" | "plan";
+type MediaCategory = "image" | "video" | "audio" | "plan" | "note";
 
 export function useMediaUpload(dossierId: string) {
   const queryClient = useQueryClient();
@@ -29,7 +29,7 @@ export function useMediaUpload(dossierId: string) {
       duration,
     }: {
       files: File[] | Blob[];
-      category: MediaCategory;
+      category: Exclude<MediaCategory, "note">;
       duration?: number;
     }) => {
       if (!user) throw new Error("Non authentifié");
@@ -65,7 +65,7 @@ export function useMediaUpload(dossierId: string) {
         if (insertError) throw insertError;
 
         // Add historique
-        const labels: Record<MediaCategory, string> = {
+        const labels: Record<Exclude<MediaCategory, "note">, string> = {
           image: "Photo ajoutée",
           video: "Vidéo ajoutée",
           audio: "Note vocale ajoutée",
@@ -74,6 +74,30 @@ export function useMediaUpload(dossierId: string) {
         const durationStr = duration ? ` (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")})` : "";
         await addHistorique("media_added", `${labels[category]}${durationStr} — ${fileName}`);
       }
+    },
+    onSuccess: invalidate,
+  });
+
+  // Stores a text note directly in the medias table so it appears
+  // alongside photos, videos and voice notes in the media feed.
+  const addNote = useMutation({
+    mutationFn: async (text: string) => {
+      if (!user) throw new Error("Non authentifié");
+
+      const { error } = await supabase.from("medias").insert({
+        dossier_id: dossierId,
+        user_id: user.id,
+        file_name: null,
+        file_type: "text/plain",
+        file_url: null,
+        file_size: null,
+        media_category: "note",
+        note_text: text,
+        duration: null,
+      });
+      if (error) throw error;
+
+      await addHistorique("note", text);
     },
     onSuccess: invalidate,
   });
@@ -87,5 +111,5 @@ export function useMediaUpload(dossierId: string) {
     onSuccess: invalidate,
   });
 
-  return { uploadFiles, deleteMedia };
+  return { uploadFiles, addNote, deleteMedia };
 }

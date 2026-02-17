@@ -33,7 +33,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
   const appointmentStatus = ((dossier as any).appointment_status || "none") as AppointmentStatus;
   const { data: invoices = [] } = useInvoices(dossier.id);
   const { data: quotes = [] } = useQuotes(dossier.id);
-  const { generateFromQuote } = useInvoiceActions(dossier.id);
 
   const [showManualRdv, setShowManualRdv] = useState(false);
   const [manualDate, setManualDate] = useState("");
@@ -152,16 +151,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       queryClient.invalidateQueries({ queryKey: ["invoices", dossier.id] });
     },
   });
-
-  const handleGenerate = () => {
-    generateFromQuote.mutate(undefined, {
-      onSuccess: (invoice: any) => {
-        toast({ title: "Facture générée ✅", description: `N° ${invoice.invoice_number}` });
-        navigate(`/dossier/${dossier.id}/facture/${invoice.id}`);
-      },
-      onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
-    });
-  };
 
   // Send client link mutation
   const sendClientLink = useMutation({
@@ -363,8 +352,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         primaryIcon: <CreditCard className="h-4 w-4" />,
         primaryAction: () => markPaid.mutate(),
         isPending: markPaid.isPending,
-        secondaryLabel: inv ? "Voir la facture" : undefined,
-        secondaryAction: inv ? () => navigate(`/dossier/${dossier.id}/facture/${inv.id}`) : undefined,
       };
     }
 

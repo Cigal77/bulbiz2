@@ -24,8 +24,9 @@ interface DossierActionsProps {
 }
 
 export function DossierActions({ dossier }: DossierActionsProps) {
-  const { addNote, toggleRelance, sendRelance } = useDossierActions(dossier.id);
-  const { uploadFiles } = useMediaUpload(dossier.id);
+  const { toggleRelance, sendRelance } = useDossierActions(dossier.id);
+  // Notes now go through useMediaUpload so they appear in the media feed
+  const { uploadFiles, addNote } = useMediaUpload(dossier.id);
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -161,7 +162,7 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           Ajouter photo / vidéo
         </Button>
 
-        {/* 6. Relancer maintenant (contextual) */}
+        {/* 5. Relancer maintenant (contextual) */}
         {showRelancerNow && (
           <Button
             variant="outline"
@@ -178,19 +179,19 @@ export function DossierActions({ dossier }: DossierActionsProps) {
           </Button>
         )}
 
-        {/* 7. Importer devis (always available) */}
+        {/* 6. Importer devis (always available) */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportDevisOpen(true)}>
           <FileText className="h-4 w-4 text-primary" />
           Importer devis (PDF)
         </Button>
 
-        {/* 8. Importer facture (always available) */}
+        {/* 7. Importer facture (always available) */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportFactureOpen(true)}>
           <Receipt className="h-4 w-4 text-primary" />
           Importer facture (PDF)
         </Button>
 
-        {/* 9. Toggle relances (contextual) */}
+        {/* 8. Toggle relances (contextual) */}
         {showToggleRelance && (
           <Button
             variant="outline"

@@ -406,30 +406,24 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         </div>
       )}
 
-      {/* ─── NO RDV — prominent CTA ─── */}
-      {(status === "none" || status === "cancelled") && (
-        <div className="text-center py-2 space-y-3">
-          <p className="text-sm text-muted-foreground">Aucun rendez-vous fixé</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
-              <Button
-                className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-base h-11"
-                onClick={() => setShowManualForm(true)}
-              >
-                <Calendar className="h-4 w-4" />
-                Fixer un RDV
-              </Button>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
-              <Button variant="outline" className="w-full gap-2 h-11" onClick={() => setShowSlotForm(true)}>
-                <Send className="h-4 w-4" />
-                Proposer des créneaux
-              </Button>
-            </motion.div>
-          </div>
-        </div>
-      )}
-
+      {/* ─── NO RDV — dans le bloc (status === "none" || status === "cancelled") ─── */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+          <Button
+            className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-sm h-11 px-2" // Changé text-base en text-sm + px-2
+            onClick={() => setShowManualForm(true)}
+          >
+            <Calendar className="h-4 w-4 shrink-0" />
+            <span className="truncate">Fixer un rendez-vous</span> {/* Ajout de truncate au cas où */}
+          </Button>
+        </motion.div>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
+          <Button variant="outline" className="w-full gap-2 h-11 text-sm px-2" onClick={() => setShowSlotForm(true)}>
+            <Send className="h-4 w-4 shrink-0" />
+            <span className="truncate">Proposer des créneaux</span>
+          </Button>
+        </motion.div>
+      </div>
       {/* ─── PENDING — waiting action ─── */}
       {status === "rdv_pending" && (
         <div className="text-center py-2 space-y-3">
@@ -511,7 +505,7 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
 
         {status === "done" && (
           <Button variant="outline" className="w-full gap-1.5" onClick={() => window.dispatchEvent(new CustomEvent("open-import-facture"))}>
-            <Receipt className="h-3.5 w-3.5" /> Générer / importer facture
+            <Receipt className="h-3.5 w-3.5" /> Importer facture
           </Button>
         )}
 
@@ -579,21 +573,24 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
-          className="border border-border rounded-lg p-4 space-y-3 bg-background"
+          className="border border-border rounded-lg p-3 space-y-3 bg-background"
         >
-          <p className="text-sm font-medium text-foreground">📅 Fixer un rendez-vous</p>
+          <p className="text-sm font-bold text-foreground flex items-center gap-2 leading-tight">
+            <Calendar className="h-4 w-4 text-primary" />
+            Fixer un rendez-vous
+          </p>
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1">
               <Label className="text-xs">Date</Label>
-              <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="h-9" />
+              <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="h-8 text-xs" />
             </div>
-            <div className="w-24 space-y-1">
+            <div className="w-20 space-y-1">
               <Label className="text-xs">Début</Label>
-              <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-9" />
+              <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-8 text-xs" />
             </div>
-            <div className="w-24 space-y-1">
+            <div className="w-20 space-y-1">
               <Label className="text-xs">Fin</Label>
-              <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-9" />
+              <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-8 text-xs" />
             </div>
           </div>
           <div className="flex gap-2">

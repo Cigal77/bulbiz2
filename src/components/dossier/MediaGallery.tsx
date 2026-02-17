@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { Media } from "@/hooks/useDossier";
-import { Image, Film, FileText, Mic, Trash2, Download, Play } from "lucide-react";
+import { Image, Film, FileText, Mic, Trash2, Download, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,55 @@ interface MediaGalleryProps {
 function formatDuration(seconds: number | null): string {
   if (!seconds) return "";
   return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+function NoteCard({ item, onDelete }: { item: Media; onDelete?: (id: string) => void }) {
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  return (
+    <>
+      <div className="flex gap-3 rounded-xl border border-border bg-muted/40 p-3">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <MessageSquare className="h-3.5 w-3.5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0 space-y-1">
+          <p className="text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words">
+            {(item as any).note_text}
+          </p>
+          {item.created_at && (
+            <p className="text-xs text-muted-foreground">
+              {format(new Date(item.created_at), "d MMM yyyy 'à' HH:mm", { locale: fr })}
+            </p>
+          )}
+        </div>
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+            onClick={() => setDeleteId(item.id)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette note ?</AlertDialogTitle>
+            <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (deleteId && onDelete) { onDelete(deleteId); setDeleteId(null); } }}>
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 function MediaSection({
@@ -170,34 +221,53 @@ export function MediaGallery({ medias, isLoading, dossierId }: MediaGalleryProps
 
   const getCategory = (m: Media): string => {
     const cat = (m as any).media_category;
+    if (cat === "note") return "note";
     if (cat && cat !== "image") return cat;
-    if (m.file_type.startsWith("video/")) return "video";
-    if (m.file_type.startsWith("audio/")) return "audio";
+    if (m.file_type?.startsWith("video/")) return "video";
+    if (m.file_type?.startsWith("audio/")) return "audio";
     if (m.file_type === "application/pdf") return "plan";
     return "image";
   };
 
+  // Unified feed: all items sorted by date descending, notes mixed in
+  const notes  = medias.filter((m) => getCategory(m) === "note");
   const images = medias.filter((m) => getCategory(m) === "image");
   const videos = medias.filter((m) => getCategory(m) === "video");
   const audios = medias.filter((m) => getCategory(m) === "audio");
-  const plans = medias.filter((m) => getCategory(m) === "plan");
+  const plans  = medias.filter((m) => getCategory(m) === "plan");
 
-  const hasAny = medias.length > 0;
+  const totalCount = medias.length;
+  const hasAny = totalCount > 0;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-5">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Médias {hasAny && <span className="text-foreground">({medias.length})</span>}
+        Médias {hasAny && <span className="text-foreground">({totalCount})</span>}
       </h3>
 
       {!hasAny ? (
         <p className="text-sm text-muted-foreground">Aucun média attaché.</p>
       ) : (
-        <div className="space-y-4">
-          <MediaSection title="Photos" icon={<Image className="h-3.5 w-3.5" />} items={images} onDelete={handleDelete} />
-          <MediaSection title="Vidéos" icon={<Film className="h-3.5 w-3.5" />} items={videos} onDelete={handleDelete} />
-          <MediaSection title="Notes vocales" icon={<Mic className="h-3.5 w-3.5" />} items={audios} onDelete={handleDelete} />
-          <MediaSection title="Plans" icon={<FileText className="h-3.5 w-3.5" />} items={plans} onDelete={handleDelete} />
+        <div className="space-y-5">
+          {/* Notes texte — carte dans le flux */}
+          {notes.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span>Notes ({notes.length})</span>
+              </div>
+              <div className="space-y-2">
+                {notes.map((m) => (
+                  <NoteCard key={m.id} item={m} onDelete={handleDelete} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <MediaSection title="Photos"        icon={<Image   className="h-3.5 w-3.5" />} items={images} onDelete={handleDelete} />
+          <MediaSection title="Vidéos"        icon={<Film    className="h-3.5 w-3.5" />} items={videos} onDelete={handleDelete} />
+          <MediaSection title="Notes vocales" icon={<Mic     className="h-3.5 w-3.5" />} items={audios} onDelete={handleDelete} />
+          <MediaSection title="Plans"         icon={<FileText className="h-3.5 w-3.5" />} items={plans}  onDelete={handleDelete} />
         </div>
       )}
     </div>

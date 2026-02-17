@@ -99,7 +99,8 @@ export default function Settings() {
         payment_terms_default: data.payment_terms_default || null,
       });
       toast.success("Paramètres sauvegardés");
-    } catch {
+    } catch (e) {
+      console.error("Settings save error:", e);
       toast.error("Erreur lors de la sauvegarde");
     }
   };
