@@ -34,6 +34,41 @@ interface Slot {
   selected_at: string | null;
 }
 
+interface ConfirmedRdv {
+  id: string;
+  appointment_date: string;
+  appointment_time_start: string;
+  appointment_time_end: string;
+  client_first_name: string | null;
+  client_last_name: string | null;
+}
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+function slotsOverlap(
+  startA: string, endA: string,
+  startB: string, endB: string,
+): boolean {
+  return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(startB) < timeToMinutes(endA);
+}
+
+function findConflicts(
+  date: string, start: string, end: string,
+  confirmedRdvs: ConfirmedRdv[],
+  currentDossierId: string,
+): ConfirmedRdv[] {
+  if (!date || !start || !end) return [];
+  return confirmedRdvs.filter(
+    (rdv) =>
+      rdv.id !== currentDossierId &&
+      rdv.appointment_date === date &&
+      slotsOverlap(start, end, rdv.appointment_time_start, rdv.appointment_time_end),
+  );
+}
+
 // Visual config per status
 const STATUS_CONFIG: Record<string, { bg: string; border: string; iconColor: string; headerBg: string }> = {
   none: { bg: "bg-muted/30", border: "border-border", iconColor: "text-muted-foreground", headerBg: "bg-muted/50" },
@@ -72,6 +107,7 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
     queryClient.invalidateQueries({ queryKey: ["appointment_slots", dossier.id] });
     queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+    queryClient.invalidateQueries({ queryKey: ["confirmed_rdvs", user?.id] });
   };
 
   // Fetch slots
@@ -86,6 +122,23 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       if (error) throw error;
       return data as Slot[];
     },
+  });
+
+  // Fetch all confirmed RDVs for this artisan (across all dossiers)
+  const { data: confirmedRdvs = [] } = useQuery({
+    queryKey: ["confirmed_rdvs", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data, error } = await supabase
+        .from("dossiers")
+        .select("id, appointment_date, appointment_time_start, appointment_time_end, client_first_name, client_last_name")
+        .eq("user_id", user.id)
+        .eq("appointment_status", "rdv_confirmed" as any)
+        .not("appointment_date", "is", null);
+      if (error) throw error;
+      return (data || []) as ConfirmedRdv[];
+    },
+    enabled: !!user?.id,
   });
 
   const addHistorique = async (action: string, details: string) => {
@@ -149,6 +202,21 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       const validSlots = newSlots.filter((s) => s.date && s.start && s.end);
       if (!validSlots.length) throw new Error("Ajoutez au moins un créneau");
 
+      // Check for conflicts with confirmed RDVs
+      const conflicts = validSlots.flatMap((s) =>
+        findConflicts(s.date, s.start, s.end, confirmedRdvs, dossier.id).map((rdv) => ({
+          slot: s,
+          rdv,
+        }))
+      );
+      if (conflicts.length > 0) {
+        const details = conflicts.map((c) => {
+          const clientName = [c.rdv.client_first_name, c.rdv.client_last_name].filter(Boolean).join(" ") || "un client";
+          return `${c.slot.date} ${c.slot.start}–${c.slot.end} (conflit avec RDV ${clientName})`;
+        }).join(", ");
+        throw new Error(`Conflit de créneaux : ${details}`);
+      }
+
       const { error: slotErr } = await supabase.from("appointment_slots").insert(
         validSlots.map((s) => ({ dossier_id: dossier.id, slot_date: s.date, time_start: s.start, time_end: s.end }))
       );
@@ -184,6 +252,14 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
   const setManualRdv = useMutation({
     mutationFn: async () => {
       if (!manualDate) throw new Error("Choisissez une date");
+
+      // Check for conflicts with confirmed RDVs
+      const conflicts = findConflicts(manualDate, manualStart, manualEnd, confirmedRdvs, dossier.id);
+      if (conflicts.length > 0) {
+        const clientName = [conflicts[0].client_first_name, conflicts[0].client_last_name].filter(Boolean).join(" ") || "un client";
+        throw new Error(`Conflit : vous avez déjà un RDV avec ${clientName} le ${manualDate} de ${conflicts[0].appointment_time_start.slice(0, 5)} à ${conflicts[0].appointment_time_end.slice(0, 5)}`);
+      }
+
       const { error } = await supabase
         .from("dossiers")
         .update({
@@ -217,6 +293,14 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
     mutationFn: async () => {
       const selected = slots.find((s) => s.selected_at);
       if (!selected) throw new Error("Aucun créneau sélectionné par le client");
+
+      // Check for conflicts with confirmed RDVs
+      const conflicts = findConflicts(selected.slot_date, selected.time_start, selected.time_end, confirmedRdvs, dossier.id);
+      if (conflicts.length > 0) {
+        const clientName = [conflicts[0].client_first_name, conflicts[0].client_last_name].filter(Boolean).join(" ") || "un client";
+        throw new Error(`Conflit : vous avez déjà un RDV avec ${clientName} le ${selected.slot_date} de ${conflicts[0].appointment_time_start.slice(0, 5)} à ${conflicts[0].appointment_time_end.slice(0, 5)}`);
+      }
+
       const { error } = await supabase
         .from("dossiers")
         .update({
@@ -278,7 +362,6 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
   const selectedSlot = slots.find((s) => s.selected_at);
 
   const resendEventMap: Partial<Record<AppointmentStatus, { label: string; event: string }>> = {
-    rdv_pending: { label: "Renvoyer la proposition", event: "APPOINTMENT_REQUESTED" },
     slots_proposed: { label: "Renvoyer le lien", event: "SLOTS_PROPOSED" },
     client_selected: { label: "Renvoyer le lien", event: "SLOTS_PROPOSED" },
     rdv_confirmed: { label: "Renvoyer la confirmation", event: "APPOINTMENT_CONFIRMED" },
@@ -531,27 +614,38 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       {showSlotForm && (
         <div className="border border-border rounded-lg p-3 space-y-3 bg-background">
           <p className="text-xs font-medium text-foreground">Ajouter des créneaux (max 5)</p>
-          {newSlots.map((slot, idx) => (
-            <div key={idx} className="flex items-end gap-2">
-              <div className="flex-1 space-y-1">
-                <Label className="text-[10px]">Date</Label>
-                <Input type="date" value={slot.date} onChange={(e) => updateSlotRow(idx, "date", e.target.value)} className="h-8 text-xs" />
+          {newSlots.map((slot, idx) => {
+            const slotConflicts = findConflicts(slot.date, slot.start, slot.end, confirmedRdvs, dossier.id);
+            return (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Label className="text-[10px]">Date</Label>
+                    <Input type="date" value={slot.date} onChange={(e) => updateSlotRow(idx, "date", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
+                  </div>
+                  <div className="w-20 space-y-1">
+                    <Label className="text-[10px]">Début</Label>
+                    <Input type="time" value={slot.start} onChange={(e) => updateSlotRow(idx, "start", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
+                  </div>
+                  <div className="w-20 space-y-1">
+                    <Label className="text-[10px]">Fin</Label>
+                    <Input type="time" value={slot.end} onChange={(e) => updateSlotRow(idx, "end", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
+                  </div>
+                  {newSlots.length > 1 && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeSlotRow(idx)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {slotConflicts.length > 0 && (
+                  <p className="text-[10px] text-destructive flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Conflit : RDV avec {[slotConflicts[0].client_first_name, slotConflicts[0].client_last_name].filter(Boolean).join(" ") || "un client"} ({slotConflicts[0].appointment_time_start.slice(0, 5)}–{slotConflicts[0].appointment_time_end.slice(0, 5)})
+                  </p>
+                )}
               </div>
-              <div className="w-20 space-y-1">
-                <Label className="text-[10px]">Début</Label>
-                <Input type="time" value={slot.start} onChange={(e) => updateSlotRow(idx, "start", e.target.value)} className="h-8 text-xs" />
-              </div>
-              <div className="w-20 space-y-1">
-                <Label className="text-[10px]">Fin</Label>
-                <Input type="time" value={slot.end} onChange={(e) => updateSlotRow(idx, "end", e.target.value)} className="h-8 text-xs" />
-              </div>
-              {newSlots.length > 1 && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeSlotRow(idx)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-          ))}
+            );
+          })}
           <div className="flex gap-2">
             {newSlots.length < 5 && (
               <Button variant="ghost" size="sm" onClick={addSlotRow} className="gap-1 text-xs">
@@ -569,41 +663,50 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       )}
 
       {/* Manual RDV form — simplified */}
-      {showManualForm && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="border border-border rounded-lg p-3 space-y-3 bg-background"
-        >
-          <p className="text-sm font-bold text-foreground flex items-center gap-2 leading-tight">
-            <Calendar className="h-4 w-4 text-primary" />
-            Fixer un rendez-vous
-          </p>
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1">
-              <Label className="text-xs">Date</Label>
-              <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="h-8 text-xs" />
+      {showManualForm && (() => {
+        const manualConflicts = findConflicts(manualDate, manualStart, manualEnd, confirmedRdvs, dossier.id);
+        return (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="border border-border rounded-lg p-3 space-y-3 bg-background"
+          >
+            <p className="text-sm font-bold text-foreground flex items-center gap-2 leading-tight">
+              <Calendar className="h-4 w-4 text-primary" />
+              Fixer un rendez-vous
+            </p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs">Date</Label>
+                <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-xs">Début</Label>
+                <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-xs">Fin</Label>
+                <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
+              </div>
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-xs">Début</Label>
-              <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-8 text-xs" />
+            {manualConflicts.length > 0 && (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Conflit : RDV avec {[manualConflicts[0].client_first_name, manualConflicts[0].client_last_name].filter(Boolean).join(" ") || "un client"} ({manualConflicts[0].appointment_time_start.slice(0, 5)}–{manualConflicts[0].appointment_time_end.slice(0, 5)})
+              </p>
+            )}
+            <div className="flex gap-2">
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                <Button onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending || manualConflicts.length > 0} className="gap-2">
+                  {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Confirmer
+                </Button>
+              </motion.div>
+              <Button variant="ghost" onClick={() => setShowManualForm(false)}>Annuler</Button>
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-xs">Fin</Label>
-              <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-8 text-xs" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-              <Button onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending} className="gap-2">
-                {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Confirmer
-              </Button>
-            </motion.div>
-            <Button variant="ghost" onClick={() => setShowManualForm(false)}>Annuler</Button>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        );
+      })()}
     </motion.div>
   );
 }
