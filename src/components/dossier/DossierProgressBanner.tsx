@@ -18,17 +18,17 @@ type Step = {
 export function DossierProgressBanner({ dossier }: DossierProgressBannerProps) {
   const status = dossier.status;
 
+  // New flow: Dossier → RDV → Devis → Facture
   const statusOrder = [
-    "nouveau", "a_qualifier", "devis_a_faire", "devis_envoye",
-    "devis_signe", "clos_signe", "en_attente_rdv", "rdv_pris", "rdv_termine",
+    "nouveau", "a_qualifier", "en_attente_rdv", "rdv_pris", "rdv_termine",
+    "devis_a_faire", "devis_envoye", "devis_signe", "clos_signe",
     "invoice_pending", "invoice_paid",
   ];
   const currentIdx = statusOrder.indexOf(status);
 
   // Determine step completion based on status progression
-  const isPostDevisSigne = currentIdx >= 4; // devis_signe or beyond
-  const isPostRdv = ["rdv_pris", "rdv_termine", "invoice_pending", "invoice_paid"].includes(status);
-  const isPostRdvTermine = ["rdv_termine", "invoice_pending", "invoice_paid"].includes(status);
+  const isPostRdvTermine = ["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe", "clos_signe", "invoice_pending", "invoice_paid"].includes(status);
+  const isPostDevisSigne = ["devis_signe", "clos_signe", "invoice_pending", "invoice_paid"].includes(status);
 
   const steps: Step[] = [
     {
@@ -40,20 +40,20 @@ export function DossierProgressBanner({ dossier }: DossierProgressBannerProps) {
       active: currentIdx <= 1,
     },
     {
-      key: "devis",
-      label: "Devis",
-      subLabel: status === "devis_a_faire" ? "À faire" : status === "devis_envoye" ? "Envoyé" : isPostDevisSigne ? "Signé" : undefined,
-      icon: <ClipboardList className="h-4 w-4" />,
-      done: isPostDevisSigne,
-      active: status === "devis_a_faire" || status === "devis_envoye",
-    },
-    {
       key: "rdv",
       label: "RDV",
       subLabel: status === "en_attente_rdv" ? "En attente" : status === "rdv_pris" ? "Pris" : isPostRdvTermine ? "Terminé" : undefined,
       icon: <Calendar className="h-4 w-4" />,
       done: isPostRdvTermine,
       active: status === "en_attente_rdv" || status === "rdv_pris",
+    },
+    {
+      key: "devis",
+      label: "Devis",
+      subLabel: status === "devis_a_faire" ? "À faire" : status === "devis_envoye" ? "Envoyé" : isPostDevisSigne ? "Signé" : undefined,
+      icon: <ClipboardList className="h-4 w-4" />,
+      done: isPostDevisSigne,
+      active: status === "devis_a_faire" || status === "devis_envoye" || status === "rdv_termine",
     },
     {
       key: "facture",

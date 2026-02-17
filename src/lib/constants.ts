@@ -38,12 +38,12 @@ export const STATUS_COLORS: Record<DossierStatus, string> = {
 /** Statuses displayed on the dashboard (ordered) */
 export const DASHBOARD_STATUSES: DossierStatus[] = [
   "nouveau",
-  "devis_a_faire",
-  "devis_envoye",
-  "devis_signe",
   "en_attente_rdv",
   "rdv_pris",
   "rdv_termine",
+  "devis_a_faire",
+  "devis_envoye",
+  "devis_signe",
   "invoice_pending",
   "invoice_paid",
   "clos_perdu",
@@ -52,12 +52,12 @@ export const DASHBOARD_STATUSES: DossierStatus[] = [
 /** All valid statuses for the status select dropdown */
 export const ALL_STATUSES: DossierStatus[] = [
   "nouveau",
-  "devis_a_faire",
-  "devis_envoye",
-  "devis_signe",
   "en_attente_rdv",
   "rdv_pris",
   "rdv_termine",
+  "devis_a_faire",
+  "devis_envoye",
+  "devis_signe",
   "invoice_pending",
   "invoice_paid",
   "clos_perdu",

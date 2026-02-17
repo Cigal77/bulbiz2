@@ -180,19 +180,12 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     const now = new Date();
     const status = dossier.status;
 
-    // Don't show for: nouveau, devis_a_faire, rdv_termine, invoice_paid, clos_perdu, clos_signe
-    const noCounterStatuses = ["nouveau", "a_qualifier", "devis_a_faire", "rdv_termine", "invoice_paid", "clos_perdu", "clos_signe"];
+    // Don't show for early/terminal statuses
+    const noCounterStatuses = ["nouveau", "a_qualifier", "rdv_termine", "devis_a_faire", "invoice_paid", "clos_perdu", "clos_signe"];
     if (noCounterStatuses.includes(status)) return null;
 
-    // Devis envoyé → since sent_at
-    if (status === "devis_envoye") {
-      const sentQuote = quotes.find(q => q.sent_at);
-      const ref = sentQuote?.sent_at ? new Date(sentQuote.sent_at) : new Date(dossier.status_changed_at);
-      return formatCounter("Envoyé", ref, now);
-    }
-
-    // Devis signé / en attente RDV → since status change
-    if (status === "devis_signe" || status === "en_attente_rdv") {
+    // En attente RDV → since status change
+    if (status === "en_attente_rdv") {
       const ref = new Date(dossier.status_changed_at);
       return formatCounter("En attente", ref, now);
     }
@@ -209,6 +202,19 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         return { text: `RDV dans ${daysUntil} jour(s)`, color: "muted" };
       }
       return null;
+    }
+
+    // Devis envoyé → since sent_at
+    if (status === "devis_envoye") {
+      const sentQuote = quotes.find(q => q.sent_at);
+      const ref = sentQuote?.sent_at ? new Date(sentQuote.sent_at) : new Date(dossier.status_changed_at);
+      return formatCounter("Envoyé", ref, now);
+    }
+
+    // Devis signé → since status change
+    if (status === "devis_signe") {
+      const ref = new Date(dossier.status_changed_at);
+      return formatCounter("Signé", ref, now);
     }
 
     // Facture en attente → since invoice creation
@@ -257,8 +263,7 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     const status = dossier.status;
 
     // ──── PRIORITY 1: Incomplete client info (for early statuses) ────
-    if (hasIncompleteInfo && ["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
-      const hasAnyContact = dossier.client_email || dossier.client_phone;
+    if (hasIncompleteInfo && ["nouveau", "a_qualifier"].includes(status)) {
       return {
         message: "Prochaine étape : Récupérer les informations manquantes",
         hint: `Le client n'a pas encore renseigné : ${missingFields.join(", ")}.`,
@@ -266,15 +271,49 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         primaryIcon: <Link2 className="h-4 w-4" />,
         primaryAction: () => sendClientLink.mutate(),
         isPending: sendClientLink.isPending,
-        secondaryLabel: "Importer devis (PDF)",
-        secondaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
+        secondaryLabel: "Fixer un rendez-vous",
+        secondaryAction: () => onScrollToAppointment?.(),
       };
     }
 
-    // ──── Early statuses with complete info → Import/Create devis ────
-    if (["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
+    // ──── Early statuses with complete info → Fixer RDV ────
+    if (["nouveau", "a_qualifier", "en_attente_rdv"].includes(status)) {
       return {
-        message: "Prochaine étape : Importer un devis",
+        message: "Prochaine étape : Fixer un rendez-vous",
+        hint: "Proposez des créneaux au client ou fixez le RDV directement.",
+        primaryLabel: "Proposer des créneaux",
+        primaryIcon: <Calendar className="h-4 w-4" />,
+        primaryAction: () => onScrollToAppointment?.(),
+        secondaryLabel: "Fixer le RDV manuellement",
+        secondaryAction: () => setShowManualRdv(true),
+      };
+    }
+
+    // ──── RDV pris → Marquer intervention terminée ────
+    if (status === "rdv_pris") {
+      const appointmentDate = (dossier as any).appointment_date;
+      const timeStart = (dossier as any).appointment_time_start;
+      const timeEnd = (dossier as any).appointment_time_end;
+      const dateInfo = appointmentDate
+        ? format(new Date(appointmentDate), "EEEE d MMMM", { locale: fr })
+        : "";
+      const timeInfo = timeStart && timeEnd ? ` de ${timeStart.slice(0, 5)} à ${timeEnd.slice(0, 5)}` : "";
+
+      return {
+        message: `Intervention prévue ${dateInfo}${timeInfo}`,
+        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer au devis.",
+        primaryLabel: "Marquer intervention terminée",
+        primaryIcon: <CheckCircle2 className="h-4 w-4" />,
+        primaryAction: () => markDone.mutate(),
+        isPending: markDone.isPending,
+      };
+    }
+
+    // ──── RDV terminé / Devis à faire → Importer devis ────
+    if (status === "rdv_termine" || status === "devis_a_faire") {
+      return {
+        message: "Prochaine étape : Importer le devis",
+        hint: "L'intervention est terminée. Envoyez le devis au client.",
         primaryLabel: "Importer devis (PDF)",
         primaryIcon: <FileText className="h-4 w-4" />,
         primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
@@ -298,51 +337,18 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
-    // ──── PRIORITY 2: Devis signé / en attente RDV → Fixer RDV ────
-    if (status === "devis_signe" || status === "en_attente_rdv") {
-      return {
-        message: "Prochaine étape : Fixer un rendez-vous",
-        hint: "Le devis est signé. Proposez des créneaux au client pour l'intervention.",
-        primaryLabel: "Proposer des créneaux",
-        primaryIcon: <Calendar className="h-4 w-4" />,
-        primaryAction: () => onScrollToAppointment?.(),
-        secondaryLabel: "Fixer le RDV manuellement",
-        secondaryAction: () => setShowManualRdv(true),
-      };
-    }
-
-    // ──── PRIORITY 3: RDV pris → Marquer intervention terminée ────
-    if (status === "rdv_pris") {
-      const appointmentDate = (dossier as any).appointment_date;
-      const timeStart = (dossier as any).appointment_time_start;
-      const timeEnd = (dossier as any).appointment_time_end;
-      const dateInfo = appointmentDate
-        ? format(new Date(appointmentDate), "EEEE d MMMM", { locale: fr })
-        : "";
-      const timeInfo = timeStart && timeEnd ? ` de ${timeStart.slice(0, 5)} à ${timeEnd.slice(0, 5)}` : "";
-
-      return {
-        message: `Intervention prévue ${dateInfo}${timeInfo}`,
-        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer à la facturation.",
-        primaryLabel: "Marquer intervention terminée",
-        primaryIcon: <CheckCircle2 className="h-4 w-4" />,
-        primaryAction: () => markDone.mutate(),
-        isPending: markDone.isPending,
-      };
-    }
-
-    // ──── PRIORITY 4: RDV terminé → Facturer ────
-    if (status === "rdv_termine") {
+    // ──── Devis signé → Facturer ────
+    if (status === "devis_signe") {
       return {
         message: "Prochaine étape : Importer la facture",
-        hint: "L'intervention est terminée. Envoyez la facture au client.",
+        hint: "Le devis est signé. Envoyez la facture au client.",
         primaryLabel: "Importer facture (PDF)",
         primaryIcon: <Receipt className="h-4 w-4" />,
         primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-facture")),
       };
     }
 
-    // ──── PRIORITY 5: Facture en attente → Marquer payée ────
+    // ──── Facture en attente → Marquer payée ────
     if (status === "invoice_pending") {
       const inv = invoices[0];
       return {
