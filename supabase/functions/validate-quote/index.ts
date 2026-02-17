@@ -130,59 +130,9 @@ Deno.serve(async (req) => {
         details: "Prise de rendez-vous en attente",
       });
 
-      // Send APPOINTMENT_REQUESTED notification via the unified service
-      try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("company_name, first_name, last_name, phone, email, sms_enabled")
-          .eq("user_id", dossier.user_id)
-          .maybeSingle();
-
-        const artisanName =
-          profile?.company_name ||
-          [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-          "Votre artisan";
-
-        // Send email notification
-        const resendKey = Deno.env.get("RESEND_API_KEY");
-        if (resendKey && dossier.client_email) {
-          const { Resend: ResendClass } = await import("npm:resend@2.0.0");
-          const resendClient = new ResendClass(resendKey);
-          const clientName = dossier.client_first_name || "Bonjour";
-          await resendClient.emails.send({
-            from: `${artisanName} <noreply@bulbiz.fr>`,
-            to: [dossier.client_email],
-            subject: `${artisanName} souhaite convenir d'un rendez-vous`,
-            html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-              <h2 style="color:#2563eb;">📅 Proposition de rendez-vous</h2>
-              <p>Bonjour ${clientName},</p>
-              <p>Suite à la validation de votre devis, <strong>${artisanName}</strong> souhaite convenir d'un rendez-vous pour l'intervention.</p>
-              <p>Merci de le contacter${profile?.phone ? ` au ${profile.phone}` : ""}${profile?.email ? ` ou par email à ${profile.email}` : ""} pour fixer une date.</p>
-              <p>N'hésitez pas à nous contacter pour toute question.</p>
-              ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
-              ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
-              <br/>
-              <p>Cordialement,<br/>${artisanName}</p>
-            </div>`,
-          });
-          await supabase.from("notification_logs").insert({
-            dossier_id: dossier.id,
-            event_type: "APPOINTMENT_REQUESTED",
-            channel: "email",
-            recipient: dossier.client_email,
-            status: "SENT",
-          });
-          await supabase.from("historique").insert({
-            dossier_id: dossier.id,
-            user_id: dossier.user_id,
-            action: "notification_sent",
-            details: `Email envoyé : proposition de rendez-vous → ${dossier.client_email}`,
-          });
-        }
-      } catch (notifErr) {
-        console.error("Failed to send appointment notification:", notifErr);
-      }
+      // NOTE: APPOINTMENT_REQUESTED email to client removed —
+      // the artisan will propose slots or fix the RDV manually,
+      // which triggers the appropriate notification at that point.
     } else {
       await supabase
         .from("quotes")
@@ -285,36 +235,8 @@ Deno.serve(async (req) => {
       console.error("Failed to send artisan notification email:", emailErr);
     }
 
-    // ── Send confirmation SMS to client after validation ──
-    if (action === "accept" && dossier.client_phone) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("company_name, first_name, last_name, phone, email, sms_enabled")
-          .eq("user_id", dossier.user_id)
-          .maybeSingle();
-
-        const smsEnabled = profile?.sms_enabled !== false;
-        if (smsEnabled) {
-          const cleaned = dossier.client_phone.replace(/[\s\-().]/g, "");
-          if (/^\+?\d{10,15}$/.test(cleaned)) {
-            let phone = cleaned;
-            if (phone.startsWith("0") && phone.length === 10) phone = "+33" + phone.slice(1);
-            if (!phone.startsWith("+")) phone = "+" + phone;
-
-            const artisanName =
-              profile?.company_name ||
-              [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-              "Votre artisan";
-            const contactInfo = profile?.phone ? profile.phone : profile?.email || "";
-            const smsBody = `Merci, devis ${quote.quote_number} validé ✅ Pour fixer le RDV : ${contactInfo} — ${artisanName}`;
-            await sendSms(phone, smsBody);
-          }
-        }
-      } catch (smsErr) {
-        console.error("Failed to send client confirmation SMS:", smsErr);
-      }
-    }
+    // NOTE: Client confirmation SMS ("Pour fixer le RDV") removed —
+    // the artisan will propose slots or fix the RDV, triggering notifications at that point.
 
     return new Response(JSON.stringify({ success: true, action }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
