@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info } from "lucide-react";
+import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info, Video } from "lucide-react";
+import { VideoRecorderWithTorch } from "@/components/VideoRecorderWithTorch";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
@@ -95,6 +96,7 @@ export default function ClientForm() {
   const [rgpdConsent, setRgpdConsent] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [selectingSlot, setSelectingSlot] = useState(false);
+  const [videoRecorderOpen, setVideoRecorderOpen] = useState(false);
 
   const hasSlots = (dossier?.appointment_slots?.length ?? 0) > 0;
   const isSlotMode = hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
@@ -171,6 +173,10 @@ export default function ClientForm() {
   };
 
   const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
+
+  const handleVideoRecorded = (file: File) => {
+    setFiles((prev) => [...prev, file].slice(0, MAX_FILES));
+  };
 
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
@@ -574,12 +580,23 @@ export default function ClientForm() {
               )}
 
               {files.length < MAX_FILES && (
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
-                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                  <span className="text-sm text-muted-foreground">Appuyez pour ajouter</span>
-                  <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 10 Mo</span>
-                  <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} capture="environment" />
-                </label>
+                <div className="space-y-3">
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
+                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                    <span className="text-sm text-muted-foreground">Appuyez pour ajouter</span>
+                    <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 10 Mo</span>
+                    <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} capture="environment" />
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => setVideoRecorderOpen(true)}
+                  >
+                    <Video className="h-4 w-4" />
+                    Filmer avec flash
+                  </Button>
+                </div>
               )}
 
               <div className="flex justify-between">
@@ -652,6 +669,12 @@ export default function ClientForm() {
           </Card>
         )}
       </main>
+
+      <VideoRecorderWithTorch
+        open={videoRecorderOpen}
+        onClose={() => setVideoRecorderOpen(false)}
+        onVideoRecorded={handleVideoRecorded}
+      />
     </div>
   );
 }

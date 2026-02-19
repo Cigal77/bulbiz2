@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -34,10 +34,12 @@ const URGENCIES: UrgencyLevel[] = ["aujourdhui", "48h", "semaine"];
 
 export default function CreateDossier() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { profile } = useProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const importType = searchParams.get("import");
 
   const form = useForm<DossierFormData>({
     resolver: zodResolver(dossierSchema),
@@ -124,7 +126,7 @@ export default function CreateDossier() {
         toast({ title: "Dossier créé !" });
       }
 
-      navigate(`/dossier/${dossier.id}`);
+      navigate(importType ? `/dossier/${dossier.id}?import=${importType}` : `/dossier/${dossier.id}`);
     },
     onError: (e: Error) => {
       toast({ title: "Erreur", description: e.message, variant: "destructive" });

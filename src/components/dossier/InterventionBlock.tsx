@@ -190,7 +190,14 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
           <div className="space-y-2">
             <div className="flex items-start gap-2 text-sm font-medium text-foreground">
               <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-              <span>{dossier.address}</span>
+              <div>
+                <span>{dossier.address}</span>
+                {(dossier.postal_code || dossier.city) && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {[dossier.postal_code, dossier.city].filter(Boolean).join(" ")}
+                  </p>
+                )}
+              </div>
             </div>
             {isVerified ? (
               <span className="inline-flex items-center gap-1 text-xs text-success ml-6">
