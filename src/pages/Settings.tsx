@@ -7,11 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, LogOut } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+
+const DELAY_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
+const VALIDITY_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
 
 interface SettingsForm {
   first_name: string;
@@ -21,7 +32,6 @@ interface SettingsForm {
   email: string;
   siret: string;
   address: string;
-  default_vat_rate: number;
   default_validity_days: number;
   auto_relance_enabled: boolean;
   relance_delay_info: number;
@@ -39,6 +49,7 @@ interface SettingsForm {
 export default function Settings() {
   const navigate = useNavigate();
   const { profile, isLoading, update } = useProfile();
+  const { signOut } = useAuth();
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SettingsForm>();
 
@@ -57,13 +68,18 @@ export default function Settings() {
         email: profile.email ?? "",
         siret: profile.siret ?? "",
         address: profile.address ?? "",
-        default_vat_rate: profile.default_vat_rate ?? 10,
         default_validity_days: profile.default_validity_days ?? 30,
         auto_relance_enabled: profile.auto_relance_enabled,
         relance_delay_info: profile.relance_delay_info,
         relance_delay_devis_1: profile.relance_delay_devis_1,
         relance_delay_devis_2: profile.relance_delay_devis_2,
-        email_signature: profile.email_signature ?? "",
+        email_signature: profile.email_signature || [
+          "Cordialement,",
+          [profile.first_name, profile.last_name].filter(Boolean).join(" "),
+          profile.company_name,
+          profile.phone,
+          profile.email,
+        ].filter(Boolean).join("\n"),
         auto_send_client_link: (profile as any).auto_send_client_link ?? true,
         client_link_validity_days: (profile as any).client_link_validity_days ?? 7,
         sms_enabled: (profile as any).sms_enabled ?? true,
@@ -84,7 +100,6 @@ export default function Settings() {
         email: data.email || null,
         siret: data.siret || null,
         address: data.address || null,
-        default_vat_rate: data.default_vat_rate,
         default_validity_days: data.default_validity_days,
         auto_relance_enabled: data.auto_relance_enabled,
         relance_delay_info: data.relance_delay_info,
@@ -165,45 +180,8 @@ export default function Settings() {
                 <Input id="address" {...register("address")} placeholder="12 rue des Artisans, 75001 Paris" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="default_vat_rate">TVA par défaut (%)</Label>
-                <Input id="default_vat_rate" type="number" step="0.1" {...register("default_vat_rate", { valueAsNumber: true })} />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
                 <Input id="default_validity_days" type="number" min={1} {...register("default_validity_days", { valueAsNumber: true })} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Facturation settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Facturation</CardTitle>
-              <CardDescription>Paramètres par défaut pour les factures</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>TVA applicable</Label>
-                  <p className="text-sm text-muted-foreground">Décochez si vous êtes en franchise de base (art. 293 B du CGI)</p>
-                </div>
-                <Switch
-                  checked={watch("vat_applicable")}
-                  onCheckedChange={(v) => setValue("vat_applicable", v)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tva_intracom">N° TVA intracommunautaire</Label>
-                <Input id="tva_intracom" {...register("tva_intracom")} placeholder="FR XX XXXXXXXXX" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payment_terms_default">Conditions de paiement par défaut</Label>
-                <Textarea
-                  id="payment_terms_default"
-                  rows={2}
-                  {...register("payment_terms_default")}
-                  placeholder="Paiement à réception de facture. Chèque, virement ou espèces."
-                />
               </div>
             </CardContent>
           </Card>
@@ -226,14 +204,22 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-2 max-w-[200px]">
-                <Label htmlFor="client_link_validity_days">Durée de validité du lien (jours)</Label>
-                <Input
-                  id="client_link_validity_days"
-                  type="number"
-                  min={1}
-                  max={90}
-                  {...register("client_link_validity_days", { valueAsNumber: true })}
-                />
+                <Label>Durée de validité du lien (jours)</Label>
+                <Select
+                  value={String(watch("client_link_validity_days") || 7)}
+                  onValueChange={(v) => setValue("client_link_validity_days", Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VALIDITY_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} jour{n > 1 ? "s" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -244,7 +230,7 @@ export default function Settings() {
               <CardTitle>SMS</CardTitle>
               <CardDescription>Envoi de SMS au client en complément des emails</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent>
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Envoyer aussi par SMS</Label>
@@ -255,9 +241,6 @@ export default function Settings() {
                   onCheckedChange={(v) => setValue("sms_enabled", v)}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                💡 Pour activer l'envoi réel de SMS, configurez les clés Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) dans les secrets du projet.
-              </p>
             </CardContent>
           </Card>
 
@@ -281,31 +264,58 @@ export default function Settings() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="relance_delay_info">Délai info manquante (jours)</Label>
-                  <Input
-                    id="relance_delay_info"
-                    type="number"
-                    min={1}
-                    {...register("relance_delay_info", { valueAsNumber: true })}
-                  />
+                  <Label>Délai info manquante (jours)</Label>
+                  <Select
+                    value={String(watch("relance_delay_info") || 3)}
+                    onValueChange={(v) => setValue("relance_delay_info", Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DELAY_OPTIONS.map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} jour{n > 1 ? "s" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="relance_delay_devis_1">1ère relance devis (jours)</Label>
-                  <Input
-                    id="relance_delay_devis_1"
-                    type="number"
-                    min={1}
-                    {...register("relance_delay_devis_1", { valueAsNumber: true })}
-                  />
+                  <Label>1ère relance devis (jours)</Label>
+                  <Select
+                    value={String(watch("relance_delay_devis_1") || 7)}
+                    onValueChange={(v) => setValue("relance_delay_devis_1", Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DELAY_OPTIONS.map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} jour{n > 1 ? "s" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="relance_delay_devis_2">2ème relance devis (jours)</Label>
-                  <Input
-                    id="relance_delay_devis_2"
-                    type="number"
-                    min={1}
-                    {...register("relance_delay_devis_2", { valueAsNumber: true })}
-                  />
+                  <Label>2ème relance devis (jours)</Label>
+                  <Select
+                    value={String(watch("relance_delay_devis_2") || 14)}
+                    onValueChange={(v) => setValue("relance_delay_devis_2", Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DELAY_OPTIONS.map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} jour{n > 1 ? "s" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -333,6 +343,18 @@ export default function Settings() {
             </Button>
           </div>
         </form>
+
+        {/* Déconnexion */}
+        <div className="mt-8 mb-24">
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4" />
+            Se déconnecter
+          </Button>
+        </div>
       </main>
     </div>
   );

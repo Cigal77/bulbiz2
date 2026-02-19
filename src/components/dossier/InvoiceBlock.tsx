@@ -310,28 +310,26 @@ function InvoiceRow({
           </SelectContent>
         </Select>
 
-        {/* Delete (optionnel, souvent uniquement brouillon) */}
-        {invoice.status === "draft" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  La facture {(invoice as any).invoice_number ?? ""} sera définitivement supprimée.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(invoice.id)}>Supprimer</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+        {/* Delete */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer cette facture ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                La facture {(invoice as any).invoice_number ?? ""} sera définitivement supprimée.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(invoice.id)}>Supprimer</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
