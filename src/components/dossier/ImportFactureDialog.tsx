@@ -46,11 +46,24 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
 
     setLoading(true);
     try {
-      // Generate invoice number if not provided
       let finalNumber = invoiceNumber.trim();
+
       if (!finalNumber) {
-        const y = new Date().getFullYear();
-        finalNumber = `FAC-${y}-${String(Date.now()).slice(-6)}`; // ex FAC-2026-123456
+        const { data: dossier, error: dossierErr } = await supabase
+          .from("dossiers")
+          .select("client_last_name, client_first_name")
+          .eq("id", dossierId)
+          .single();
+
+        if (dossierErr) throw dossierErr;
+
+        const normalize = (s: string) =>
+          s.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "").toUpperCase();
+
+        const last = dossier?.client_last_name ? normalize(dossier.client_last_name) : "CLIENT";
+        const firstInitial = dossier?.client_first_name ? normalize(dossier.client_first_name)[0] : "X";
+
+        finalNumber = `FACT-${last}_${firstInitial}`;
       }
 
       // Upload PDF
