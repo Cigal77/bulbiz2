@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useDossier, useDossierHistorique, useDossierMedias } from "@/hooks/useDossier";
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { ClientBlock } from "@/components/dossier/ClientBlock";
@@ -53,6 +53,7 @@ function CollapsibleSection({ title, defaultOpen = false, children }: { title: s
 export default function DossierDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const { data: dossier, isLoading } = useDossier(id!);
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
@@ -74,6 +75,18 @@ export default function DossierDetail() {
       window.removeEventListener("open-import-facture", openFacture);
     };
   }, []);
+
+  // Auto-open import dialog when redirected from CreateDossier with ?import=devis|facture
+  useEffect(() => {
+    const importParam = searchParams.get("import");
+    if (importParam === "devis") {
+      setImportDevisOpen(true);
+      setSearchParams({}, { replace: true });
+    } else if (importParam === "facture") {
+      setImportFactureOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   if (isLoading) {
     return (

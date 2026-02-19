@@ -127,7 +127,7 @@ export function MobileBottomNav() {
 
   const handlePickerCreateNew = () => {
     setPickerOpen(false);
-    navigate("/nouveau");
+    navigate(importType ? `/nouveau?import=${importType}` : "/nouveau");
   };
 
   const pickerTitle =
