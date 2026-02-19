@@ -266,11 +266,6 @@ function InvoiceRow({
         )}
       </div>
 
-      {/* Petit résumé */}
-      <p className="text-[11px] text-muted-foreground">
-        {invoice.total_ttc ? `Total : ${Number(invoice.total_ttc).toFixed(2)} € TTC` : "Total non renseigné"}
-      </p>
-
       <div className="flex flex-wrap items-center gap-2">
         {pdfUrl && (
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
