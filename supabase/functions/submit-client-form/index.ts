@@ -1,4 +1,41 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "npm:resend@2.0.0";
+
+// ── Helpers for sending confirmation email/SMS ──
+function formatDateFr(dateStr: string): string {
+  const date = new Date(dateStr);
+  const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+  const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function normalizePhone(phone: string): string | null {
+  const cleaned = phone.replace(/[\s\-().]/g, "");
+  if (!/^\+?\d{10,15}$/.test(cleaned)) return null;
+  let p = cleaned;
+  if (p.startsWith("0") && p.length === 10) p = "+33" + p.slice(1);
+  if (!p.startsWith("+")) p = "+" + p;
+  return p;
+}
+
+async function sendSms(to: string, body: string): Promise<boolean> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
+  if (!accountSid || !authToken || !fromPhone) return false;
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
+      },
+      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
+    });
+    return resp.ok;
+  } catch { return false; }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -212,6 +249,7 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Mark selected slot
       await supabase
         .from("appointment_slots")
         .update({ selected_at: new Date().toISOString() })
@@ -223,22 +261,133 @@ Deno.serve(async (req) => {
         .eq("dossier_id", dossier.id)
         .neq("id", slot_id);
 
-      await supabase
-        .from("dossiers")
-        .update({ appointment_status: "client_selected" })
-        .eq("id", dossier.id);
+      // Count total slots for this dossier
+      const { count: totalSlots } = await supabase
+        .from("appointment_slots")
+        .select("id", { count: "exact", head: true })
+        .eq("dossier_id", dossier.id);
 
-      const slotDate = new Date(slot.slot_date).toLocaleDateString("fr-FR");
-      await supabase.from("historique").insert({
-        dossier_id: dossier.id,
-        user_id: null,
-        action: "client_slot_selected",
-        details: `Le client a choisi le créneau du ${slotDate} ${slot.time_start.slice(0,5)}–${slot.time_end.slice(0,5)}`,
-      });
+      const isSingleSlot = (totalSlots ?? 0) <= 1;
+      const slotDateFr = formatDateFr(slot.slot_date);
+      const slotDateShort = new Date(slot.slot_date).toLocaleDateString("fr-FR");
+      const timeRange = `${slot.time_start.slice(0,5)}–${slot.time_end.slice(0,5)}`;
 
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (isSingleSlot) {
+        // Auto-confirm: only 1 slot, no need for artisan to confirm again
+        await supabase
+          .from("dossiers")
+          .update({
+            appointment_status: "rdv_confirmed",
+            status: "rdv_pris",
+            status_changed_at: new Date().toISOString(),
+            appointment_date: slot.slot_date,
+            appointment_time_start: slot.time_start,
+            appointment_time_end: slot.time_end,
+            appointment_source: "client_selected",
+            appointment_confirmed_at: new Date().toISOString(),
+          })
+          .eq("id", dossier.id);
+
+        await supabase.from("historique").insert({
+          dossier_id: dossier.id,
+          user_id: null,
+          action: "client_slot_selected",
+          details: `Le client a confirmé le créneau du ${slotDateShort} ${timeRange}`,
+        });
+
+        await supabase.from("historique").insert({
+          dossier_id: dossier.id,
+          user_id: null,
+          action: "rdv_confirmed",
+          details: `Rendez-vous auto-confirmé : ${slotDateFr} ${timeRange}`,
+        });
+
+        // Send confirmation email + SMS
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("user_id", dossier.user_id)
+          .maybeSingle();
+
+        const artisanName = profile?.company_name
+          || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
+          || "Votre artisan";
+        const clientName = dossier.client_first_name || "Bonjour";
+
+        // Email
+        const clientEmail = dossier.client_email;
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (clientEmail && resendKey) {
+          try {
+            const resend = new Resend(resendKey);
+            await resend.emails.send({
+              from: `${artisanName} <noreply@bulbiz.fr>`,
+              to: [clientEmail],
+              subject: `Rendez-vous confirmé avec ${artisanName}`,
+              html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#16a34a;">✅ Rendez-vous confirmé</h2>
+                <p>Bonjour ${clientName},</p>
+                <p>Votre rendez-vous avec <strong>${artisanName}</strong> est confirmé :</p>
+                <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${slotDateFr} — 🕐 ${timeRange}</p>
+                <p>En cas d'empêchement, merci de nous prévenir${profile?.phone ? ` au ${profile.phone}` : ""}.</p>
+                ${profile?.email ? `<p style="font-size:13px;color:#374151;">Email : ${profile.email}</p>` : ""}
+                ${profile?.phone ? `<p style="font-size:13px;color:#374151;">Tél : ${profile.phone}</p>` : ""}
+                <br/><p>Cordialement,<br/>${artisanName}</p>
+              </div>`,
+            });
+            await supabase.from("notification_logs").insert({
+              dossier_id: dossier.id,
+              event_type: "APPOINTMENT_CONFIRMED",
+              channel: "email",
+              recipient: clientEmail,
+              status: "SENT",
+            });
+          } catch (e) {
+            console.error("Email error on auto-confirm:", e);
+          }
+        }
+
+        // SMS
+        const clientPhone = dossier.client_phone;
+        if (clientPhone) {
+          const normalized = normalizePhone(clientPhone);
+          if (normalized) {
+            const sent = await sendSms(normalized,
+              `✅ RDV confirmé avec ${artisanName} : ${slotDateFr} à ${timeRange}.${profile?.phone ? ` Contact : ${profile.phone}` : ""}`
+            );
+            if (sent) {
+              await supabase.from("notification_logs").insert({
+                dossier_id: dossier.id,
+                event_type: "APPOINTMENT_CONFIRMED",
+                channel: "sms",
+                recipient: normalized,
+                status: "SENT",
+              });
+            }
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, auto_confirmed: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        // Multiple slots: keep current behavior — artisan must confirm
+        await supabase
+          .from("dossiers")
+          .update({ appointment_status: "client_selected" })
+          .eq("id", dossier.id);
+
+        await supabase.from("historique").insert({
+          dossier_id: dossier.id,
+          user_id: null,
+          action: "client_slot_selected",
+          details: `Le client a choisi le créneau du ${slotDateShort} ${timeRange}`,
+        });
+
+        return new Response(JSON.stringify({ success: true, auto_confirmed: false }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ error: "Action inconnue" }), {

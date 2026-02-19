@@ -75,6 +75,7 @@ export default function ClientForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [slotSuccess, setSlotSuccess] = useState(false);
+  const [autoConfirmed, setAutoConfirmed] = useState(false);
   const [emailError, setEmailError] = useState("");
 
   const [dossier, setDossier] = useState<DossierData | null>(null);
@@ -153,6 +154,7 @@ export default function ClientForm() {
       });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
+      if (data?.auto_confirmed) setAutoConfirmed(true);
       setSlotSuccess(true);
     } catch (e: any) {
       setError(e.message || "Erreur lors de la sélection");
@@ -281,7 +283,9 @@ export default function ClientForm() {
         <Card className="max-w-md w-full">
           <CardContent className="pt-6 text-center space-y-4">
             <CheckCircle2 className="h-12 w-12 text-success mx-auto" />
-            <h2 className="text-xl font-bold text-foreground">Créneau confirmé !</h2>
+            <h2 className="text-xl font-bold text-foreground">
+              {autoConfirmed ? "Rendez-vous confirmé !" : "Créneau confirmé !"}
+            </h2>
             {chosen && (
               <div className="rounded-lg bg-success/10 border border-success/20 p-4">
                 <p className="text-sm font-semibold text-foreground flex items-center justify-center gap-2">
@@ -294,7 +298,11 @@ export default function ClientForm() {
                 </p>
               </div>
             )}
-            <p className="text-muted-foreground text-sm">Votre artisan va confirmer le rendez-vous. Vous recevrez une notification.</p>
+            <p className="text-muted-foreground text-sm">
+              {autoConfirmed
+                ? "Votre rendez-vous est confirmé. Un email de confirmation vous a été envoyé."
+                : "Votre artisan va confirmer le rendez-vous. Vous recevrez une notification."}
+            </p>
           </CardContent>
         </Card>
       </div>
