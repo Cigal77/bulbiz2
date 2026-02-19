@@ -623,11 +623,11 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
                     <Label className="text-[10px]">Date</Label>
                     <Input type="date" value={slot.date} onChange={(e) => updateSlotRow(idx, "date", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
                   </div>
-                  <div className="w-20 space-y-1">
+                  <div className="w-18 space-y-1">
                     <Label className="text-[10px]">Début</Label>
                     <Input type="time" value={slot.start} onChange={(e) => updateSlotRow(idx, "start", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
                   </div>
-                  <div className="w-20 space-y-1">
+                  <div className="w-18 space-y-1">
                     <Label className="text-[10px]">Fin</Label>
                     <Input type="time" value={slot.end} onChange={(e) => updateSlotRow(idx, "end", e.target.value)} className={cn("h-8 text-xs", slotConflicts.length > 0 && "border-destructive")} />
                   </div>
@@ -680,11 +680,11 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
                 <Label className="text-xs">Date</Label>
                 <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
               </div>
-              <div className="w-20 space-y-1">
+              <div className="w-18 space-y-1">
                 <Label className="text-xs">Début</Label>
                 <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
               </div>
-              <div className="w-20 space-y-1">
+              <div className="w-18 space-y-1">
                 <Label className="text-xs">Fin</Label>
                 <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className={cn("h-8 text-xs", manualConflicts.length > 0 && "border-destructive")} />
               </div>
