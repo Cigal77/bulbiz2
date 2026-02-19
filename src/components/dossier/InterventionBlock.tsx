@@ -6,6 +6,7 @@ import { CATEGORY_LABELS, URGENCY_LABELS, URGENCY_COLORS } from "@/lib/constants
 import { cn } from "@/lib/utils";
 import { MapPin, Wrench, AlertTriangle, ExternalLink, CheckCircle2, Navigation, Pencil, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -49,6 +50,8 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
   const [editing, setEditing] = useState(false);
   const [address, setAddress] = useState(dossier.address ?? "");
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
+  const [postalCode, setPostalCode] = useState(dossier.postal_code ?? "");
+  const [city, setCity] = useState(dossier.city ?? "");
   const [category, setCategory] = useState<ProblemCategory>(dossier.category);
   const [urgency, setUrgency] = useState<UrgencyLevel>(dossier.urgency);
   const [description, setDescription] = useState(dossier.description ?? "");
@@ -63,6 +66,8 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
   const startEdit = () => {
     setAddress(dossier.address ?? "");
     setAddressData({});
+    setPostalCode(dossier.postal_code ?? "");
+    setCity(dossier.city ?? "");
     setCategory(dossier.category);
     setUrgency(dossier.urgency);
     setDescription(dossier.description ?? "");
@@ -76,6 +81,11 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
 
     const newAddress = addressData.address || address || null;
     if (newAddress !== (dossier.address || null)) changedFields.push("Adresse mise à jour");
+    const newPostalCode = (addressData.postal_code ?? postalCode) || null;
+    const newCity = (addressData.city ?? city) || null;
+    if (newPostalCode !== (dossier.postal_code || null) || newCity !== (dossier.city || null)) {
+      changedFields.push("CP / Ville mis à jour");
+    }
     if (category !== dossier.category) changedFields.push("Catégorie mise à jour");
     if (urgency !== dossier.urgency) changedFields.push("Urgence mise à jour");
     if ((description || null) !== (dossier.description || null)) changedFields.push("Description mise à jour");
@@ -90,8 +100,8 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
         updates: {
           address: newAddress,
           address_line: addressData.address_line ?? dossier.address_line,
-          postal_code: addressData.postal_code ?? dossier.postal_code,
-          city: addressData.city ?? dossier.city,
+          postal_code: newPostalCode,
+          city: newCity,
           country: addressData.country ?? dossier.country,
           google_place_id: addressData.google_place_id ?? (addressData.address ? null : dossier.google_place_id),
           lat: addressData.lat ?? (addressData.address ? null : dossier.lat),
@@ -129,8 +139,32 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
           <AddressAutocomplete
             value={address}
             onChange={(val) => { setAddress(val); setAddressData({}); }}
-            onAddressSelect={(data) => { setAddress(data.address); setAddressData(data); }}
+            onAddressSelect={(data) => {
+              setAddress(data.address);
+              setAddressData(data);
+              if (data.postal_code) setPostalCode(data.postal_code);
+              if (data.city) setCity(data.city);
+            }}
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Code postal</Label>
+            <Input
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="75001"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Ville</Label>
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Paris"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -192,11 +226,11 @@ export function InterventionBlock({ dossier }: InterventionBlockProps) {
               <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
               <div>
                 <span>{dossier.address}</span>
-                {(dossier.postal_code || dossier.city) && (
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {[dossier.postal_code, dossier.city].filter(Boolean).join(" ")}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {dossier.postal_code || dossier.city
+                    ? [dossier.postal_code, dossier.city].filter(Boolean).join(" ")
+                    : <span className="italic">CP / Ville non renseignés</span>}
+                </p>
               </div>
             </div>
             {isVerified ? (
