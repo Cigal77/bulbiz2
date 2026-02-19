@@ -303,27 +303,25 @@ function QuoteRow({
           </SelectContent>
         </Select>
 
-        {quote.status === "brouillon" && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Le devis {quote.quote_number} sera définitivement supprimé.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(quote.id)}>Supprimer</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ce devis ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Le devis {quote.quote_number} sera définitivement supprimé.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(quote.id)}>Supprimer</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
