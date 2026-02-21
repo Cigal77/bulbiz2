@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,11 @@ type AuthMode = "login" | "signup" | "reset";
 export default function Auth() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [mode, setMode] = useState<AuthMode>("login");
+  // Capture du code de parrainage depuis l'URL (?ref=CODE)
+  const refCode = searchParams.get("ref") ?? "";
+  const [mode, setMode] = useState<AuthMode>(refCode ? "signup" : "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -48,13 +51,13 @@ export default function Auth() {
           password,
           options: {
             emailRedirectTo: window.location.origin,
-            data: { first_name: firstName, last_name: lastName, phone },
+            data: { first_name: firstName, last_name: lastName, phone, referred_by_code: refCode || undefined },
           },
         });
         if (error) throw error;
         // Notify admin about new signup (fire-and-forget)
         supabase.functions.invoke("notify-new-signup", {
-          body: { first_name: firstName, last_name: lastName, email, phone },
+          body: { first_name: firstName, last_name: lastName, email, phone, referred_by_code: refCode || undefined },
         }).catch(() => {});
         toast({
           title: "Inscription réussie",

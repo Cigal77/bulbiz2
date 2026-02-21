@@ -20,6 +20,7 @@ import InvoiceEditor from "./pages/InvoiceEditor";
 import InvoiceView from "./pages/InvoiceView";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/dossier/:dossierId/devis" element={<ProtectedRoute><QuoteEditor /></ProtectedRoute>} />
               <Route path="/dossier/:id/facture/:invoiceId" element={<ProtectedRoute><InvoiceEditor /></ProtectedRoute>} />
               <Route path="/parametres" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/pricing" element={<ProtectedRoute><Pricing /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <MobileBottomNav />

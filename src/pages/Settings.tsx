@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useProfile } from "@/hooks/useProfile";
+import { useSubscription } from "@/hooks/useSubscription";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,10 +17,11 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, LogOut } from "lucide-react";
+import { ArrowLeft, Save, LogOut, Copy, Crown, Gift, Zap } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 const DELAY_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
 const VALIDITY_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
@@ -50,6 +52,8 @@ export default function Settings() {
   const navigate = useNavigate();
   const { profile, isLoading, update } = useProfile();
   const { signOut } = useAuth();
+  const { subscription, startCheckout, isStartingCheckout, openPortal, isOpeningPortal } =
+    useSubscription();
 
   const { register, handleSubmit, reset, watch, setValue } = useForm<SettingsForm>();
 
@@ -343,6 +347,103 @@ export default function Settings() {
             </Button>
           </div>
         </form>
+
+        {/* ── Abonnement ──────────────────────────────────────── */}
+        <Card className={subscription?.isPro ? "border-blue-200 bg-blue-50/40" : ""}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-yellow-500" />
+                Mon abonnement
+              </CardTitle>
+              {subscription?.isPro ? (
+                <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                  {subscription.isTrialing ? "Essai" : "Pro"} ✓
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Gratuit</Badge>
+              )}
+            </div>
+            <CardDescription>
+              {subscription?.isPro
+                ? subscription.isTrialing && subscription.trialEndsAt
+                  ? `Essai jusqu'au ${subscription.trialEndsAt.toLocaleDateString("fr-FR")}`
+                  : subscription.currentPeriodEnd
+                  ? `Renouvellement le ${subscription.currentPeriodEnd.toLocaleDateString("fr-FR")}`
+                  : "Abonnement Pro actif"
+                : "Passez Pro pour débloquer toutes les fonctionnalités"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {subscription?.isPro ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openPortal()}
+                disabled={isOpeningPortal}
+              >
+                {isOpeningPortal ? "Ouverture..." : "Gérer l'abonnement"}
+              </Button>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => startCheckout()}
+                  disabled={isStartingCheckout}
+                >
+                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                  {isStartingCheckout ? "Redirection..." : "Passer Pro — 14 j gratuits"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/pricing")}>
+                  Voir les offres
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Parrainage ──────────────────────────────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5 text-green-500" />
+              Parrainage
+            </CardTitle>
+            <CardDescription>
+              Parrainez un artisan → vous gagnez <strong>1 mois offert</strong> dès qu'il passe Pro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {subscription?.referralCode ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded-md bg-gray-100 px-3 py-2 text-sm font-mono tracking-widest">
+                    {subscription.referralCode}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const url = `${window.location.origin}/?ref=${subscription.referralCode}`;
+                      navigator.clipboard.writeText(url);
+                      toast.success("Lien copié !");
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                {(subscription.referralCreditsMonths ?? 0) > 0 && (
+                  <p className="text-sm text-green-700 font-medium">
+                    Vous avez {subscription.referralCreditsMonths} mois de crédit en attente.
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">Votre code de parrainage est en cours de génération…</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Déconnexion */}
         <div className="mt-8 mb-24">

@@ -44,3 +44,14 @@ verify_jwt = false
 
 [functions.notify-new-signup]
 verify_jwt = false
+
+# Paiement Stripe
+[functions.create-checkout-session]
+verify_jwt = true
+
+[functions.create-portal-session]
+verify_jwt = true
+
+# Le webhook Stripe n'utilise pas de JWT — il est authentifié par la signature Stripe
+[functions.stripe-webhook]
+verify_jwt = false
