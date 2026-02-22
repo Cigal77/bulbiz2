@@ -1,73 +1,65 @@
 
+# Connexion Gmail personnelle via Google Cloud Console
 
-# Mot de passe oublie / Reinitialisation
+## Ce que tu veux
+Ajouter dans les Parametres un bloc "Connexion Gmail" qui permet a chaque artisan de connecter **son propre compte Gmail** pour envoyer les emails (devis, factures, relances) depuis sa propre adresse Gmail au lieu de `noreply@bulbiz.fr`. Chaque connexion est privee et liee uniquement au compte de l'utilisateur.
 
-## Approche
+## Comment ca marche
 
-Supabase Auth fournit nativement `resetPasswordForEmail()` et `updateUser()`. Pas besoin de creer des tokens manuels, des tables supplementaires ou des edge functions. Le flux est entierement gere par le backend d'authentification integre.
+1. Tu crees un projet sur **Google Cloud Console** avec les identifiants OAuth 2.0 (Client ID + Client Secret)
+2. Dans Bulbiz, tu cliques "Connecter Gmail" -- ca te redirige vers Google pour autoriser l'acces
+3. Bulbiz stocke le token de facon securisee, lie a ton user_id
+4. Les emails sont ensuite envoyes via l'API Gmail au lieu de Resend
 
-## Modifications
+## Plan technique
 
-### 1. Page Auth (`src/pages/Auth.tsx`)
+### Etape 1 -- Stocker les secrets Google OAuth (cote serveur)
 
-- Ajouter un mode `"reset"` au type `AuthMode` existant (`"login" | "signup" | "magic" | "reset"`)
-- Ajouter un lien "Mot de passe oublie ?" sous le champ mot de passe (mode login)
-- En mode `reset` : afficher un formulaire email seul + bouton "Envoyer le lien"
-- Appeler `supabase.auth.resetPasswordForEmail({ email, options: { redirectTo: window.location.origin + "/auth?mode=update-password" } })`
-- Toujours afficher le meme message de confirmation quel que soit l'email (securite : ne pas reveler si le compte existe)
+Tu devras fournir ton **Google Client ID** et **Google Client Secret** (crees dans Google Cloud Console). Ils seront stockes comme secrets backend accessibles par les fonctions serveur.
 
-### 2. Page de mise a jour du mot de passe (`src/pages/ResetPassword.tsx`)
-
-- Nouvelle page avec route `/reset-password`
-- Supabase redirige l'utilisateur avec un token dans le hash de l'URL. Le client Supabase detecte automatiquement ce token via `onAuthStateChange` (evenement `PASSWORD_RECOVERY`)
-- Formulaire : nouveau mot de passe + confirmation
-- Validation : minimum 10 caracteres, au moins 1 lettre et 1 chiffre
-- Indicateur visuel de force du mot de passe (barre coloree)
-- Appeler `supabase.auth.updateUser({ password })` pour mettre a jour
-- En cas de succes : afficher un message et rediriger vers `/auth`
-- En cas d'erreur (lien expire/invalide) : message clair + bouton "Renvoyer un lien"
-
-### 3. Routing (`src/App.tsx`)
-
-- Ajouter la route `/reset-password` pointant vers `ResetPassword`
-
-### 4. Detection du token de recovery (`src/hooks/useAuth.tsx`)
-
-- Ecouter l'evenement `PASSWORD_RECOVERY` dans `onAuthStateChange` pour detecter automatiquement quand l'utilisateur arrive via le lien de reset et le rediriger vers `/reset-password`
-
-## Details techniques
-
-### Flux complet
+### Etape 2 -- Nouvelle table `gmail_connections`
 
 ```text
-1. Utilisateur clique "Mot de passe oublie ?" sur /auth
-2. Saisit son email, clique "Envoyer"
-3. Supabase envoie un email avec lien vers {origin}/reset-password#access_token=...
-4. Utilisateur clique le lien dans l'email
-5. Le client Supabase detecte le token, emet PASSWORD_RECOVERY
-6. useAuth redirige vers /reset-password
-7. Utilisateur saisit nouveau mot de passe
-8. supabase.auth.updateUser({ password }) applique le changement
-9. Redirection vers /auth avec message de succes
+gmail_connections
+- id (uuid, PK)
+- user_id (uuid, unique, FK vers auth.users)
+- gmail_address (text)
+- access_token (text, chiffre)
+- refresh_token (text, chiffre)
+- token_expires_at (timestamptz)
+- created_at (timestamptz)
+- updated_at (timestamptz)
 ```
 
-### Validation mot de passe
-- Minimum 10 caracteres
-- Au moins 1 lettre (`/[a-zA-Z]/`)
-- Au moins 1 chiffre (`/[0-9]/`)
-- Barre de force : rouge (faible) / orange (moyen) / vert (fort)
+Politiques RLS : chaque utilisateur ne voit/modifie que sa propre connexion.
+
+### Etape 3 -- Edge Function `gmail-oauth`
+
+Deux endpoints :
+- **`action: authorize`** : Genere l'URL de redirection Google OAuth avec les scopes `gmail.send` + `userinfo.email`. Redirige vers `/parametres?gmail=callback`.
+- **`action: callback`** : Recoit le code d'autorisation, l'echange contre des tokens (access + refresh), stocke dans `gmail_connections`.
+- **`action: disconnect`** : Supprime la connexion Gmail.
+- **`action: status`** : Verifie si une connexion active existe.
+
+### Etape 4 -- Bloc UI dans Settings
+
+Nouveau card "Connexion Gmail" dans la page Parametres :
+
+- **Etat deconnecte** : Bouton "Connecter mon Gmail" avec icone Google
+- **Etat connecte** : Affiche l'adresse Gmail connectee + bouton "Deconnecter"
+- Explication claire : "Les emails seront envoyes depuis votre adresse Gmail personnelle"
+
+### Etape 5 -- Modifier l'envoi d'emails
+
+Dans chaque edge function d'envoi (send-quote, send-invoice, send-relance, etc.) :
+1. Verifier si l'utilisateur a une `gmail_connection` active
+2. Si oui : envoyer via l'API Gmail (`POST googleapis.com/gmail/v1/users/me/messages/send`) avec le token
+3. Si non : continuer avec Resend (comportement actuel)
+4. Si le token est expire : utiliser le refresh_token pour en obtenir un nouveau
 
 ### Securite
-- Message generique apres demande de reset (pas de fuite d'information)
-- Le token est a usage unique et expire (gere par Supabase)
-- Pas de table custom necessaire (Supabase gere les tokens de recovery en interne)
 
-## Fichiers concernes
-
-| Fichier | Action |
-|---------|--------|
-| `src/pages/Auth.tsx` | Ajouter mode "reset" + lien "Mot de passe oublie" |
-| `src/pages/ResetPassword.tsx` | Creer (formulaire nouveau mot de passe) |
-| `src/App.tsx` | Ajouter route `/reset-password` |
-| `src/hooks/useAuth.tsx` | Detecter evenement `PASSWORD_RECOVERY` |
-
+- Les tokens sont stockes cote serveur uniquement (jamais exposes au frontend)
+- RLS strict : un utilisateur ne peut acceder qu'a sa propre connexion
+- Le refresh_token permet de renouveler l'acces sans re-autorisation
+- Scope minimal : uniquement `gmail.send` (pas de lecture de mails)
