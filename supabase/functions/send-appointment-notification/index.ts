@@ -7,6 +7,43 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Gmail helpers ──
+async function refreshGmailTokenFn(supabase: any, userId: string, connection: any): Promise<string | null> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  if (!clientId || !clientSecret || !connection.refresh_token) return null;
+  try {
+    const resp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: connection.refresh_token, grant_type: "refresh_token" }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) return null;
+    await supabase.from("gmail_connections").update({ access_token: data.access_token, token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString() }).eq("user_id", userId);
+    return data.access_token;
+  } catch { return null; }
+}
+
+async function sendViaGmailFn(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
+  const message = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`, `MIME-Version: 1.0`, `Content-Type: text/html; charset=UTF-8`, ``, html].join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
+  if (!resp.ok) { const err = await resp.text(); console.error("Gmail API error:", err); return false; }
+  await resp.json();
+  return true;
+}
+
+async function getGmailConnectionFn(supabase: any, userId: string) {
+  const { data: conn } = await supabase.from("gmail_connections").select("*").eq("user_id", userId).maybeSingle();
+  if (!conn) return null;
+  if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+    const newToken = await refreshGmailTokenFn(supabase, userId, conn);
+    if (newToken) { conn.access_token = newToken; } else { return null; }
+  }
+  return conn;
+}
+
 type EventType = "APPOINTMENT_REQUESTED" | "SLOTS_PROPOSED" | "APPOINTMENT_CONFIRMED";
 type NotifStatus = "SENT" | "FAILED" | "SKIPPED";
 
@@ -265,7 +302,31 @@ Deno.serve(async (req: Request) => {
       result.email_status = "FAILED";
     } else {
       const resendKey = Deno.env.get("RESEND_API_KEY");
-      if (!resendKey) {
+      // Try Gmail first
+      const gmailConn = await getGmailConnectionFn(supabase, user.id);
+      let gmailSent = false;
+
+      if (gmailConn) {
+        const template = getEmailTemplate(event_type as EventType, notifPayload);
+        gmailSent = await sendViaGmailFn(
+          gmailConn.access_token,
+          `${artisanName} <${gmailConn.gmail_address}>`,
+          clientEmail,
+          template.subject,
+          template.html
+        );
+      }
+
+      if (gmailSent) {
+        await supabase.from("notification_logs").insert({
+          dossier_id, event_type, channel: "email", recipient: clientEmail, status: "SENT",
+        });
+        await supabase.from("historique").insert({
+          dossier_id, user_id: user.id, action: "notification_sent",
+          details: `Email envoyé via Gmail : ${label} → ${clientEmail}`,
+        });
+        result.email_status = "SENT";
+      } else if (!resendKey) {
         await supabase.from("notification_logs").insert({
           dossier_id,
           event_type,
