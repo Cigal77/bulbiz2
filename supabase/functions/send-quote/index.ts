@@ -7,6 +7,88 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Gmail helpers ──
+async function refreshGmailToken(supabase: any, userId: string, connection: any): Promise<string | null> {
+  const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
+  const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
+  if (!clientId || !clientSecret || !connection.refresh_token) return null;
+
+  try {
+    const resp = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: connection.refresh_token,
+        grant_type: "refresh_token",
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) return null;
+
+    const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
+    await supabase.from("gmail_connections").update({
+      access_token: data.access_token,
+      token_expires_at: expiresAt,
+    }).eq("user_id", userId);
+
+    return data.access_token;
+  } catch { return null; }
+}
+
+async function sendViaGmail(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    html,
+  ].join("\r\n");
+
+  const raw = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ raw }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error("Gmail API error:", err);
+    return false;
+  }
+  await resp.json();
+  return true;
+}
+
+async function getGmailConnection(supabase: any, userId: string) {
+  const { data: conn } = await supabase
+    .from("gmail_connections")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!conn) return null;
+
+  // Check if token is expired
+  if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
+    const newToken = await refreshGmailToken(supabase, userId, conn);
+    if (newToken) {
+      conn.access_token = newToken;
+    } else {
+      return null;
+    }
+  }
+  return conn;
+}
+
 async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
@@ -127,15 +209,19 @@ Deno.serve(async (req: Request) => {
     const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
     const validationUrl = `${origin}/devis/validation?token=${signatureToken}`;
 
-    // Send email
+    // Send email - try Gmail first, fallback to Resend
     if (dossier.client_email) {
-      const resend = new Resend(resendKey);
-      await resend.emails.send({
-        from: `${artisanName} <noreply@bulbiz.fr>`,
-        to: [dossier.client_email],
-        subject: `${artisanName} – Votre devis`,
-        html: `
-          <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      const gmailConn = await getGmailConnection(supabase, user.id);
+      let emailSent = false;
+
+      if (gmailConn) {
+        const fromAddr = gmailConn.gmail_address;
+        emailSent = await sendViaGmail(
+          gmailConn.access_token,
+          `${artisanName} <${fromAddr}>`,
+          dossier.client_email,
+          `${artisanName} – Votre devis`,
+          `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <p>Bonjour ${dossier.client_first_name || ""},</p>
             <p>Veuillez trouver ci-joint votre devis.</p>
             <p style="margin: 24px 0;">
@@ -149,9 +235,36 @@ Deno.serve(async (req: Request) => {
             ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
             <br/>
             <p style="white-space: pre-line;">${signature}</p>
-          </div>
-        `,
-      });
+          </div>`
+        );
+      }
+
+      if (!emailSent) {
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (resendKey) {
+          const resend = new Resend(resendKey);
+          await resend.emails.send({
+            from: `${artisanName} <noreply@bulbiz.fr>`,
+            to: [dossier.client_email],
+            subject: `${artisanName} – Votre devis`,
+            html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <p>Bonjour ${dossier.client_first_name || ""},</p>
+              <p>Veuillez trouver ci-joint votre devis.</p>
+              <p style="margin: 24px 0;">
+                <a href="${validationUrl}" style="background-color: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">
+                  ✅ Voir et valider le devis
+                </a>
+              </p>
+              <p style="font-size: 13px; color: #6b7280;">Ce lien est valable 30 jours.</p>
+              <p>N'hésitez pas à nous contacter pour toute question.</p>
+              ${profile?.email ? `<p style="font-size: 13px; color: #374151;">Email : ${profile.email}</p>` : ""}
+              ${profile?.phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${profile.phone}</p>` : ""}
+              <br/>
+              <p style="white-space: pre-line;">${signature}</p>
+            </div>`,
+          });
+        }
+      }
 
       await supabase.from("historique").insert({
         dossier_id: dossier.id,
