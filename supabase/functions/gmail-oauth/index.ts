@@ -89,16 +89,9 @@ Deno.serve(async (req: Request) => {
       });
       const userinfo = await userinfoResp.json();
 
-      // Verify Gmail service is actually enabled by checking the profile
-      const gmailCheckResp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` },
-      });
-      if (!gmailCheckResp.ok) {
-        const errData = await gmailCheckResp.json().catch(() => ({}));
-        console.error("Gmail service check failed:", errData);
-        throw new Error(
-          `Le service Gmail n'est pas activé pour ${userinfo.email}. Connectez un compte Gmail (pas iCloud, Outlook, etc.).`
-        );
+      // Basic validation
+      if (!userinfo.email) {
+        throw new Error("Impossible de récupérer l'email du compte Google.");
       }
 
       const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
