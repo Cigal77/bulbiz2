@@ -8,6 +8,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Set up the auth state change listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("[useAuth] onAuthStateChange:", event, "session:", !!session, "user:", session?.user?.email);
@@ -20,11 +21,24 @@ export function useAuth() {
       }
     );
 
+    // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log("[useAuth] getSession:", "session:", !!session, "user:", session?.user?.email);
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      // Only set loading to false if there's no hash with tokens being processed
+      // The hash tokens will be handled by onAuthStateChange
+      const hash = window.location.hash;
+      const hasOAuthTokens = hash && (hash.includes("access_token") || hash.includes("refresh_token"));
+      if (!hasOAuthTokens || session) {
+        setLoading(false);
+      }
+      // If we have OAuth tokens in hash but no session yet, wait for onAuthStateChange
+      // Set a timeout as a fallback to avoid infinite loading
+      if (hasOAuthTokens && !session) {
+        console.log("[useAuth] OAuth tokens detected in URL hash, waiting for session...");
+        setTimeout(() => setLoading(false), 5000);
+      }
     });
 
     return () => subscription.unsubscribe();
