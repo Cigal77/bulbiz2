@@ -276,8 +276,53 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
-    // ──── Early statuses with complete info → Fixer RDV ────
-    if (["nouveau", "a_qualifier", "en_attente_rdv"].includes(status)) {
+    // ──── Early statuses with complete info → Créer devis ────
+    if (["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
+      return {
+        message: "Prochaine étape : Créer le devis",
+        hint: "Établissez le devis avant de planifier l'intervention. Vous pouvez aussi proposer un RDV à tout moment.",
+        primaryLabel: "Importer devis (PDF)",
+        primaryIcon: <FileText className="h-4 w-4" />,
+        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
+        secondaryLabel: "Proposer un RDV",
+        secondaryAction: () => onScrollToAppointment?.(),
+      };
+    }
+
+    // ──── Devis envoyé → Waiting for signature ────
+    if (status === "devis_envoye") {
+      return {
+        message: "En attente de la signature du client",
+        hint: "Le devis a été envoyé. Relancez si le client tarde à répondre. Vous pouvez aussi proposer un RDV.",
+        primaryLabel: "Renvoyer le devis",
+        primaryIcon: <Send className="h-4 w-4" />,
+        primaryAction: () => {
+          if (quotes.length > 0 && quotes[0].status === "envoye") {
+            supabase.functions.invoke("send-quote", { body: { quote_id: quotes[0].id } })
+              .then(() => toast({ title: "Devis renvoyé !" }))
+              .catch((e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }));
+          }
+        },
+        secondaryLabel: "Proposer un RDV",
+        secondaryAction: () => onScrollToAppointment?.(),
+      };
+    }
+
+    // ──── Devis signé → Planifier RDV intervention ────
+    if (status === "devis_signe") {
+      return {
+        message: "Prochaine étape : Planifier le RDV d'intervention",
+        hint: "Le devis est signé. Proposez des créneaux au client ou fixez le RDV directement.",
+        primaryLabel: "Proposer des créneaux",
+        primaryIcon: <Calendar className="h-4 w-4" />,
+        primaryAction: () => onScrollToAppointment?.(),
+        secondaryLabel: "Fixer le RDV manuellement",
+        secondaryAction: () => setShowManualRdv(true),
+      };
+    }
+
+    // ──── En attente RDV → Proposer créneaux ────
+    if (status === "en_attente_rdv") {
       return {
         message: "Prochaine étape : Fixer un rendez-vous",
         hint: "Proposez des créneaux au client ou fixez le RDV directement.",
@@ -301,7 +346,7 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
 
       return {
         message: `Intervention prévue ${dateInfo}${timeInfo}`,
-        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer au devis.",
+        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer à la facturation.",
         primaryLabel: "Marquer intervention terminée",
         primaryIcon: <CheckCircle2 className="h-4 w-4" />,
         primaryAction: () => markDone.mutate(),
@@ -309,39 +354,11 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       };
     }
 
-    // ──── RDV terminé / Devis à faire → Importer devis ────
-    if (status === "rdv_termine" || status === "devis_a_faire") {
-      return {
-        message: "Prochaine étape : Importer le devis",
-        hint: "L'intervention est terminée. Envoyez le devis au client.",
-        primaryLabel: "Importer devis (PDF)",
-        primaryIcon: <FileText className="h-4 w-4" />,
-        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
-      };
-    }
-
-    // ──── Devis envoyé → Waiting for signature ────
-    if (status === "devis_envoye") {
-      return {
-        message: "En attente de la signature du client",
-        hint: "Le devis a été envoyé. Relancez si le client tarde à répondre.",
-        primaryLabel: "Renvoyer le devis",
-        primaryIcon: <Send className="h-4 w-4" />,
-        primaryAction: () => {
-          if (quotes.length > 0 && quotes[0].status === "envoye") {
-            supabase.functions.invoke("send-quote", { body: { quote_id: quotes[0].id } })
-              .then(() => toast({ title: "Devis renvoyé !" }))
-              .catch((e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }));
-          }
-        },
-      };
-    }
-
-    // ──── Devis signé → Facturer ────
-    if (status === "devis_signe") {
+    // ──── RDV terminé → Facturer ────
+    if (status === "rdv_termine") {
       return {
         message: "Prochaine étape : Importer la facture",
-        hint: "Le devis est signé. Envoyez la facture au client.",
+        hint: "L'intervention est terminée. Envoyez la facture au client.",
         primaryLabel: "Importer facture (PDF)",
         primaryIcon: <Receipt className="h-4 w-4" />,
         primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-facture")),

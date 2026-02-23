@@ -18,42 +18,48 @@ type Step = {
 export function DossierProgressBanner({ dossier }: DossierProgressBannerProps) {
   const status = dossier.status;
 
-  // New flow: Dossier → RDV → Devis → Facture
-  const statusOrder = [
-    "nouveau", "a_qualifier", "en_attente_rdv", "rdv_pris", "rdv_termine",
-    "devis_a_faire", "devis_envoye", "devis_signe", "clos_signe",
-    "invoice_pending", "invoice_paid",
-  ];
-  const currentIdx = statusOrder.indexOf(status);
+  // Flow: Dossier → Devis → RDV → Facture
+  const isPostDevisSigne = ["devis_signe", "clos_signe", "en_attente_rdv", "rdv_pris", "rdv_termine", "invoice_pending", "invoice_paid"].includes(status);
+  const isPostRdvTermine = ["rdv_termine", "invoice_pending", "invoice_paid"].includes(status);
 
-  // Determine step completion based on status progression
-  const isPostRdvTermine = ["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe", "clos_signe", "invoice_pending", "invoice_paid"].includes(status);
-  const isPostDevisSigne = ["devis_signe", "clos_signe", "invoice_pending", "invoice_paid"].includes(status);
+  // Map status to a rough index for Dossier step completion
+  const earlyStatuses = ["nouveau", "a_qualifier"];
+  const devisStatuses = ["devis_a_faire", "devis_envoye", "devis_signe"];
+  const rdvStatuses = ["en_attente_rdv", "rdv_pris", "rdv_termine"];
+
+  const isDossierDone = !earlyStatuses.includes(status);
+  const isDossierActive = earlyStatuses.includes(status);
+
+  const isDevisActive = devisStatuses.includes(status);
+  const isDevisDone = isPostDevisSigne;
+
+  const isRdvActive = rdvStatuses.includes(status);
+  const isRdvDone = isPostRdvTermine;
 
   const steps: Step[] = [
     {
       key: "dossier",
       label: "Dossier",
-      subLabel: currentIdx <= 1 ? "Nouveau" : "Complété",
+      subLabel: isDossierActive ? "Nouveau" : "Complété",
       icon: <FileText className="h-4 w-4" />,
-      done: currentIdx > 1,
-      active: currentIdx <= 1,
-    },
-    {
-      key: "rdv",
-      label: "RDV",
-      subLabel: status === "en_attente_rdv" ? "En attente" : status === "rdv_pris" ? "Pris" : isPostRdvTermine ? "Terminé" : undefined,
-      icon: <Calendar className="h-4 w-4" />,
-      done: isPostRdvTermine,
-      active: status === "en_attente_rdv" || status === "rdv_pris",
+      done: isDossierDone,
+      active: isDossierActive,
     },
     {
       key: "devis",
       label: "Devis",
       subLabel: status === "devis_a_faire" ? "À faire" : status === "devis_envoye" ? "Envoyé" : isPostDevisSigne ? "Signé" : undefined,
       icon: <ClipboardList className="h-4 w-4" />,
-      done: isPostDevisSigne,
-      active: status === "devis_a_faire" || status === "devis_envoye" || status === "rdv_termine",
+      done: isDevisDone,
+      active: isDevisActive,
+    },
+    {
+      key: "rdv",
+      label: "RDV",
+      subLabel: status === "en_attente_rdv" ? "En attente" : status === "rdv_pris" ? "Pris" : isPostRdvTermine ? "Terminé" : undefined,
+      icon: <Calendar className="h-4 w-4" />,
+      done: isRdvDone,
+      active: isRdvActive,
     },
     {
       key: "facture",
