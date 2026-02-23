@@ -42,10 +42,15 @@ export function GoogleCalendarCard() {
       setGoogleEmail(data.google_email);
       toast.success(`Google Calendar connecté : ${data.google_email}`);
     } catch (e: any) {
-      toast.error(`Erreur : ${e.message}`);
+      const msg = e.message || "Erreur inconnue";
+      const isConfig = msg.includes("URI") || msg.includes("redirect") || msg.includes("invalid_grant") || msg.includes("Google Cloud");
+      toast.error(isConfig
+        ? "Configuration Google Cloud incomplète. Vérifiez les URIs de redirection autorisées."
+        : `Erreur : ${msg}`,
+        { duration: 8000 }
+      );
     } finally {
       setActionLoading(false);
-      // Clean URL
       searchParams.delete("code");
       searchParams.delete("scope");
       searchParams.delete("state");

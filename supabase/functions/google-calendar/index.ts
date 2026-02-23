@@ -89,7 +89,16 @@ Deno.serve(async (req: Request) => {
         }),
       });
       const tokenData = await tokenResp.json();
-      if (!tokenResp.ok) throw new Error(tokenData.error_description || "Token exchange failed");
+      if (!tokenResp.ok) {
+        console.error("Google Calendar token exchange failed:", JSON.stringify(tokenData));
+        console.error("redirect_uri used:", redirect_uri);
+        const hint = tokenData.error === "redirect_uri_mismatch"
+          ? "L'URI de redirection n'est pas autorisée dans Google Cloud Console. Ajoutez : " + redirect_uri
+          : tokenData.error === "invalid_grant"
+          ? "Code expiré ou URI de redirection incorrecte. Vérifiez la configuration Google Cloud."
+          : tokenData.error_description || "Échec de l'échange de token";
+        throw new Error(hint);
+      }
 
       const userinfoResp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
