@@ -45,6 +45,10 @@ export default function Auth() {
       }
     } catch (error: any) {
       console.error("[Auth] Google sign in error:", error);
+      console.error("[Auth] caught error:", error);
+      console.error("[Auth] error.message:", error?.message);
+      console.error("[Auth] error.status:", error?.status);
+      console.error("[Auth] error stack:", error?.stack);
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de la connexion Google",
