@@ -263,60 +263,6 @@ export default function CreateDossier() {
 
               <FormField
                 control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Catégorie</FormLabel>
-                    <div className="flex flex-wrap gap-2">
-                      {CATEGORIES.map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => field.onChange(cat)}
-                          className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
-                            field.value === cat
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-card text-muted-foreground hover:border-primary/30"
-                          }`}
-                        >
-                          {CATEGORY_LABELS[cat]}
-                        </button>
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="urgency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Urgence</FormLabel>
-                    <div className="flex gap-2">
-                      {URGENCIES.map((urg) => (
-                        <button
-                          key={urg}
-                          type="button"
-                          onClick={() => field.onChange(urg)}
-                          className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium text-center transition-all ${
-                            field.value === urg
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border bg-card text-muted-foreground hover:border-primary/30"
-                          }`}
-                        >
-                          {URGENCY_LABELS[urg]}
-                        </button>
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
