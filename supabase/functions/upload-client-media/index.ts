@@ -31,14 +31,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate file type
+    // Validate file type (strip codec params like "video/webm;codecs=vp9,opus")
+    const baseType = file.type.split(";")[0].trim().toLowerCase();
     const allowedTypes = [
       "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
       "video/mp4", "video/quicktime", "video/webm", "video/3gpp",
       "audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/aac",
       "application/pdf",
     ];
-    if (!allowedTypes.includes(file.type)) {
+    if (!allowedTypes.includes(baseType)) {
       return new Response(
         JSON.stringify({ error: `Type de fichier non autorisé : ${file.type}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
