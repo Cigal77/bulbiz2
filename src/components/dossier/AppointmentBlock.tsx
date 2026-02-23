@@ -320,7 +320,14 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       await addHistorique("rdv_confirmed", `Rendez-vous fixé manuellement : ${dateStr} ${manualStart}–${manualEnd}`);
 
       try {
-        await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${manualStart}–${manualEnd}` });
+        const fullAddress = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
+        await sendNotification("APPOINTMENT_CONFIRMED", {
+          appointment_date: dateStr,
+          appointment_time: manualStart,
+          appointment_time_end: manualEnd,
+          address: fullAddress,
+          raw_date: manualDate,
+        });
       } catch (e) {
         console.error("Notification error after manual rdv:", e);
       }
@@ -364,7 +371,14 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       await addHistorique("rdv_confirmed", `Rendez-vous confirmé : ${dateStr} ${selected.time_start}–${selected.time_end}`);
 
       try {
-        await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${selected.time_start.slice(0, 5)}–${selected.time_end.slice(0, 5)}` });
+        const fullAddress2 = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
+        await sendNotification("APPOINTMENT_CONFIRMED", {
+          appointment_date: dateStr,
+          appointment_time: selected.time_start.slice(0, 5),
+          appointment_time_end: selected.time_end.slice(0, 5),
+          address: fullAddress2,
+          raw_date: selected.slot_date,
+        });
       } catch (e) {
         console.error("Notification error after confirm slot:", e);
       }
