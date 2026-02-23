@@ -36,6 +36,9 @@ export default function Auth() {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin + "/auth",
       });
+      console.log("[Auth] result:", JSON.stringify(result));
+      console.log("[Auth] result.error:", result?.error);
+      console.log("[Auth] result.redirected:", result?.redirected);
       if (result.error) throw result.error;
       if (!result.redirected) {
         navigate("/");
