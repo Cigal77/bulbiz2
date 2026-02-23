@@ -89,6 +89,17 @@ Deno.serve(async (req) => {
         .eq("dossier_id", dossier.id)
         .order("slot_date", { ascending: true });
 
+      // Fetch artisan profile for branding
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_name, first_name, last_name, phone, email, logo_url")
+        .eq("user_id", dossier.user_id)
+        .maybeSingle();
+
+      const artisan_name = profile?.company_name
+        || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
+        || "Votre artisan";
+
       return new Response(JSON.stringify({
         dossier_id: dossier.id,
         client_first_name: dossier.client_first_name,
@@ -102,6 +113,8 @@ Deno.serve(async (req) => {
         status: dossier.status,
         appointment_status: dossier.appointment_status,
         appointment_slots: slots || [],
+        artisan_name,
+        artisan_logo_url: profile?.logo_url || null,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       

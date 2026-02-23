@@ -42,6 +42,8 @@ interface DossierData {
   status: string;
   appointment_status?: string;
   appointment_slots?: SlotData[];
+  artisan_name?: string;
+  artisan_logo_url?: string | null;
 }
 
 function validateEmail(email: string): boolean {
@@ -335,7 +337,9 @@ export default function ClientForm() {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
-          <div className="max-w-lg mx-auto"><BulbizLogo size={20} /></div>
+          <div className="max-w-lg mx-auto">
+            <span className="text-lg font-bold text-foreground">{dossier?.artisan_name || "Votre artisan"}</span>
+          </div>
         </header>
         <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
           <Card>
@@ -355,21 +359,21 @@ export default function ClientForm() {
                     key={slot.id}
                     onClick={() => setSelectedSlotId(slot.id)}
                     className={cn(
-                      "w-full text-left rounded-xl border-2 p-4 transition-all",
-                      isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-border hover:border-primary/40 bg-card"
+                      "w-full text-left rounded-xl border-2 p-4 min-h-[56px] transition-all active:scale-[0.98]",
+                      isSelected ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20" : "border-border hover:border-primary/40 bg-card"
                     )}
                   >
                     <div className="flex items-center gap-3">
                       <div className={cn(
-                        "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0",
+                        "h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
                         isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
                       )}>
-                        {isSelected && <div className="h-2 w-2 rounded-full bg-white" />}
+                        {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-foreground">{formatSlotDate(slot.slot_date)}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Clock className="h-3 w-3" />
+                        <p className="text-base font-semibold text-foreground">{formatSlotDate(slot.slot_date)}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3.5 w-3.5" />
                           {slot.time_start.slice(0, 5)} – {slot.time_end.slice(0, 5)}
                         </p>
                       </div>
@@ -381,14 +385,16 @@ export default function ClientForm() {
                 );
               })}
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button onClick={handleSlotSelect} disabled={!selectedSlotId || selectingSlot} className="w-full mt-4 gap-2">
-                {selectingSlot ? (<><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>) : "Confirmer ce créneau"}
-              </Button>
-              {alreadySelected && selectedSlotId === alreadySelected.id && (
-                <p className="text-xs text-muted-foreground text-center">Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre.</p>
-              )}
             </CardContent>
           </Card>
+          <div className="sticky bottom-4 px-2">
+            <Button onClick={handleSlotSelect} disabled={!selectedSlotId || selectingSlot} className="w-full h-12 text-base gap-2 shadow-lg">
+              {selectingSlot ? (<><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>) : "Confirmer ce créneau"}
+            </Button>
+            {alreadySelected && selectedSlotId === alreadySelected.id && (
+              <p className="text-xs text-muted-foreground text-center mt-2">Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre.</p>
+            )}
+          </div>
         </main>
       </div>
     );
@@ -402,7 +408,9 @@ export default function ClientForm() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur px-4 py-3">
-        <div className="max-w-lg mx-auto"><BulbizLogo size={20} /></div>
+        <div className="max-w-lg mx-auto">
+          <span className="text-lg font-bold text-foreground">{dossier?.artisan_name || "Votre artisan"}</span>
+        </div>
       </header>
 
       <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
