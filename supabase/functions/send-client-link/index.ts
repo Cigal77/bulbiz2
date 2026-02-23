@@ -99,8 +99,8 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) throw new Error("Missing authorization header");
 
     // Extract user_id from JWT (already verified by infrastructure)
-    const token = authHeader.replace("Bearer ", "");
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const jwtToken = authHeader.replace("Bearer ", "");
+    const payload = JSON.parse(atob(jwtToken.split(".")[1]));
     const userId = payload.sub;
     if (!userId) throw new Error("Unauthorized");
 
