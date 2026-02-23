@@ -164,16 +164,13 @@ export function useInvoiceActions(dossierId: string) {
         .maybeSingle();
       if (pErr) throw pErr;
 
-      const year = new Date().getFullYear();
-      const { count, error: cErr } = await supabase
-      .from("invoices")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", `${year}-01-01T00:00:00.000Z`)
-      .lt("created_at", `${year + 1}-01-01T00:00:00.000Z`);
-      if (cErr) throw cErr;
-      const seq = (count ?? 0) + 1;
-      const invoiceNumber = `FAC-${year}-${String(seq).padStart(4, "0")}`;
+      const clientName = dossier?.client_last_name || dossier?.client_first_name || null;
+      const { data: numData, error: numError } = await supabase.rpc("generate_invoice_number", {
+        p_user_id: user.id,
+        p_client_name: clientName,
+      });
+      if (numError) throw numError;
+      const invoiceNumber = numData as string;
 
       // Upload PDF (même bucket que devis)
       const filePath = `${dossierId}/facture_${Date.now()}.pdf`;

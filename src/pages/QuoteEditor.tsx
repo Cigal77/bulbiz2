@@ -76,8 +76,10 @@ export default function QuoteEditor() {
           total_ht, total_tva, total_ttc,
         }).eq("id", currentQuoteId);
       } else {
+        const clientName = dossier?.client_last_name || dossier?.client_first_name || null;
         const { data: numData, error: numError } = await supabase.rpc("generate_quote_number", {
           p_user_id: user.id,
+          p_client_name: clientName,
         });
         if (numError) throw numError;
         setQuoteNumber(numData as string);

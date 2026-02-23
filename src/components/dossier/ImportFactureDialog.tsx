@@ -49,7 +49,7 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
       let finalNumber = invoiceNumber.trim();
 
       if (!finalNumber) {
-        const { data: dossier, error: dossierErr } = await supabase
+        const { data: dossierData, error: dossierErr } = await supabase
           .from("dossiers")
           .select("client_last_name, client_first_name")
           .eq("id", dossierId)
@@ -57,13 +57,13 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
 
         if (dossierErr) throw dossierErr;
 
-        const normalize = (s: string) =>
-          s.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "").toUpperCase();
-
-        const last = dossier?.client_last_name ? normalize(dossier.client_last_name) : "CLIENT";
-        const firstInitial = dossier?.client_first_name ? normalize(dossier.client_first_name)[0] : "X";
-
-        finalNumber = `FACT-${last}_${firstInitial}`;
+        const clientName = dossierData?.client_last_name || dossierData?.client_first_name || null;
+        const { data: numData, error: numError } = await supabase.rpc("generate_invoice_number", {
+          p_user_id: user.id,
+          p_client_name: clientName,
+        });
+        if (numError) throw numError;
+        finalNumber = numData as string;
       }
 
       // Upload PDF

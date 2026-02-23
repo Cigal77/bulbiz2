@@ -67,13 +67,13 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
 
         if (dossierErr) throw dossierErr;
 
-        const normalize = (s: string) =>
-          s.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "").toUpperCase();
-
-        const last = dossier?.client_last_name ? normalize(dossier.client_last_name) : "CLIENT";
-        const firstInitial = dossier?.client_first_name ? normalize(dossier.client_first_name)[0] : "X";
-
-        finalNumber = `DEV-${last}_${firstInitial}`;
+        const clientName = dossier?.client_last_name || dossier?.client_first_name || null;
+        const { data: numData, error: numError } = await supabase.rpc("generate_quote_number", {
+          p_user_id: user.id,
+          p_client_name: clientName,
+        });
+        if (numError) throw numError;
+        finalNumber = numData as string;
       }
 
       // Upload PDF
