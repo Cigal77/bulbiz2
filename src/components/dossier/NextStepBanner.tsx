@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -9,20 +9,31 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { useInvoices, useInvoiceActions } from "@/hooks/useInvoices";
+import { useInvoices } from "@/hooks/useInvoices";
 import { useQuotes } from "@/hooks/useQuotes";
 import type { Dossier } from "@/hooks/useDossier";
 import type { AppointmentStatus } from "@/lib/constants";
-import { format } from "date-fns";
+import { format, differenceInHours, differenceInDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
-  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles, CreditCard, Link2, AlertCircle, Clock,
+  Calendar, Send, CheckCircle2, FileText, Receipt, Loader2, ArrowRight, Sparkles,
+  CreditCard, Link2, AlertCircle, Clock, Phone, Mic, Camera, PenLine, RefreshCw,
 } from "lucide-react";
-import { differenceInHours, differenceInDays } from "date-fns";
 
 interface NextStepBannerProps {
   dossier: Dossier;
   onScrollToAppointment?: () => void;
+}
+
+interface ActionCard {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+  action: () => void;
+  isPending?: boolean;
+  variant: "primary" | "secondary" | "subtle";
+  pulse?: boolean;
 }
 
 export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBannerProps) {
@@ -45,7 +56,7 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     queryClient.invalidateQueries({ queryKey: ["dossiers"] });
   };
 
-  // Manual RDV mutation
+  // ── Mutations ──
   const setManualRdv = useMutation({
     mutationFn: async () => {
       if (!manualDate) throw new Error("Choisissez une date");
@@ -72,7 +83,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
         details: `Rendez-vous fixé manuellement : ${dateStr} ${manualStart}–${manualEnd}`,
       });
 
-      // Send notification
       try {
         await supabase.functions.invoke("send-appointment-notification", {
           body: {
@@ -80,7 +90,10 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
             dossier_id: dossier.id,
             payload: {
               appointment_date: dateStr,
-              appointment_time: `${manualStart}–${manualEnd}`,
+              appointment_time: manualStart,
+              appointment_time_end: manualEnd,
+              raw_date: manualDate,
+              address: dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", "),
             },
           },
         });
@@ -96,7 +109,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  // Mark done mutation
   const markDone = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -121,7 +133,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     },
   });
 
-  // Mark paid mutation
   const markPaid = useMutation({
     mutationFn: async () => {
       if (invoices.length === 0) throw new Error("Aucune facture");
@@ -152,7 +163,6 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     },
   });
 
-  // Send client link mutation
   const sendClientLink = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("send-client-link", {
@@ -167,30 +177,21 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
-  // Detect missing client info
+  // ── Missing info detection ──
   const missingFields: string[] = [];
   if (!dossier.client_email) missingFields.push("email");
   if (!dossier.client_phone) missingFields.push("téléphone");
   if (!dossier.address && !dossier.address_line) missingFields.push("adresse");
   const hasIncompleteInfo = missingFields.length > 0;
 
-  // Determine next step with priority logic
-  // ── Smart time counter logic ──
+  // ── Time counter ──
   const getTimeCounter = (): { text: string; color: "muted" | "warning" | "destructive" } | null => {
     const now = new Date();
     const status = dossier.status;
-
-    // Don't show for early/terminal statuses
     const noCounterStatuses = ["nouveau", "a_qualifier", "rdv_termine", "devis_a_faire", "invoice_paid", "clos_perdu", "clos_signe"];
     if (noCounterStatuses.includes(status)) return null;
 
-    // En attente RDV → since status change
-    if (status === "en_attente_rdv") {
-      const ref = new Date(dossier.status_changed_at);
-      return formatCounter("En attente", ref, now);
-    }
-
-    // RDV pris → countdown to appointment
+    if (status === "en_attente_rdv") return formatCounter("En attente", new Date(dossier.status_changed_at), now);
     if (status === "rdv_pris") {
       const appointmentDate = (dossier as any).appointment_date;
       if (appointmentDate) {
@@ -203,40 +204,29 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       }
       return null;
     }
-
-    // Devis envoyé → since sent_at
     if (status === "devis_envoye") {
       const sentQuote = quotes.find(q => q.sent_at);
       const ref = sentQuote?.sent_at ? new Date(sentQuote.sent_at) : new Date(dossier.status_changed_at);
       return formatCounter("Envoyé", ref, now);
     }
-
-    // Devis signé → since status change
-    if (status === "devis_signe") {
-      const ref = new Date(dossier.status_changed_at);
-      return formatCounter("Signé", ref, now);
-    }
-
-    // Facture en attente → since invoice creation
+    if (status === "devis_signe") return formatCounter("Signé", new Date(dossier.status_changed_at), now);
     if (status === "invoice_pending") {
       const inv = invoices[0];
       const ref = inv ? new Date(inv.created_at) : new Date(dossier.status_changed_at);
-      const days = differenceInDays(now, ref);
-      // Check payment terms for overdue
+      const now2 = new Date();
       if (inv?.payment_terms) {
         const termDays = parseInt(inv.payment_terms, 10);
         if (!isNaN(termDays)) {
           const dueDate = new Date(ref);
           dueDate.setDate(dueDate.getDate() + termDays);
-          if (now > dueDate) {
-            const overdueDays = differenceInDays(now, dueDate);
+          if (now2 > dueDate) {
+            const overdueDays = differenceInDays(now2, dueDate);
             return { text: `En retard de ${overdueDays} jour(s)`, color: "destructive" };
           }
         }
       }
-      return formatCounter("Émise", ref, now);
+      return formatCounter("Émise", ref, now2);
     }
-
     return null;
   };
 
@@ -248,164 +238,331 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
     return { text: `${prefix} il y a ${days} jour(s)`, color: "warning" };
   };
 
-  const getNextStep = (): {
-    message: string;
-    hint?: string;
-    primaryLabel: string;
-    primaryIcon: React.ReactNode;
-    primaryAction: () => void;
-    secondaryLabel?: string;
-    secondaryAction?: () => void;
-    isPending?: boolean;
-    done?: boolean;
-    badge?: string;
-  } | null => {
+  // ── Build contextual action cards ──
+  const getContextualActions = (): { headline: string; subtitle?: string; actions: ActionCard[]; done?: boolean; badge?: string } => {
     const status = dossier.status;
 
-    // ──── PRIORITY 1: Incomplete client info (for early statuses) ────
+    // ──── DONE STATES ────
+    if (status === "invoice_paid") {
+      return { headline: "Dossier terminé avec succès !", done: true, badge: "✅ Terminé", actions: [] };
+    }
+    if (status === "clos_perdu") {
+      return { headline: "Ce dossier est classé comme perdu", done: true, badge: "Clos", actions: [] };
+    }
+
+    // ──── NOUVEAU / A QUALIFIER — Client info incomplete ────
     if (hasIncompleteInfo && ["nouveau", "a_qualifier"].includes(status)) {
       return {
-        message: "Prochaine étape : Récupérer les informations manquantes",
-        hint: `Le client n'a pas encore renseigné : ${missingFields.join(", ")}.`,
-        primaryLabel: "Envoyer lien client",
-        primaryIcon: <Link2 className="h-4 w-4" />,
-        primaryAction: () => sendClientLink.mutate(),
-        isPending: sendClientLink.isPending,
-        secondaryLabel: "Fixer un rendez-vous",
-        secondaryAction: () => onScrollToAppointment?.(),
+        headline: "Infos manquantes du client",
+        subtitle: `Manque : ${missingFields.join(", ")}. Envoyez le lien pour que le client complète.`,
+        actions: [
+          {
+            id: "send-link",
+            label: "Envoyer le lien client",
+            description: "Le client remplira ses infos",
+            icon: <Link2 className="h-5 w-5" />,
+            action: () => sendClientLink.mutate(),
+            isPending: sendClientLink.isPending,
+            variant: "primary",
+            pulse: true,
+          },
+          {
+            id: "call",
+            label: "Appeler le client",
+            description: "Récupérer les infos par téléphone",
+            icon: <Phone className="h-5 w-5" />,
+            action: () => { if (dossier.client_phone) window.open(`tel:${dossier.client_phone}`); },
+            variant: "secondary",
+          },
+          {
+            id: "rdv",
+            label: "Fixer un RDV",
+            description: "Planifier directement",
+            icon: <Calendar className="h-5 w-5" />,
+            action: () => onScrollToAppointment?.(),
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── Early statuses with complete info → Créer devis ────
+    // ──── NOUVEAU / A QUALIFIER / DEVIS_A_FAIRE — Infos complètes ────
     if (["nouveau", "a_qualifier", "devis_a_faire"].includes(status)) {
       return {
-        message: "Prochaine étape : Créer le devis",
-        hint: "Établissez le devis avant de planifier l'intervention. Vous pouvez aussi proposer un RDV à tout moment.",
-        primaryLabel: "Importer devis (PDF)",
-        primaryIcon: <FileText className="h-4 w-4" />,
-        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
-        secondaryLabel: "Proposer un RDV",
-        secondaryAction: () => onScrollToAppointment?.(),
+        headline: "Client prêt — choisissez votre prochaine action",
+        subtitle: "Créez un devis ou planifiez l'intervention selon votre façon de travailler.",
+        actions: [
+          {
+            id: "import-devis",
+            label: "Importer un devis",
+            description: "Charger un PDF existant",
+            icon: <FileText className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-import-devis")),
+            variant: "primary",
+          },
+          {
+            id: "create-devis",
+            label: "Créer un devis",
+            description: "Éditeur de devis assisté",
+            icon: <PenLine className="h-5 w-5" />,
+            action: () => navigate(`/devis/new?dossier=${dossier.id}`),
+            variant: "primary",
+          },
+          {
+            id: "rdv",
+            label: "Proposer un RDV",
+            description: "Envoyer des créneaux",
+            icon: <Calendar className="h-5 w-5" />,
+            action: () => onScrollToAppointment?.(),
+            variant: "secondary",
+          },
+          {
+            id: "note",
+            label: "Note vocale",
+            description: "Dicter une note terrain",
+            icon: <Mic className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-voice-recorder")),
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── Devis envoyé → Waiting for signature ────
+    // ──── DEVIS ENVOYÉ — En attente signature ────
     if (status === "devis_envoye") {
       return {
-        message: "En attente de la signature du client",
-        hint: "Le devis a été envoyé. Relancez si le client tarde à répondre. Vous pouvez aussi proposer un RDV.",
-        primaryLabel: "Renvoyer le devis",
-        primaryIcon: <Send className="h-4 w-4" />,
-        primaryAction: () => {
-          if (quotes.length > 0 && quotes[0].status === "envoye") {
-            supabase.functions.invoke("send-quote", { body: { quote_id: quotes[0].id } })
-              .then(() => toast({ title: "Devis renvoyé !" }))
-              .catch((e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }));
-          }
-        },
-        secondaryLabel: "Proposer un RDV",
-        secondaryAction: () => onScrollToAppointment?.(),
+        headline: "Devis envoyé — en attente de réponse",
+        subtitle: "Relancez le client ou planifiez un RDV en attendant la signature.",
+        actions: [
+          {
+            id: "relance",
+            label: "Relancer le client",
+            description: "Renvoyer le devis par email",
+            icon: <RefreshCw className="h-5 w-5" />,
+            action: () => {
+              if (quotes.length > 0 && quotes[0].status === "envoye") {
+                supabase.functions.invoke("send-quote", { body: { quote_id: quotes[0].id } })
+                  .then(() => toast({ title: "Devis renvoyé !" }))
+                  .catch((e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }));
+              }
+            },
+            variant: "primary",
+            pulse: true,
+          },
+          {
+            id: "rdv",
+            label: "Proposer un RDV",
+            description: "Anticiper l'intervention",
+            icon: <Calendar className="h-5 w-5" />,
+            action: () => onScrollToAppointment?.(),
+            variant: "secondary",
+          },
+          {
+            id: "call",
+            label: "Appeler le client",
+            description: "Suivi par téléphone",
+            icon: <Phone className="h-5 w-5" />,
+            action: () => { if (dossier.client_phone) window.open(`tel:${dossier.client_phone}`); },
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── Devis signé → Planifier RDV intervention ────
+    // ──── DEVIS SIGNÉ — Planifier intervention ────
     if (status === "devis_signe") {
       return {
-        message: "Prochaine étape : Planifier le RDV d'intervention",
-        hint: "Le devis est signé. Proposez des créneaux au client ou fixez le RDV directement.",
-        primaryLabel: "Proposer des créneaux",
-        primaryIcon: <Calendar className="h-4 w-4" />,
-        primaryAction: () => onScrollToAppointment?.(),
-        secondaryLabel: "Fixer le RDV manuellement",
-        secondaryAction: () => setShowManualRdv(true),
+        headline: "Devis signé ! Planifiez l'intervention",
+        subtitle: "Proposez des créneaux au client ou fixez le RDV directement.",
+        actions: [
+          {
+            id: "propose-slots",
+            label: "Proposer des créneaux",
+            description: "Le client choisit son horaire",
+            icon: <Calendar className="h-5 w-5" />,
+            action: () => onScrollToAppointment?.(),
+            variant: "primary",
+            pulse: true,
+          },
+          {
+            id: "manual-rdv",
+            label: "Fixer manuellement",
+            description: "RDV par téléphone ou accord",
+            icon: <CheckCircle2 className="h-5 w-5" />,
+            action: () => setShowManualRdv(true),
+            variant: "secondary",
+          },
+          {
+            id: "photo",
+            label: "Ajouter des photos",
+            description: "Préparer le dossier terrain",
+            icon: <Camera className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-photo-upload")),
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── En attente RDV → Proposer créneaux ────
+    // ──── EN ATTENTE RDV ────
     if (status === "en_attente_rdv") {
       return {
-        message: "Prochaine étape : Fixer un rendez-vous",
-        hint: "Proposez des créneaux au client ou fixez le RDV directement.",
-        primaryLabel: "Proposer des créneaux",
-        primaryIcon: <Calendar className="h-4 w-4" />,
-        primaryAction: () => onScrollToAppointment?.(),
-        secondaryLabel: "Fixer le RDV manuellement",
-        secondaryAction: () => setShowManualRdv(true),
+        headline: "En attente — fixez un rendez-vous",
+        subtitle: "Proposez des créneaux ou fixez le RDV directement.",
+        actions: [
+          {
+            id: "propose-slots",
+            label: "Proposer des créneaux",
+            description: "Le client choisit son horaire",
+            icon: <Calendar className="h-5 w-5" />,
+            action: () => onScrollToAppointment?.(),
+            variant: "primary",
+            pulse: true,
+          },
+          {
+            id: "manual-rdv",
+            label: "Fixer manuellement",
+            description: "Accord verbal ou téléphone",
+            icon: <CheckCircle2 className="h-5 w-5" />,
+            action: () => setShowManualRdv(true),
+            variant: "secondary",
+          },
+          {
+            id: "call",
+            label: "Appeler le client",
+            description: "Convenir d'un horaire",
+            icon: <Phone className="h-5 w-5" />,
+            action: () => { if (dossier.client_phone) window.open(`tel:${dossier.client_phone}`); },
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── RDV pris → Marquer intervention terminée ────
+    // ──── RDV PRIS — Intervention à venir ────
     if (status === "rdv_pris") {
       const appointmentDate = (dossier as any).appointment_date;
       const timeStart = (dossier as any).appointment_time_start;
       const timeEnd = (dossier as any).appointment_time_end;
-      const dateInfo = appointmentDate
-        ? format(new Date(appointmentDate), "EEEE d MMMM", { locale: fr })
-        : "";
+      const dateInfo = appointmentDate ? format(new Date(appointmentDate), "EEEE d MMMM", { locale: fr }) : "";
       const timeInfo = timeStart && timeEnd ? ` de ${timeStart.slice(0, 5)} à ${timeEnd.slice(0, 5)}` : "";
 
       return {
-        message: `Intervention prévue ${dateInfo}${timeInfo}`,
-        hint: "Une fois l'intervention réalisée, marquez-la comme terminée pour passer à la facturation.",
-        primaryLabel: "Marquer intervention terminée",
-        primaryIcon: <CheckCircle2 className="h-4 w-4" />,
-        primaryAction: () => markDone.mutate(),
-        isPending: markDone.isPending,
+        headline: `Intervention ${dateInfo}${timeInfo}`,
+        subtitle: "Marquez comme terminée après l'intervention.",
+        actions: [
+          {
+            id: "mark-done",
+            label: "Intervention terminée",
+            description: "Passer à la facturation",
+            icon: <CheckCircle2 className="h-5 w-5" />,
+            action: () => markDone.mutate(),
+            isPending: markDone.isPending,
+            variant: "primary",
+          },
+          {
+            id: "photo",
+            label: "Photos chantier",
+            description: "Documenter le travail",
+            icon: <Camera className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-photo-upload")),
+            variant: "secondary",
+          },
+          {
+            id: "note",
+            label: "Note vocale",
+            description: "Compte rendu rapide",
+            icon: <Mic className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-voice-recorder")),
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── RDV terminé → Facturer ────
+    // ──── RDV TERMINÉ — Facturer ────
     if (status === "rdv_termine") {
       return {
-        message: "Prochaine étape : Importer la facture",
-        hint: "L'intervention est terminée. Envoyez la facture au client.",
-        primaryLabel: "Importer facture (PDF)",
-        primaryIcon: <Receipt className="h-4 w-4" />,
-        primaryAction: () => window.dispatchEvent(new CustomEvent("open-import-facture")),
+        headline: "Intervention terminée — facturation",
+        subtitle: "Importez ou créez la facture pour finaliser.",
+        actions: [
+          {
+            id: "import-facture",
+            label: "Importer facture",
+            description: "Charger un PDF existant",
+            icon: <Receipt className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-import-facture")),
+            variant: "primary",
+            pulse: true,
+          },
+          {
+            id: "create-facture",
+            label: "Créer une facture",
+            description: "Éditeur de facture",
+            icon: <PenLine className="h-5 w-5" />,
+            action: () => navigate(`/facture/new?dossier=${dossier.id}`),
+            variant: "primary",
+          },
+          {
+            id: "photo",
+            label: "Photos finales",
+            description: "Preuves du travail réalisé",
+            icon: <Camera className="h-5 w-5" />,
+            action: () => window.dispatchEvent(new CustomEvent("open-photo-upload")),
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    // ──── Facture en attente → Marquer payée ────
+    // ──── FACTURE EN ATTENTE ────
     if (status === "invoice_pending") {
       const inv = invoices[0];
       return {
-        message: inv ? `Facture ${inv.invoice_number} en attente de paiement` : "Facture en attente de paiement",
-        hint: "Marquez la facture comme payée dès réception du règlement.",
-        primaryLabel: "Marquer payée",
-        primaryIcon: <CreditCard className="h-4 w-4" />,
-        primaryAction: () => markPaid.mutate(),
-        isPending: markPaid.isPending,
+        headline: inv ? `Facture ${inv.invoice_number} — en attente de paiement` : "Facture en attente de paiement",
+        subtitle: "Marquez comme payée dès réception du règlement.",
+        actions: [
+          {
+            id: "mark-paid",
+            label: "Marquer payée",
+            description: "Le client a réglé",
+            icon: <CreditCard className="h-5 w-5" />,
+            action: () => markPaid.mutate(),
+            isPending: markPaid.isPending,
+            variant: "primary",
+          },
+          {
+            id: "relance",
+            label: "Relancer le paiement",
+            description: "Envoyer un rappel",
+            icon: <Send className="h-5 w-5" />,
+            action: () => {
+              supabase.functions.invoke("send-relance", {
+                body: { dossier_id: dossier.id, type: "invoice_pending" },
+              })
+                .then(() => toast({ title: "Relance envoyée !" }))
+                .catch((e) => toast({ title: "Erreur", description: e.message, variant: "destructive" }));
+            },
+            variant: "secondary",
+          },
+          {
+            id: "call",
+            label: "Appeler le client",
+            description: "Suivi de paiement",
+            icon: <Phone className="h-5 w-5" />,
+            action: () => { if (dossier.client_phone) window.open(`tel:${dossier.client_phone}`); },
+            variant: "subtle",
+          },
+        ],
       };
     }
 
-    if (status === "invoice_paid") {
-      return {
-        message: "Dossier terminé avec succès !",
-        primaryLabel: "",
-        primaryIcon: null,
-        primaryAction: () => {},
-        done: true,
-        badge: "✅ Terminé",
-      };
-    }
-
-    if (status === "clos_perdu") {
-      return {
-        message: "Ce dossier est classé comme perdu",
-        primaryLabel: "",
-        primaryIcon: null,
-        primaryAction: () => {},
-        done: true,
-        badge: "Clos",
-      };
-    }
-
-    return null;
+    return { headline: "", actions: [] };
   };
 
-  const step = getNextStep();
+  const { headline, subtitle, actions, done, badge } = getContextualActions();
   const timeCounter = getTimeCounter();
-  if (!step) return null;
+  if (!headline) return null;
 
   const counterColorClass = timeCounter?.color === "destructive"
     ? "text-destructive"
@@ -413,135 +570,158 @@ export function NextStepBanner({ dossier, onScrollToAppointment }: NextStepBanne
       ? "text-warning"
       : "text-muted-foreground";
 
+  const variantStyles = {
+    primary: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md border-0",
+    secondary: "bg-card text-foreground hover:bg-accent border border-border shadow-sm",
+    subtle: "bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent",
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 space-y-3"
+      className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/[0.02] p-4 space-y-3"
     >
-      {/* Next step message */}
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.15, duration: 0.3 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
         className="space-y-1"
       >
         <div className="flex items-center gap-2">
           <motion.div
-            animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.2, 1] }}
+            animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.15, 1] }}
             transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
           >
             <Sparkles className="h-4 w-4 text-primary shrink-0" />
           </motion.div>
-          <p className="text-sm font-medium text-foreground">{step.message}</p>
+          <p className="text-sm font-semibold text-foreground">{headline}</p>
         </div>
         {timeCounter && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.3 }}
+            transition={{ delay: 0.3 }}
             className={`text-[11px] flex items-center gap-1 ml-6 ${counterColorClass}`}
           >
             <Clock className="h-3 w-3" />
             {timeCounter.text}
           </motion.p>
         )}
+        {subtitle && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-start gap-2 mt-1 ml-6"
+          >
+            <AlertCircle className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>
+          </motion.div>
+        )}
       </motion.div>
 
-      {/* Hint — "Pourquoi ?" */}
-      {step.hint && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          transition={{ delay: 0.25, duration: 0.3 }}
-          className="flex items-start gap-2 rounded-lg bg-muted/50 px-3 py-2"
-        >
-          <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">{step.hint}</p>
-        </motion.div>
-      )}
-
       {/* Done state */}
-      {step.done && step.badge && (
+      {done && badge && (
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring", stiffness: 300 }}>
-          <Badge className="bg-success/15 text-success text-sm px-3 py-1">{step.badge}</Badge>
+          <Badge className="bg-success/15 text-success text-sm px-3 py-1">{badge}</Badge>
         </motion.div>
       )}
 
-      {/* Primary action button */}
-      {!step.done && step.primaryLabel && (
+      {/* Action cards grid */}
+      {actions.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.3 }}
-          className="flex flex-wrap gap-2"
+          transition={{ delay: 0.25, duration: 0.3 }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-2"
         >
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-            <Button
-              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md"
-              onClick={step.primaryAction}
-              disabled={step.isPending}
+          {actions.map((card, i) => (
+            <motion.button
+              key={card.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + i * 0.08, duration: 0.25 }}
+              whileHover={{ scale: 1.02, y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={card.action}
+              disabled={card.isPending}
+              className={`
+                relative flex items-center gap-3 rounded-lg px-3.5 py-3 text-left transition-all
+                ${variantStyles[card.variant]}
+                ${card.isPending ? "opacity-60 cursor-wait" : "cursor-pointer"}
+                ${card.variant === "primary" && actions.filter(a => a.variant === "primary").length === 1 ? "sm:col-span-2" : ""}
+              `}
             >
-              {step.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : step.primaryIcon}
-              {step.primaryLabel}
-              <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2 }}>
-                <ArrowRight className="h-4 w-4" />
-              </motion.div>
-            </Button>
-          </motion.div>
+              {/* Pulse ring for priority actions */}
+              {card.pulse && !card.isPending && (
+                <motion.span
+                  className="absolute inset-0 rounded-lg border-2 border-primary/40"
+                  animate={{ opacity: [0.6, 0, 0.6], scale: [1, 1.02, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              )}
 
-          {step.secondaryLabel && step.secondaryAction && (
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button variant="outline" className="gap-2" onClick={step.secondaryAction}>
-                {step.secondaryLabel}
-              </Button>
-            </motion.div>
-          )}
+              <span className={`shrink-0 ${card.variant === "primary" ? "text-primary-foreground" : card.variant === "secondary" ? "text-primary" : "text-muted-foreground"}`}>
+                {card.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : card.icon}
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className={`block text-sm font-medium leading-tight ${card.variant === "primary" ? "text-primary-foreground" : "text-foreground"}`}>
+                  {card.label}
+                </span>
+                <span className={`block text-[11px] leading-tight mt-0.5 ${card.variant === "primary" ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                  {card.description}
+                </span>
+              </div>
+              {card.variant === "primary" && (
+                <motion.div
+                  animate={{ x: [0, 3, 0] }}
+                  transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 2 }}
+                  className="shrink-0"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                </motion.div>
+              )}
+            </motion.button>
+          ))}
         </motion.div>
       )}
 
       {/* Manual RDV inline form */}
-      {showManualRdv && (
-        <div className="border border-border rounded-lg p-3 space-y-3 bg-background">
-          <p className="text-xs font-medium text-foreground">Fixer un rendez-vous</p>
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1">
-              <Label className="text-[10px]">Date</Label>
-              <Input
-                type="date"
-                value={manualDate}
-                onChange={(e) => setManualDate(e.target.value)}
-                className="h-8 text-xs"
-              />
+      <AnimatePresence>
+        {showManualRdv && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border border-border rounded-lg p-3 space-y-3 bg-background overflow-hidden"
+          >
+            <p className="text-xs font-medium text-foreground">Fixer un rendez-vous</p>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 space-y-1">
+                <Label className="text-[10px]">Date</Label>
+                <Input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-[10px]">Début</Label>
+                <Input type="time" value={manualStart} onChange={(e) => setManualStart(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div className="w-20 space-y-1">
+                <Label className="text-[10px]">Fin</Label>
+                <Input type="time" value={manualEnd} onChange={(e) => setManualEnd(e.target.value)} className="h-8 text-xs" />
+              </div>
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-[10px]">Début</Label>
-              <Input
-                type="time"
-                value={manualStart}
-                onChange={(e) => setManualStart(e.target.value)}
-                className="h-8 text-xs"
-              />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending}>
+                {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirmer le RDV"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowManualRdv(false)}>Annuler</Button>
             </div>
-            <div className="w-20 space-y-1">
-              <Label className="text-[10px]">Fin</Label>
-              <Input
-                type="time"
-                value={manualEnd}
-                onChange={(e) => setManualEnd(e.target.value)}
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => setManualRdv.mutate()} disabled={setManualRdv.isPending}>
-              {setManualRdv.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirmer le RDV"}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowManualRdv(false)}>Annuler</Button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
