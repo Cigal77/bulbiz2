@@ -218,7 +218,7 @@ export default function DossierDetail() {
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
 
-            {/* Accordion sections */}
+            {/* RDV before Devis */}
             <CollapsibleSection title="📝 Devis" defaultOpen={["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe"].includes(dossier.status)}>
               <QuoteBlock dossier={dossier} />
             </CollapsibleSection>

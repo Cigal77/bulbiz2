@@ -225,7 +225,7 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          {/* SMS */}
+          {/* SMS - simplified, no Twilio mention */}
           <Card>
             <CardHeader>
               <CardTitle>SMS</CardTitle>

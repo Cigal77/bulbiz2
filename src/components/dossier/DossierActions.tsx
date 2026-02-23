@@ -24,9 +24,8 @@ interface DossierActionsProps {
 }
 
 export function DossierActions({ dossier }: DossierActionsProps) {
-  const { toggleRelance, sendRelance } = useDossierActions(dossier.id);
-  // Notes now go through useMediaUpload so they appear in the media feed
-  const { uploadFiles, addNote } = useMediaUpload(dossier.id);
+  const { toggleRelance, sendRelance, addNote } = useDossierActions(dossier.id);
+  const { uploadFiles } = useMediaUpload(dossier.id);
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");

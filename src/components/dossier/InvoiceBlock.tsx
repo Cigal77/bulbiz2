@@ -266,6 +266,13 @@ function InvoiceRow({
         )}
       </div>
 
+      {/* Only show total if it's > 0 */}
+      {(invoice as any).total_ttc > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Total : {Number((invoice as any).total_ttc).toFixed(2)} € TTC
+        </p>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {pdfUrl && (
           <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
