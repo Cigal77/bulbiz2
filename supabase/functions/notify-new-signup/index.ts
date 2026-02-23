@@ -24,8 +24,8 @@ Deno.serve(async (req: Request) => {
       subject: `Nouveau compte créé – ${first_name || ""} ${last_name || ""}`.trim(),
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2563eb;">Nouveau compte Bulbiz</h2>
-          <p>Un nouveau compte vient d'être créé :</p>
+          <h2 style="color: #2563eb;">Nouveau compte</h2>
+          <p>Un nouveau compte artisan vient d'être créé :</p>
           <ul style="line-height: 1.8;">
             <li><strong>Prénom :</strong> ${first_name || "—"}</li>
             <li><strong>Nom :</strong> ${last_name || "—"}</li>
@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
             <li><strong>Téléphone :</strong> ${phone || "—"}</li>
           </ul>
           <p style="font-size: 13px; color: #6b7280; margin-top: 24px;">
-            Email envoyé automatiquement par Bulbiz.
+            Notification automatique.
           </p>
         </div>
       `,
