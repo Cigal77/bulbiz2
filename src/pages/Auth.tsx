@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -27,49 +27,14 @@ export default function Auth() {
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // Detect OAuth tokens in URL after redirect flow
-  useEffect(() => {
-    console.log("[Auth] Page loaded. URL:", window.location.href);
-    console.log("[Auth] Hash:", window.location.hash);
-    console.log("[Auth] Search:", window.location.search);
-
-    // Check hash for tokens (Supabase default)
-    const hash = window.location.hash;
-    if (hash && hash.includes("access_token")) {
-      console.log("[Auth] Detected access_token in hash, Supabase should auto-detect");
-    }
-
-    // Check search params for tokens (some OAuth brokers)
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
-    if (accessToken && refreshToken) {
-      console.log("[Auth] Detected tokens in search params, setting session");
-      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        .then(({ error }) => {
-          if (error) console.error("[Auth] setSession error:", error);
-          else {
-            console.log("[Auth] Session set from URL params");
-            window.history.replaceState({}, "", "/auth");
-            navigate("/");
-          }
-        });
-    }
-  }, [navigate]);
-
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    const redirectUri = window.location.origin + "/auth";
-    console.log("[Auth] Starting Google sign in, redirect_uri:", redirectUri);
-    console.log("[Auth] isInIframe:", (() => { try { return window.self !== window.top; } catch { return true; } })());
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: redirectUri,
+        redirect_uri: window.location.origin,
       });
-      console.log("[Auth] Google sign in result:", JSON.stringify(result, null, 2));
       if (result.error) throw result.error;
       if (!result.redirected) {
-        console.log("[Auth] Popup flow succeeded, navigating to /");
         navigate("/");
       }
     } catch (error: any) {
