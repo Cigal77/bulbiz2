@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -18,8 +19,9 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { downloadIcsFile, generateGoogleCalendarUrl, generateOutlookCalendarUrl } from "@/lib/ics-utils";
 import {
-  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle, CheckCircle2, RefreshCw, MapPin, Phone, Navigation, Receipt,
+  Calendar, Clock, Plus, Check, X, Send, Edit2, Loader2, AlertTriangle, CheckCircle2, RefreshCw, MapPin, Phone, Navigation, Receipt, CalendarPlus, Download,
 } from "lucide-react";
 
 interface AppointmentBlockProps {
@@ -169,6 +171,36 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
     return data;
   };
 
+  // Auto-sync confirmed RDV to Google Calendar (silent, best-effort)
+  const syncToGoogleCalendar = async (date: string, startTime: string, endTime: string) => {
+    try {
+      const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ");
+      const { data, error } = await supabase.functions.invoke("google-calendar", {
+        body: {
+          action: "add_event",
+          dossier_id: dossier.id,
+          event: {
+            summary: `RDV${clientName ? ` – ${clientName}` : ""}`,
+            date,
+            start_time: startTime.slice(0, 5),
+            end_time: endTime.slice(0, 5),
+            location: dossier.address || "",
+            description: [
+              clientName && `Client : ${clientName}`,
+              dossier.client_phone && `Tél : ${dossier.client_phone}`,
+              dossier.description,
+            ].filter(Boolean).join("\n"),
+          },
+        },
+      });
+      if (!error && data?.success) {
+        toast({ title: "📅 RDV ajouté à Google Calendar" });
+      }
+    } catch {
+      // Silent fail — Google Calendar is optional
+    }
+  };
+
   const handleResend = async (eventType: string) => {
     setResending(true);
     try {
@@ -280,6 +312,9 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       } catch (e) {
         console.error("Notification error after manual rdv:", e);
       }
+
+      // Auto-sync to Google Calendar
+      syncToGoogleCalendar(manualDate, manualStart, manualEnd);
     },
     onSuccess: () => {
       toast({ title: "Rendez-vous confirmé ✅" });
@@ -321,6 +356,9 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       } catch (e) {
         console.error("Notification error after confirm slot:", e);
       }
+
+      // Auto-sync to Google Calendar
+      syncToGoogleCalendar(selected.slot_date, selected.time_start, selected.time_end);
     },
     onSuccess: () => { toast({ title: "Rendez-vous confirmé ✅" }); invalidate(); },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
@@ -420,7 +458,7 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
               )}
             </div>
           </div>
-          {/* Quick navigation links */}
+          {/* Quick navigation + calendar links */}
           <div className="flex flex-wrap gap-2">
             {hasCoords && (
               <>
@@ -456,6 +494,107 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
                   <Phone className="h-3.5 w-3.5" /> Appeler
                 </a>
               </Button>
+            )}
+
+            {/* Calendar dropdown */}
+            {appointmentDate && timeStart && timeEnd && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                    <CalendarPlus className="h-3.5 w-3.5" /> Agenda
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ");
+                    const title = `RDV${clientName ? ` – ${clientName}` : ""}`;
+                    downloadIcsFile({
+                      title,
+                      startDate: appointmentDate,
+                      startTime: timeStart,
+                      endTime: timeEnd,
+                      location: dossier.address || undefined,
+                      description: [
+                        clientName && `Client : ${clientName}`,
+                        dossier.client_phone && `Tél : ${dossier.client_phone}`,
+                        dossier.description && `\n${dossier.description}`,
+                      ].filter(Boolean).join("\n"),
+                      uid: dossier.id,
+                    });
+                  }}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Télécharger .ics
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href={generateGoogleCalendarUrl({
+                      title: `RDV${dossier.client_first_name ? ` – ${[dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ")}` : ""}`,
+                      startDate: appointmentDate,
+                      startTime: timeStart,
+                      endTime: timeEnd,
+                      location: dossier.address || undefined,
+                      description: [
+                        dossier.client_phone && `Tél : ${dossier.client_phone}`,
+                        dossier.description,
+                      ].filter(Boolean).join("\n"),
+                    })} target="_blank" rel="noopener noreferrer">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Google Calendar
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href={generateOutlookCalendarUrl({
+                      title: `RDV${dossier.client_first_name ? ` – ${[dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ")}` : ""}`,
+                      startDate: appointmentDate,
+                      startTime: timeStart,
+                      endTime: timeEnd,
+                      location: dossier.address || undefined,
+                      description: [
+                        dossier.client_phone && `Tél : ${dossier.client_phone}`,
+                        dossier.description,
+                      ].filter(Boolean).join("\n"),
+                    })} target="_blank" rel="noopener noreferrer">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Outlook
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ");
+                      const { data, error } = await supabase.functions.invoke("google-calendar", {
+                        body: {
+                          action: "add_event",
+                          dossier_id: dossier.id,
+                          event: {
+                            summary: `RDV${clientName ? ` – ${clientName}` : ""}`,
+                            date: appointmentDate,
+                            start_time: timeStart.slice(0, 5),
+                            end_time: timeEnd.slice(0, 5),
+                            location: dossier.address || "",
+                            description: [
+                              clientName && `Client : ${clientName}`,
+                              dossier.client_phone && `Tél : ${dossier.client_phone}`,
+                              dossier.description,
+                            ].filter(Boolean).join("\n"),
+                          },
+                        },
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      toast({ title: "RDV ajouté à Google Calendar ✅" });
+                      invalidate();
+                    } catch (e: any) {
+                      if (e.message?.includes("non connecté")) {
+                        toast({ title: "Google Calendar non connecté", description: "Connectez-le dans les paramètres.", variant: "destructive" });
+                      } else {
+                        toast({ title: "Erreur", description: e.message, variant: "destructive" });
+                      }
+                    }
+                  }}>
+                    <CalendarPlus className="h-4 w-4 mr-2" />
+                    Synchro auto (Google)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </motion.div>
