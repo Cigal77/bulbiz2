@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
     if (!token || !file) {
       return new Response(
-        JSON.stringify({ error: "Token et fichier requis" }),
+        JSON.stringify({ error: `Token et fichier requis (token: ${!!token}, file: ${!!file})` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -33,13 +33,14 @@ Deno.serve(async (req) => {
 
     // Validate file type
     const allowedTypes = [
-      "image/jpeg", "image/png", "image/webp",
-      "video/mp4", "video/quicktime", "video/webm",
-      "audio/webm", "audio/mp4",
+      "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
+      "video/mp4", "video/quicktime", "video/webm", "video/3gpp",
+      "audio/webm", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/aac",
+      "application/pdf",
     ];
     if (!allowedTypes.includes(file.type)) {
       return new Response(
-        JSON.stringify({ error: "Type de fichier non autorisé" }),
+        JSON.stringify({ error: `Type de fichier non autorisé : ${file.type}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
