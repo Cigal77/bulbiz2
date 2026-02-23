@@ -250,16 +250,25 @@ export default function ClientForm() {
     try {
       const mediaUrls: { url: string; name: string; type: string; size: number }[] = [];
       if (files.length > 0) {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const formData = new FormData();
           formData.append("token", token!);
           formData.append("file", file);
-          const { data, error: uploadError } = await supabase.functions.invoke("upload-client-media", {
+          const res = await fetch(`${supabaseUrl}/functions/v1/upload-client-media`, {
+            method: "POST",
+            headers: {
+              "apikey": anonKey,
+            },
             body: formData,
           });
-          if (uploadError) throw uploadError;
-          if (data?.error) throw new Error(data.error);
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({}));
+            throw new Error(errBody.error || `Erreur upload (${res.status})`);
+          }
+          const data = await res.json();
           mediaUrls.push({ url: data.url, name: data.name, type: data.type, size: data.size });
           setUploadProgress(Math.round(((i + 1) / files.length) * 100));
         }
