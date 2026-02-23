@@ -1,65 +1,113 @@
 
-# Connexion Gmail personnelle via Google Cloud Console
+# Lot 2 : Bugs critiques, UX et branding
 
-## Ce que tu veux
-Ajouter dans les Parametres un bloc "Connexion Gmail" qui permet a chaque artisan de connecter **son propre compte Gmail** pour envoyer les emails (devis, factures, relances) depuis sa propre adresse Gmail au lieu de `noreply@bulbiz.fr`. Chaque connexion est privee et liee uniquement au compte de l'utilisateur.
+## Vue d'ensemble
 
-## Comment ca marche
+Ce lot couvre 4 axes principaux : correction du bug de statut RDV, amelioration UX mobile pour les creneaux, personnalisation du branding (remplacement de "Bulbiz"), et numerotation devis/factures avec nom client.
 
-1. Tu crees un projet sur **Google Cloud Console** avec les identifiants OAuth 2.0 (Client ID + Client Secret)
-2. Dans Bulbiz, tu cliques "Connecter Gmail" -- ca te redirige vers Google pour autoriser l'acces
-3. Bulbiz stocke le token de facon securisee, lie a ton user_id
-4. Les emails sont ensuite envoyes via l'API Gmail au lieu de Resend
+---
 
-## Plan technique
+## 1. Bug appointment BDD : creneau valide ne change pas le statut
 
-### Etape 1 -- Stocker les secrets Google OAuth (cote serveur)
+**Probleme** : Quand le client selectionne un creneau via le formulaire client (`submit-client-form` edge function), le statut du dossier reste inchange dans certains cas.
 
-Tu devras fournir ton **Google Client ID** et **Google Client Secret** (crees dans Google Cloud Console). Ils seront stockes comme secrets backend accessibles par les fonctions serveur.
+**Analyse** : Dans la fonction `select_slot`, quand il y a un seul creneau (`isSingleSlot`), le code met bien a jour `appointment_status` et `status` a `rdv_pris`. Quand il y a plusieurs creneaux, seul `appointment_status` passe a `client_selected` -- c'est normal, l'artisan doit confirmer.
 
-### Etape 2 -- Nouvelle table `gmail_connections`
+**Correction** : Le vrai probleme est que `confirmSlot` dans `AppointmentBlock.tsx` met a jour le dossier cote client Supabase mais le `status` sur le dossier (`rdv_pris`) ne se propage pas correctement car le `dossier.status` n'est pas dans les bons etats de depart. On va s'assurer que :
+- `confirmSlot` met aussi a jour `status: "rdv_pris"` + `status_changed_at` (deja fait)
+- Ajouter un `invalidateQueries` supplementaire pour forcer le refresh cote dashboard
+- Verifier que la mutation `setManualRdv` fait la meme chose (deja OK)
+
+**Fichiers** : `src/components/dossier/AppointmentBlock.tsx` -- ajouter invalidation de `["dossiers"]` dans toutes les mutations (deja fait mais verifier `confirmSlot.onSuccess`)
+
+---
+
+## 2. UX mobile choix creneaux (ClientForm)
+
+**Probleme** : Sur mobile, l'experience de selection de creneaux est peu ergonomique.
+
+**Corrections** :
+- Agrandir les zones cliquables des creneaux (padding + taille minimale 48px)
+- Ajouter un retour haptique visuel (animation de selection)
+- Ameliorer le bouton de confirmation (plus grand, sticky en bas)
+- Afficher les creneaux avec un formatage plus lisible
+
+**Fichier** : `src/pages/ClientForm.tsx` (section `isSlotMode`)
+
+---
+
+## 3. Numerotation devis/factures avec nom client
+
+**Probleme** : Les numeros de devis (`DEV-YYYY-XXXX`) et factures (`FAC-YYYY-XXXX`) ne contiennent pas le nom du client, ce qui rend l'identification difficile.
+
+**Correction** : Modifier les fonctions SQL `generate_quote_number` et `generate_invoice_number` pour inclure les 3 premieres lettres du nom client (ex: `DEV-2026-DUP-0001`).
+
+**Approche** : Ajouter un parametre optionnel `p_client_name` aux fonctions SQL. Extraire les 3 premieres lettres en majuscules. Si pas de nom, garder le format actuel.
+
+**Fichiers** :
+- Migration SQL pour modifier les 2 fonctions
+- `src/pages/QuoteEditor.tsx` : passer le nom du client a `generate_quote_number`
+- `src/hooks/useInvoices.tsx` : passer le nom du client a `generate_invoice_number`
+- `src/components/dossier/ImportDevisDialog.tsx` et `ImportFactureDialog.tsx` : idem
+
+---
+
+## 4. Remplacer "Bulbiz" par le nom de l'artisan dans les emails
+
+**Probleme** : Les emails envoyes via Resend (fallback) utilisent `noreply@bulbiz.fr` comme adresse d'envoi avec "Bulbiz" visible. Le nom de l'artisan est deja utilise comme `artisanName` dans le `from`, mais le domaine `@bulbiz.fr` reste visible.
+
+**Corrections** :
+- Le `from` utilise deja `artisanName <noreply@bulbiz.fr>` donc le nom affiche est correct -- pas de changement necessaire sur le nom.
+- Verifier que dans `submit-client-form` (auto-confirm), le from utilise bien `artisanName` (OK)
+- Dans le composant `BulbizLogo`, rendre le texte "Bulbiz" configurable pour que le formulaire client puisse afficher le nom de l'artisan au lieu de "Bulbiz"
+- Dans `ClientForm.tsx`, afficher le nom de l'artisan recupere depuis le profil au lieu du logo Bulbiz
+
+**Fichiers** :
+- `supabase/functions/submit-client-form/index.ts` : ajouter le nom de l'artisan dans la reponse `get`
+- `src/pages/ClientForm.tsx` : afficher le nom artisan
+- `src/components/BulbizLogo.tsx` : optionnel, pas de changement forcement necessaire
+
+---
+
+## Details techniques
+
+### Migration SQL (numerotation)
 
 ```text
-gmail_connections
-- id (uuid, PK)
-- user_id (uuid, unique, FK vers auth.users)
-- gmail_address (text)
-- access_token (text, chiffre)
-- refresh_token (text, chiffre)
-- token_expires_at (timestamptz)
-- created_at (timestamptz)
-- updated_at (timestamptz)
+CREATE OR REPLACE FUNCTION public.generate_quote_number(p_user_id uuid, p_client_name text DEFAULT NULL)
+  RETURNS text
+  ...
+  -- Extraire 3 premieres lettres du nom en majuscules
+  -- Format: DEV-YYYY-DUP-0001 ou DEV-YYYY-0001 si pas de nom
 ```
 
-Politiques RLS : chaque utilisateur ne voit/modifie que sa propre connexion.
+Meme logique pour `generate_invoice_number`.
 
-### Etape 3 -- Edge Function `gmail-oauth`
+### Edge function submit-client-form
 
-Deux endpoints :
-- **`action: authorize`** : Genere l'URL de redirection Google OAuth avec les scopes `gmail.send` + `userinfo.email`. Redirige vers `/parametres?gmail=callback`.
-- **`action: callback`** : Recoit le code d'autorisation, l'echange contre des tokens (access + refresh), stocke dans `gmail_connections`.
-- **`action: disconnect`** : Supprime la connexion Gmail.
-- **`action: status`** : Verifie si une connexion active existe.
+Ajouter dans la reponse `get` le champ `artisan_name` recupere depuis la table `profiles` :
 
-### Etape 4 -- Bloc UI dans Settings
+```text
+-- Fetch profile
+const { data: profile } = await supabase.from("profiles")
+  .select("company_name, first_name, last_name, phone, email, logo_url")
+  .eq("user_id", dossier.user_id).maybeSingle();
 
-Nouveau card "Connexion Gmail" dans la page Parametres :
+// Return artisan_name in response
+artisan_name: profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan"
+```
 
-- **Etat deconnecte** : Bouton "Connecter mon Gmail" avec icone Google
-- **Etat connecte** : Affiche l'adresse Gmail connectee + bouton "Deconnecter"
-- Explication claire : "Les emails seront envoyes depuis votre adresse Gmail personnelle"
+### ClientForm.tsx
 
-### Etape 5 -- Modifier l'envoi d'emails
+Afficher le nom artisan dans le header au lieu du logo Bulbiz pour le formulaire client.
 
-Dans chaque edge function d'envoi (send-quote, send-invoice, send-relance, etc.) :
-1. Verifier si l'utilisateur a une `gmail_connection` active
-2. Si oui : envoyer via l'API Gmail (`POST googleapis.com/gmail/v1/users/me/messages/send`) avec le token
-3. Si non : continuer avec Resend (comportement actuel)
-4. Si le token est expire : utiliser le refresh_token pour en obtenir un nouveau
+### Fichiers modifies (recapitulatif)
 
-### Securite
-
-- Les tokens sont stockes cote serveur uniquement (jamais exposes au frontend)
-- RLS strict : un utilisateur ne peut acceder qu'a sa propre connexion
-- Le refresh_token permet de renouveler l'acces sans re-autorisation
-- Scope minimal : uniquement `gmail.send` (pas de lecture de mails)
+1. `supabase/migrations/` -- nouvelle migration pour les fonctions SQL
+2. `supabase/functions/submit-client-form/index.ts` -- artisan_name dans la reponse
+3. `src/pages/ClientForm.tsx` -- UX creneaux mobile + nom artisan
+4. `src/components/dossier/AppointmentBlock.tsx` -- verification invalidation
+5. `src/pages/QuoteEditor.tsx` -- passer client_name au RPC
+6. `src/hooks/useInvoices.tsx` -- passer client_name au RPC
+7. `src/components/dossier/ImportDevisDialog.tsx` -- passer client_name
+8. `src/components/dossier/ImportFactureDialog.tsx` -- passer client_name
