@@ -227,9 +227,13 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
         }
       }
       if (eventType === "APPOINTMENT_CONFIRMED" && appointmentDate) {
+        const fullAddress = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
         extraPayload = {
           appointment_date: format(new Date(appointmentDate), "EEEE d MMMM yyyy", { locale: fr }),
-          appointment_time: timeStart && timeEnd ? `${timeStart.slice(0, 5)}–${timeEnd.slice(0, 5)}` : "",
+          appointment_time: timeStart?.slice(0, 5) || "",
+          appointment_time_end: timeEnd?.slice(0, 5) || "",
+          address: fullAddress,
+          raw_date: appointmentDate,
         };
       }
       await sendNotification(eventType, extraPayload);

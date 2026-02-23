@@ -314,13 +314,9 @@ Deno.serve(async (req: Request) => {
     const label = EVENT_LABELS[event_type as EventType];
     const result: NotifResult = { email_status: "SKIPPED", sms_status: "SKIPPED" };
 
-    // ── WRONG RECIPIENT PROTECTION ──
-    const artisanEmail = profile?.email;
-
     // ── EMAIL ──
     const clientEmail = dossier.client_email;
     if (!clientEmail || !isValidEmail(clientEmail)) {
-      // Log SKIPPED
       await supabase.from("notification_logs").insert({
         dossier_id,
         event_type,
@@ -337,24 +333,6 @@ Deno.serve(async (req: Request) => {
         details: `Email non envoyé (${label}) : email client manquant ou invalide`,
       });
       result.email_status = "SKIPPED";
-    } else if (artisanEmail && clientEmail === artisanEmail) {
-      // Wrong recipient protection
-      await supabase.from("notification_logs").insert({
-        dossier_id,
-        event_type,
-        channel: "email",
-        recipient: clientEmail,
-        status: "FAILED",
-        error_code: "WRONG_RECIPIENT",
-        error_message: "L'email client est identique à l'email artisan",
-      });
-      await supabase.from("historique").insert({
-        dossier_id,
-        user_id: user.id,
-        action: "notification_failed",
-        details: `Email non envoyé (${label}) : l'email client est identique à votre email`,
-      });
-      result.email_status = "FAILED";
     } else {
       const resendKey = Deno.env.get("RESEND_API_KEY");
       // Try Gmail first
@@ -482,20 +460,6 @@ Deno.serve(async (req: Request) => {
         });
         result.sms_status = "SKIPPED";
       } else {
-        // Wrong recipient protection for SMS
-        const artisanPhoneNorm = profile?.phone ? normalizePhone(String(profile.phone)) : null;
-        if (artisanPhoneNorm && normalized === artisanPhoneNorm) {
-          await supabase.from("notification_logs").insert({
-            dossier_id,
-            event_type,
-            channel: "sms",
-            recipient: normalized,
-            status: "FAILED",
-            error_code: "WRONG_RECIPIENT",
-            error_message: "Le téléphone client est identique au téléphone artisan",
-          });
-          result.sms_status = "FAILED";
-        } else {
           const smsBody = getSmsTemplate(event_type as EventType, notifPayload);
           const smsResult = await sendSms(normalized, smsBody);
 
@@ -535,7 +499,6 @@ Deno.serve(async (req: Request) => {
             }
             result.sms_status = isNotConfigured ? "SKIPPED" : "FAILED";
           }
-        }
       }
     }
 
