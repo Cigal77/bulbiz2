@@ -101,15 +101,70 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
     case "APPOINTMENT_CONFIRMED": {
       const dateStr = (payload.appointment_date as string) || "";
       const timeStr = (payload.appointment_time as string) || "";
+      const timeEnd = (payload.appointment_time_end as string) || "";
+      const address = (payload.address as string) || "";
+
+      // Format date for display
+      let displayDate = dateStr;
+      if (dateStr) {
+        try {
+          const d = new Date(dateStr + "T00:00:00");
+          const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+          const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+          displayDate = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        } catch { /* keep raw */ }
+      }
+
+      // Build calendar links
+      const eventTitle = `RDV – ${artisanName}`;
+      const eventDescription = `Rendez-vous avec ${artisanName}${artisanPhone ? `\nTél : ${payload.artisan_phone}` : ""}${payload.artisan_email ? `\nEmail : ${payload.artisan_email}` : ""}`;
+      
+      let calendarLinksHtml = "";
+      if (dateStr && timeStr) {
+        const dtStart = dateStr.replace(/-/g, "") + "T" + timeStr.slice(0, 5).replace(":", "") + "00";
+        const endTime = timeEnd || timeStr.replace(/^(\d{2}):(\d{2})/, (_, h, m) => `${String(Number(h) + 1).padStart(2, "0")}:${m}`);
+        const dtEnd = dateStr.replace(/-/g, "") + "T" + endTime.slice(0, 5).replace(":", "") + "00";
+
+        const gcalParams = new URLSearchParams({
+          action: "TEMPLATE",
+          text: eventTitle,
+          dates: `${dtStart}/${dtEnd}`,
+          details: eventDescription,
+          ...(address ? { location: address } : {}),
+        });
+        const googleCalUrl = `https://calendar.google.com/calendar/render?${gcalParams.toString()}`;
+
+        const outlookParams = new URLSearchParams({
+          rru: "addevent",
+          startdt: `${dateStr}T${timeStr.slice(0, 5)}:00`,
+          enddt: `${dateStr}T${endTime.slice(0, 5)}:00`,
+          subject: eventTitle,
+          body: eventDescription,
+          ...(address ? { location: address } : {}),
+        });
+        const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?${outlookParams.toString()}`;
+
+        calendarLinksHtml = `
+          <div style="margin:20px 0;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+            <p style="margin:0 0 12px 0;font-weight:600;color:#166534;">📅 Ajouter à mon agenda :</p>
+            <a href="${googleCalUrl}" target="_blank" style="display:inline-block;background:#4285f4;color:white;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:14px;margin-right:8px;margin-bottom:8px;">Google Agenda</a>
+            <a href="${outlookUrl}" target="_blank" style="display:inline-block;background:#0078d4;color:white;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:14px;margin-right:8px;margin-bottom:8px;">Outlook</a>
+          </div>`;
+      }
+
       return {
-        subject: `Rendez-vous confirmé avec ${artisanName}`,
+        subject: `Rendez-vous confirmé avec ${artisanName} – ${displayDate}`,
         html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
           <h2 style="color:#16a34a;">✅ Rendez-vous confirmé</h2>
           <p>Bonjour ${clientName},</p>
           <p>Votre rendez-vous avec <strong>${artisanName}</strong> est confirmé :</p>
-          <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${dateStr}${timeStr ? ` — 🕐 ${timeStr}` : ""}</p>
+          <div style="background:#f9fafb;padding:16px;border-radius:8px;margin:16px 0;">
+            <p style="font-size:18px;font-weight:bold;margin:0 0 8px 0;">📅 ${displayDate}</p>
+            ${timeStr ? `<p style="font-size:16px;margin:0 0 8px 0;">🕐 ${timeStr}${timeEnd ? ` – ${timeEnd}` : ""}</p>` : ""}
+            ${address ? `<p style="font-size:14px;margin:0;color:#4b5563;">📍 ${address}</p>` : ""}
+          </div>
+          ${calendarLinksHtml}
           <p>En cas d'empêchement, merci de nous prévenir${artisanPhone}.</p>
-          <p>N'hésitez pas à nous contacter pour toute question.</p>
           ${payload.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${payload.artisan_email}</p>` : ""}
           ${payload.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${payload.artisan_phone}</p>` : ""}
           <br/>
@@ -137,7 +192,9 @@ function getSmsTemplate(eventType: EventType, payload: Record<string, unknown>):
     case "APPOINTMENT_CONFIRMED": {
       const dateStr = (payload.appointment_date as string) || "";
       const timeStr = (payload.appointment_time as string) || "";
-      return `✅ RDV confirmé avec ${artisanName} : ${dateStr}${timeStr ? ` à ${timeStr}` : ""}.${artisanPhone ? ` Contact : ${artisanPhone}` : ""}`;
+      const timeEnd = (payload.appointment_time_end as string) || "";
+      const address = (payload.address as string) || "";
+      return `✅ RDV confirmé avec ${artisanName} : ${dateStr}${timeStr ? ` à ${timeStr}` : ""}${timeEnd ? `–${timeEnd}` : ""}.${address ? ` 📍 ${address}` : ""}${artisanPhone ? ` Contact : ${artisanPhone}` : ""}`;
     }
   }
 }

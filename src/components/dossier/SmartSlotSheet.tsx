@@ -240,7 +240,14 @@ export function SmartSlotSheet({ open, onOpenChange, dossier }: SmartSlotSheetPr
       const dateStr = format(new Date(manualDate), "EEEE d MMMM yyyy", { locale: fr });
       await addHistorique("rdv_confirmed", `RDV fixé manuellement : ${dateStr} ${manualStart}–${manualEnd}`);
       try {
-        await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${manualStart}–${manualEnd}` });
+        const fullAddress = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
+        await sendNotification("APPOINTMENT_CONFIRMED", {
+          appointment_date: dateStr,
+          appointment_time: manualStart,
+          appointment_time_end: manualEnd,
+          address: fullAddress,
+          raw_date: manualDate,
+        });
       } catch (e) { console.error("Notification error:", e); }
 
       // Auto-sync to Google Calendar
