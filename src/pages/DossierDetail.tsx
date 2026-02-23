@@ -213,7 +213,7 @@ export default function DossierDetail() {
 
             {/* RDV block — always visible, priority */}
             <div ref={appointmentRef}>
-              <AppointmentBlock dossier={dossier} />
+              <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
             </div>
             <AppointmentBanner
               dossier={dossier}
@@ -267,7 +267,7 @@ export default function DossierDetail() {
                 onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
               <div ref={appointmentRef}>
-                <AppointmentBlock dossier={dossier} />
+                <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
               </div>
               <AppointmentBanner
                 dossier={dossier}
