@@ -21,6 +21,7 @@ import { BulbizLogo } from "@/components/BulbizLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { GmailConnectionCard } from "@/components/settings/GmailConnectionCard";
+import { GoogleCalendarCard } from "@/components/settings/GoogleCalendarCard";
 
 const DELAY_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
 const VALIDITY_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
@@ -358,6 +359,9 @@ export default function Settings() {
 
           {/* Gmail Connection - outside form since it has its own actions */}
           <GmailConnectionCard />
+
+          {/* Google Calendar Connection */}
+          <GoogleCalendarCard />
 
           {/* Signature email */}
           <Card>
