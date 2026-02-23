@@ -32,7 +32,7 @@ export function GoogleCalendarCard() {
   const handleCallback = useCallback(async (code: string) => {
     setActionLoading(true);
     try {
-      const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = `${window.location.origin}/parametres`;
       const { data, error } = await supabase.functions.invoke("google-calendar", {
         body: { action: "callback", code, redirect_uri: redirectUri },
       });
@@ -71,7 +71,7 @@ export function GoogleCalendarCard() {
   const handleConnect = async () => {
     setActionLoading(true);
     try {
-      const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = `${window.location.origin}/parametres`;
       const { data, error } = await supabase.functions.invoke("google-calendar", {
         body: { action: "authorize", redirect_uri: redirectUri },
       });
