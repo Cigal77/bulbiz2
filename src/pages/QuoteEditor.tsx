@@ -183,7 +183,7 @@ export default function QuoteEditor() {
 
   if (dossierLoading) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
+      <div className="flex-1 bg-background p-4 sm:p-6 max-w-6xl mx-auto space-y-4">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -192,7 +192,7 @@ export default function QuoteEditor() {
 
   if (!dossier) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
+      <div className="flex flex-1 flex-col items-center justify-center bg-background gap-4">
         <p className="text-lg font-medium text-foreground">Dossier introuvable</p>
         <Button variant="outline" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -203,7 +203,7 @@ export default function QuoteEditor() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex flex-1 flex-col bg-background min-h-0">
       <QuoteHeaderBar
         dossier={dossier}
         quoteNumber={quoteNumber}

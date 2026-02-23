@@ -93,7 +93,7 @@ export default function DossierDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex flex-1 flex-col bg-background min-h-0">
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b bg-background/95 backdrop-blur px-4 py-3">
           <Skeleton className="h-8 w-8 rounded-md" />
           <Skeleton className="h-5 w-48" />
@@ -109,7 +109,7 @@ export default function DossierDetail() {
 
   if (!dossier) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
+      <div className="flex flex-1 flex-col items-center justify-center bg-background gap-4">
         <p className="text-lg font-medium text-foreground">Dossier introuvable</p>
         <Button variant="outline" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -136,7 +136,7 @@ export default function DossierDetail() {
     : null;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex flex-1 flex-col bg-background min-h-0">
       {/* Compact header */}
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-background/95 backdrop-blur px-3 sm:px-6 py-2.5">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="shrink-0 h-9 w-9">
@@ -196,7 +196,7 @@ export default function DossierDetail() {
       <main className="flex-1 p-3 sm:p-6 max-w-6xl mx-auto w-full">
         {isMobile ? (
           /* ═══ MOBILE LAYOUT ═══ */
-          <div className="space-y-3 pb-20">
+          <div className="space-y-3 pb-4">
             {/* Progress + Next step (always visible) */}
             <DossierProgressBanner dossier={dossier} />
             <NextStepBanner
