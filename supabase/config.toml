@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.google-calendar]
 verify_jwt = false
+
+[functions.upload-client-media]
+verify_jwt = false

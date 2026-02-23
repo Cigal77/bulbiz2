@@ -252,14 +252,15 @@ export default function ClientForm() {
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const ext = file.name.split(".").pop();
-          const filePath = `${dossier.dossier_id}/client_${Date.now()}_${i}.${ext}`;
-          const { error: uploadError } = await supabase.storage
-            .from("dossier-medias")
-            .upload(filePath, file);
+          const formData = new FormData();
+          formData.append("token", token!);
+          formData.append("file", file);
+          const { data, error: uploadError } = await supabase.functions.invoke("upload-client-media", {
+            body: formData,
+          });
           if (uploadError) throw uploadError;
-          const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
-          mediaUrls.push({ url: urlData.publicUrl, name: file.name, type: file.type, size: file.size });
+          if (data?.error) throw new Error(data.error);
+          mediaUrls.push({ url: data.url, name: data.name, type: data.type, size: data.size });
           setUploadProgress(Math.round(((i + 1) / files.length) * 100));
         }
       }
