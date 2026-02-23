@@ -193,11 +193,27 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
           },
         },
       });
-      if (!error && data?.success) {
+      if (!error && data?.success && data?.event_id) {
+        // Store the Google Calendar event ID on the dossier
+        await supabase.from("dossiers").update({ google_calendar_event_id: data.event_id } as any).eq("id", dossier.id);
         toast({ title: "📅 RDV ajouté à Google Calendar" });
       }
     } catch {
       // Silent fail — Google Calendar is optional
+    }
+  };
+
+  // Auto-delete event from Google Calendar (silent, best-effort)
+  const deleteFromGoogleCalendar = async () => {
+    try {
+      const eventId = (dossier as any).google_calendar_event_id;
+      if (!eventId) return;
+      await supabase.functions.invoke("google-calendar", {
+        body: { action: "delete_event", event_id: eventId, dossier_id: dossier.id },
+      });
+      await supabase.from("dossiers").update({ google_calendar_event_id: null } as any).eq("id", dossier.id);
+    } catch {
+      // Silent fail
     }
   };
 
@@ -367,9 +383,12 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
   // Cancel RDV
   const cancelRdv = useMutation({
     mutationFn: async () => {
+      // Auto-delete from Google Calendar before cancelling
+      await deleteFromGoogleCalendar();
+
       const { error } = await supabase
         .from("dossiers")
-        .update({ appointment_status: "cancelled", appointment_date: null, appointment_time_start: null, appointment_time_end: null, appointment_confirmed_at: null } as any)
+        .update({ appointment_status: "cancelled", appointment_date: null, appointment_time_start: null, appointment_time_end: null, appointment_confirmed_at: null, google_calendar_event_id: null } as any)
         .eq("id", dossier.id);
       if (error) throw error;
       await addHistorique("rdv_cancelled", "Rendez-vous annulé");

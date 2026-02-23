@@ -273,6 +273,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           description: string | null
+          google_calendar_event_id: string | null
           google_place_id: string | null
           id: string
           last_relance_at: string | null
@@ -314,6 +315,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
+          google_calendar_event_id?: string | null
           google_place_id?: string | null
           id?: string
           last_relance_at?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
+          google_calendar_event_id?: string | null
           google_place_id?: string | null
           id?: string
           last_relance_at?: string | null
