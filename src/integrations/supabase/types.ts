@@ -248,6 +248,7 @@ export type Database = {
       }
       dossiers: {
         Row: {
+          access_code: string | null
           address: string | null
           address_line: string | null
           appointment_confirmed_at: string | null
@@ -259,6 +260,7 @@ export type Database = {
           appointment_status: Database["public"]["Enums"]["appointment_status"]
           appointment_time_end: string | null
           appointment_time_start: string | null
+          availability: string | null
           category: Database["public"]["Enums"]["problem_category"]
           city: string | null
           client_email: string | null
@@ -273,23 +275,30 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           description: string | null
+          floor_number: number | null
           google_calendar_event_id: string | null
           google_place_id: string | null
+          has_elevator: boolean | null
+          housing_type: string | null
           id: string
           last_relance_at: string | null
           lat: number | null
           lng: number | null
+          occupant_type: string | null
           postal_code: string | null
+          problem_types: string[] | null
           relance_active: boolean
           relance_count: number
           source: Database["public"]["Enums"]["dossier_source"]
           status: Database["public"]["Enums"]["dossier_status"]
           status_changed_at: string
+          trade_types: string[] | null
           updated_at: string
           urgency: Database["public"]["Enums"]["urgency_level"]
           user_id: string
         }
         Insert: {
+          access_code?: string | null
           address?: string | null
           address_line?: string | null
           appointment_confirmed_at?: string | null
@@ -301,6 +310,7 @@ export type Database = {
           appointment_status?: Database["public"]["Enums"]["appointment_status"]
           appointment_time_end?: string | null
           appointment_time_start?: string | null
+          availability?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           city?: string | null
           client_email?: string | null
@@ -315,23 +325,30 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
+          floor_number?: number | null
           google_calendar_event_id?: string | null
           google_place_id?: string | null
+          has_elevator?: boolean | null
+          housing_type?: string | null
           id?: string
           last_relance_at?: string | null
           lat?: number | null
           lng?: number | null
+          occupant_type?: string | null
           postal_code?: string | null
+          problem_types?: string[] | null
           relance_active?: boolean
           relance_count?: number
           source?: Database["public"]["Enums"]["dossier_source"]
           status?: Database["public"]["Enums"]["dossier_status"]
           status_changed_at?: string
+          trade_types?: string[] | null
           updated_at?: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
           user_id: string
         }
         Update: {
+          access_code?: string | null
           address?: string | null
           address_line?: string | null
           appointment_confirmed_at?: string | null
@@ -343,6 +360,7 @@ export type Database = {
           appointment_status?: Database["public"]["Enums"]["appointment_status"]
           appointment_time_end?: string | null
           appointment_time_start?: string | null
+          availability?: string | null
           category?: Database["public"]["Enums"]["problem_category"]
           city?: string | null
           client_email?: string | null
@@ -357,18 +375,24 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           description?: string | null
+          floor_number?: number | null
           google_calendar_event_id?: string | null
           google_place_id?: string | null
+          has_elevator?: boolean | null
+          housing_type?: string | null
           id?: string
           last_relance_at?: string | null
           lat?: number | null
           lng?: number | null
+          occupant_type?: string | null
           postal_code?: string | null
+          problem_types?: string[] | null
           relance_active?: boolean
           relance_count?: number
           source?: Database["public"]["Enums"]["dossier_source"]
           status?: Database["public"]["Enums"]["dossier_status"]
           status_changed_at?: string
+          trade_types?: string[] | null
           updated_at?: string
           urgency?: Database["public"]["Enums"]["urgency_level"]
           user_id?: string

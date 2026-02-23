@@ -10,10 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info, Video } from "lucide-react";
+import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info, Video, Building2, User, ArrowUpDown, KeyRound, CalendarDays } from "lucide-react";
 import { VideoRecorderWithTorch } from "@/components/VideoRecorderWithTorch";
 import { BulbizLogo } from "@/components/BulbizLogo";
-import { CATEGORY_LABELS, URGENCY_LABELS } from "@/lib/constants";
+import { URGENCY_LABELS } from "@/lib/constants";
+import { TRADE_TYPES, HOUSING_TYPES, OCCUPANT_TYPES, AVAILABILITY_OPTIONS } from "@/lib/trade-types";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,14 @@ interface DossierData {
   appointment_slots?: SlotData[];
   artisan_name?: string;
   artisan_logo_url?: string | null;
+  trade_types?: string[];
+  problem_types?: string[];
+  housing_type?: string | null;
+  occupant_type?: string | null;
+  floor_number?: number | null;
+  has_elevator?: boolean | null;
+  access_code?: string | null;
+  availability?: string | null;
 }
 
 function validateEmail(email: string): boolean {
@@ -68,6 +77,18 @@ function PrefilledBadge() {
   );
 }
 
+function ReassuranceBanner() {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl bg-primary/5 border border-primary/10 p-4 text-sm text-muted-foreground">
+      <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+      <div>
+        <p className="font-medium text-foreground text-xs">Ces informations sont facultatives</p>
+        <p className="text-xs mt-0.5">Elles nous permettent simplement de mieux préparer l'intervention et d'éviter des allers-retours inutiles.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function ClientForm() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -89,7 +110,6 @@ export default function ClientForm() {
     client_email: "",
     address: "",
     description: "",
-    category: "autre",
     urgency: "semaine",
   });
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
@@ -100,11 +120,24 @@ export default function ClientForm() {
   const [selectingSlot, setSelectingSlot] = useState(false);
   const [videoRecorderOpen, setVideoRecorderOpen] = useState(false);
 
+  // New multi-trade fields
+  const [selectedTrades, setSelectedTrades] = useState<string[]>([]);
+  const [otherTrade, setOtherTrade] = useState("");
+  const [selectedProblems, setSelectedProblems] = useState<string[]>([]);
+  const [otherProblem, setOtherProblem] = useState("");
+
+  // Practical info
+  const [housingType, setHousingType] = useState("");
+  const [occupantType, setOccupantType] = useState("");
+  const [floorNumber, setFloorNumber] = useState("");
+  const [hasElevator, setHasElevator] = useState<boolean | null>(null);
+  const [accessCode, setAccessCode] = useState("");
+  const [availability, setAvailability] = useState("");
+
   const hasSlots = (dossier?.appointment_slots?.length ?? 0) > 0;
   const isSlotMode = hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
   const alreadySelected = dossier?.appointment_slots?.find(s => s.selected_at);
 
-  // Track which fields were pre-filled by artisan
   const [prefilled, setPrefilled] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -125,7 +158,6 @@ export default function ClientForm() {
       if (data?.error) throw new Error(data.error);
       setDossier(data);
 
-      // Pre-fill form with existing data
       const pf = new Set<string>();
       const newForm = { ...form };
       if (data.client_first_name) { newForm.client_first_name = data.client_first_name; pf.add("client_first_name"); }
@@ -134,10 +166,19 @@ export default function ClientForm() {
       if (data.client_email) { newForm.client_email = data.client_email; pf.add("client_email"); }
       if (data.address) { newForm.address = data.address; pf.add("address"); }
       if (data.description) { newForm.description = data.description; pf.add("description"); }
-      if (data.category) { newForm.category = data.category; if (data.category !== "autre") pf.add("category"); }
       if (data.urgency) { newForm.urgency = data.urgency; if (data.urgency !== "semaine") pf.add("urgency"); }
       setForm(newForm);
       setPrefilled(pf);
+
+      // Pre-fill new fields
+      if (data.trade_types?.length) setSelectedTrades(data.trade_types);
+      if (data.problem_types?.length) setSelectedProblems(data.problem_types);
+      if (data.housing_type) setHousingType(data.housing_type);
+      if (data.occupant_type) setOccupantType(data.occupant_type);
+      if (data.floor_number != null) setFloorNumber(String(data.floor_number));
+      if (data.has_elevator != null) setHasElevator(data.has_elevator);
+      if (data.access_code) setAccessCode(data.access_code);
+      if (data.availability) setAvailability(data.availability);
 
       const existing = data?.appointment_slots?.find((s: SlotData) => s.selected_at);
       if (existing) setSelectedSlotId(existing.id);
@@ -175,18 +216,30 @@ export default function ClientForm() {
   };
 
   const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
+  const handleVideoRecorded = (file: File) => setFiles((prev) => [...prev, file].slice(0, MAX_FILES));
 
-  const handleVideoRecorded = (file: File) => {
-    setFiles((prev) => [...prev, file].slice(0, MAX_FILES));
+  const toggleTrade = (id: string) => {
+    setSelectedTrades((prev) =>
+      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+    );
   };
+
+  const toggleProblem = (id: string) => {
+    setSelectedProblems((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
+
+  // Get available problems based on selected trades
+  const availableProblems = TRADE_TYPES
+    .filter((t) => selectedTrades.includes(t.id))
+    .flatMap((t) => t.problems);
 
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
-
-    // Validate email
     if (form.client_email && !validateEmail(form.client_email)) {
       setEmailError("Format d'email invalide");
-      setStep(1);
+      setStep(2);
       return;
     }
 
@@ -195,7 +248,6 @@ export default function ClientForm() {
     setError(null);
 
     try {
-      // Upload files
       const mediaUrls: { url: string; name: string; type: string; size: number }[] = [];
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
@@ -206,27 +258,24 @@ export default function ClientForm() {
             .from("dossier-medias")
             .upload(filePath, file);
           if (uploadError) throw uploadError;
-
           const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
           mediaUrls.push({ url: urlData.publicUrl, name: file.name, type: file.type, size: file.size });
           setUploadProgress(Math.round(((i + 1) / files.length) * 100));
         }
       }
 
-      // Send ALL form data (not just missing fields)
-      const clientData: Record<string, string> = {};
+      const clientData: Record<string, unknown> = {};
       const normalizedPhone = form.client_phone ? normalizePhone(form.client_phone) : "";
-      
+
       if (form.client_first_name.trim()) clientData.client_first_name = form.client_first_name.trim();
       if (form.client_last_name.trim()) clientData.client_last_name = form.client_last_name.trim();
       if (normalizedPhone) clientData.client_phone = normalizedPhone;
       if (form.client_email.trim()) clientData.client_email = form.client_email.trim();
       if (form.address.trim()) clientData.address = form.address.trim();
       if (form.description.trim()) clientData.description = form.description.trim();
-      if (form.category) clientData.category = form.category;
       if (form.urgency) clientData.urgency = form.urgency;
 
-      // Pass address data if selected from Google
+      // Address data
       if (addressData.google_place_id) {
         clientData.google_place_id = addressData.google_place_id;
         if (addressData.lat) clientData.lat = String(addressData.lat);
@@ -236,14 +285,20 @@ export default function ClientForm() {
         if (addressData.address_line) clientData.address_line = addressData.address_line;
       }
 
+      // New fields
+      if (selectedTrades.length > 0) clientData.trade_types = selectedTrades;
+      if (selectedProblems.length > 0) clientData.problem_types = selectedProblems;
+      if (otherTrade.trim()) clientData.other_trade = otherTrade.trim();
+      if (otherProblem.trim()) clientData.other_problem = otherProblem.trim();
+      if (housingType) clientData.housing_type = housingType;
+      if (occupantType) clientData.occupant_type = occupantType;
+      if (floorNumber) clientData.floor_number = parseInt(floorNumber, 10);
+      if (hasElevator !== null) clientData.has_elevator = hasElevator;
+      if (accessCode.trim()) clientData.access_code = accessCode.trim();
+      if (availability) clientData.availability = availability;
+
       const { data, error: fnError } = await supabase.functions.invoke("submit-client-form", {
-        body: {
-          token,
-          action: "submit",
-          data: clientData,
-          media_urls: mediaUrls,
-          rgpd_consent: true,
-        },
+        body: { token, action: "submit", data: clientData, media_urls: mediaUrls, rgpd_consent: true },
       });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
@@ -262,6 +317,7 @@ export default function ClientForm() {
     return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
+  // Loading / Error / Success / Slot states (unchanged logic)
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -331,7 +387,7 @@ export default function ClientForm() {
     );
   }
 
-  // Slot selection mode
+  // Slot selection mode (unchanged)
   if (isSlotMode) {
     const slots = dossier?.appointment_slots ?? [];
     return (
@@ -400,10 +456,23 @@ export default function ClientForm() {
     );
   }
 
-  // Standard form mode — ALL fields editable
-  const totalSteps = 3;
+  // ═══════════════════════════════════════════════════
+  // STANDARD FORM — 5 STEPS
+  // 1: Type d'intervention (trades)
+  // 2: Vos informations + type de problème + description
+  // 3: Infos pratiques (facultatif)
+  // 4: Photos/Vidéos
+  // 5: Validation RGPD
+  // ═══════════════════════════════════════════════════
+  const totalSteps = 5;
   const progressPercent = (step / totalSteps) * 100;
-  const hasSomePrefilled = prefilled.size > 0;
+  const stepLabels: Record<number, string> = {
+    1: "Intervention",
+    2: "Informations",
+    3: "Infos pratiques",
+    4: "Photos",
+    5: "Validation",
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -413,114 +482,178 @@ export default function ClientForm() {
         </div>
       </header>
 
-      <main className="p-4 max-w-lg mx-auto mt-6 space-y-6">
+      <main className="p-4 max-w-lg mx-auto mt-4 space-y-4">
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Étape {step}/{totalSteps}</span>
-            <span>{step === 1 ? "Informations" : step === 2 ? "Photos" : "Validation"}</span>
+            <span>{stepLabels[step]}</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Bonjour{form.client_first_name ? ` ${form.client_first_name}` : ""}, vérifiez et complétez vos informations pour que votre artisan puisse intervenir au mieux.
+          Bonjour{form.client_first_name ? ` ${form.client_first_name}` : ""}, complétez ce formulaire pour que votre artisan prépare au mieux son intervention.
         </p>
 
-        {hasSomePrefilled && step === 1 && (
-          <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
-            Certaines informations sont pré-remplies par votre artisan. Vous pouvez les corriger si nécessaire.
-          </div>
-        )}
-
-        {/* Step 1: Info — ALL fields editable */}
+        {/* ═══ STEP 1: Type d'intervention ═══ */}
         {step === 1 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Vos informations</CardTitle>
-              <CardDescription>Vérifiez et corrigez si besoin.</CardDescription>
+              <CardTitle className="text-lg">Quel type d'intervention ?</CardTitle>
+              <CardDescription>Sélectionnez un ou plusieurs corps de métier concernés.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1.5">
-                    Prénom
-                    {prefilled.has("client_first_name") && <PrefilledBadge />}
-                  </Label>
+              <div className="grid grid-cols-2 gap-2.5">
+                {TRADE_TYPES.map((trade) => {
+                  const isSelected = selectedTrades.includes(trade.id);
+                  return (
+                    <button
+                      key={trade.id}
+                      onClick={() => toggleTrade(trade.id)}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-xl border-2 p-3.5 text-left transition-all active:scale-[0.97] min-h-[56px]",
+                        isSelected
+                          ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                          : "border-border hover:border-primary/30 bg-card"
+                      )}
+                    >
+                      <span className="text-xl">{trade.icon}</span>
+                      <span className={cn("text-sm font-medium", isSelected ? "text-primary" : "text-foreground")}>
+                        {trade.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedTrades.includes("autre_metier") && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Précisez le métier</Label>
                   <Input
-                    placeholder="Jean"
-                    value={form.client_first_name}
-                    onChange={(e) => setForm({ ...form, client_first_name: e.target.value })}
+                    placeholder="Ex : Menuiserie, Serrurerie…"
+                    value={otherTrade}
+                    onChange={(e) => setOtherTrade(e.target.value)}
+                    maxLength={100}
                   />
                 </div>
+              )}
+
+              {/* Dynamic problem types */}
+              {availableProblems.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">Type de problème</h4>
+                    <p className="text-xs text-muted-foreground">Précisez la nature du problème (plusieurs choix possibles).</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableProblems.map((problem) => {
+                      const isSelected = selectedProblems.includes(problem.id);
+                      return (
+                        <button
+                          key={problem.id}
+                          onClick={() => toggleProblem(problem.id)}
+                          className={cn(
+                            "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                              : "border-border bg-card text-foreground hover:border-primary/40"
+                          )}
+                        >
+                          {problem.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedProblems.some(p => p.startsWith("autre")) && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Précisez</Label>
+                      <Input
+                        placeholder="Décrivez le problème…"
+                        value={otherProblem}
+                        onChange={(e) => setOtherProblem(e.target.value)}
+                        maxLength={200}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setStep(2)} disabled={selectedTrades.length === 0}>
+                  Suivant
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ═══ STEP 2: Informations client ═══ */}
+        {step === 2 && (
+          <>
+            {prefilled.size > 0 && (
+              <div className="flex items-start gap-2 rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs text-muted-foreground">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                Certaines informations sont pré-remplies par votre artisan. Vous pouvez les corriger si nécessaire.
+              </div>
+            )}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Vos informations</CardTitle>
+                <CardDescription>Vérifiez et corrigez si besoin.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      Prénom
+                      {prefilled.has("client_first_name") && <PrefilledBadge />}
+                    </Label>
+                    <Input placeholder="Jean" value={form.client_first_name} onChange={(e) => setForm({ ...form, client_first_name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs flex items-center gap-1.5">
+                      Nom
+                      {prefilled.has("client_last_name") && <PrefilledBadge />}
+                    </Label>
+                    <Input placeholder="Dupont" value={form.client_last_name} onChange={(e) => setForm({ ...form, client_last_name: e.target.value })} />
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1.5">
-                    Nom
-                    {prefilled.has("client_last_name") && <PrefilledBadge />}
+                    Téléphone
+                    {prefilled.has("client_phone") && <PrefilledBadge />}
+                  </Label>
+                  <Input placeholder="06 12 34 56 78" type="tel" value={form.client_phone} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Email
+                    {prefilled.has("client_email") && <PrefilledBadge />}
                   </Label>
                   <Input
-                    placeholder="Dupont"
-                    value={form.client_last_name}
-                    onChange={(e) => setForm({ ...form, client_last_name: e.target.value })}
+                    placeholder="client@email.com"
+                    type="email"
+                    value={form.client_email}
+                    onChange={(e) => { setForm({ ...form, client_email: e.target.value }); setEmailError(""); }}
+                    className={emailError ? "border-destructive" : ""}
                   />
+                  {emailError && <p className="text-xs text-destructive">{emailError}</p>}
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1.5">
-                  Téléphone
-                  {prefilled.has("client_phone") && <PrefilledBadge />}
-                </Label>
-                <Input
-                  placeholder="06 12 34 56 78"
-                  type="tel"
-                  value={form.client_phone}
-                  onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1.5">
-                  Email
-                  {prefilled.has("client_email") && <PrefilledBadge />}
-                </Label>
-                <Input
-                  placeholder="client@email.com"
-                  type="email"
-                  value={form.client_email}
-                  onChange={(e) => { setForm({ ...form, client_email: e.target.value }); setEmailError(""); }}
-                  className={emailError ? "border-destructive" : ""}
-                />
-                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1.5">
-                  Adresse d'intervention
-                  {prefilled.has("address") && <PrefilledBadge />}
-                </Label>
-                <AddressAutocomplete
-                  value={form.address}
-                  onChange={(val) => { setForm({ ...form, address: val }); setAddressData({}); }}
-                  onAddressSelect={(data) => { setForm({ ...form, address: data.address }); setAddressData(data); }}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1.5">
-                    Type de problème
-                    {prefilled.has("category") && <PrefilledBadge />}
+                    Adresse d'intervention
+                    {prefilled.has("address") && <PrefilledBadge />}
                   </Label>
-                  <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(val) => { setForm({ ...form, address: val }); setAddressData({}); }}
+                    onAddressSelect={(data) => { setForm({ ...form, address: data.address }); setAddressData(data); }}
+                  />
                 </div>
+
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center gap-1.5">
                     Urgence
@@ -535,32 +668,183 @@ export default function ClientForm() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1.5">
-                  Description du problème
-                  {prefilled.has("description") && <PrefilledBadge />}
-                </Label>
-                <Textarea
-                  rows={5}
-                  placeholder="Ex : Fuite sous l'évier de la cuisine depuis hier soir…"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  maxLength={5000}
-                />
-                <span className="text-xs text-muted-foreground">{form.description.length}/5000</span>
-              </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    Description du problème
+                    {prefilled.has("description") && <PrefilledBadge />}
+                  </Label>
+                  <Textarea
+                    rows={4}
+                    placeholder="Ex : Fuite sous l'évier de la cuisine depuis hier soir…"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    maxLength={5000}
+                  />
+                  <span className="text-xs text-muted-foreground">{form.description.length}/5000</span>
+                </div>
 
-              <div className="flex justify-end">
-                <Button onClick={() => setStep(2)}>Suivant</Button>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex justify-between">
+                  <Button variant="ghost" onClick={() => setStep(1)}>Retour</Button>
+                  <Button onClick={() => setStep(3)}>Suivant</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
 
-        {/* Step 2: Photos */}
-        {step === 2 && (
+        {/* ═══ STEP 3: Infos pratiques (facultatif) ═══ */}
+        {step === 3 && (
+          <>
+            <ReassuranceBanner />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Quelques infos pratiques</CardTitle>
+                <CardDescription>Pour intervenir dans les meilleures conditions. <span className="text-primary font-medium">Tout est facultatif.</span></CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Housing type */}
+                <div className="space-y-2">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Type de logement
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {HOUSING_TYPES.map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => setHousingType(housingType === h.id ? "" : h.id)}
+                        className={cn(
+                          "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                          housingType === h.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Occupant type */}
+                <div className="space-y-2">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    Vous êtes
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {OCCUPANT_TYPES.map((o) => (
+                      <button
+                        key={o.id}
+                        onClick={() => setOccupantType(occupantType === o.id ? "" : o.id)}
+                        className={cn(
+                          "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                          occupantType === o.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Access info */}
+                <div className="space-y-3">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    Accès
+                  </Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">Étage</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={99}
+                        placeholder="Ex : 3"
+                        value={floorNumber}
+                        onChange={(e) => setFloorNumber(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">Ascenseur</Label>
+                      <div className="flex gap-2 h-10 items-center">
+                        <button
+                          onClick={() => setHasElevator(hasElevator === true ? null : true)}
+                          className={cn(
+                            "rounded-lg border px-3 py-1.5 text-sm transition-all",
+                            hasElevator === true ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+                          )}
+                        >
+                          Oui
+                        </button>
+                        <button
+                          onClick={() => setHasElevator(hasElevator === false ? null : false)}
+                          className={cn(
+                            "rounded-lg border px-3 py-1.5 text-sm transition-all",
+                            hasElevator === false ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+                          )}
+                        >
+                          Non
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <KeyRound className="h-3 w-3" />
+                      Digicode / badge
+                    </Label>
+                    <Input
+                      placeholder="Ex : 1234A"
+                      value={accessCode}
+                      onChange={(e) => setAccessCode(e.target.value)}
+                      maxLength={50}
+                    />
+                  </div>
+                </div>
+
+                {/* Availability */}
+                <div className="space-y-2">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Disponibilités
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {AVAILABILITY_OPTIONS.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => setAvailability(availability === a.id ? "" : a.id)}
+                        className={cn(
+                          "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                          availability === a.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card text-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-between pt-2">
+                  <Button variant="ghost" onClick={() => setStep(2)}>Retour</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setStep(4)}>Passer</Button>
+                    <Button onClick={() => setStep(4)}>Continuer</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* ═══ STEP 4: Photos ═══ */}
+        {step === 4 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Ajoutez des photos</CardTitle>
@@ -595,12 +879,7 @@ export default function ClientForm() {
                     <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 10 Mo</span>
                     <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} capture="environment" />
                   </label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full gap-2"
-                    onClick={() => setVideoRecorderOpen(true)}
-                  >
+                  <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setVideoRecorderOpen(true)}>
                     <Video className="h-4 w-4" />
                     Filmer avec flash
                   </Button>
@@ -608,15 +887,15 @@ export default function ClientForm() {
               )}
 
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(1)}>Retour</Button>
-                <Button onClick={() => setStep(3)}>{files.length === 0 ? "Passer" : "Suivant"}</Button>
+                <Button variant="ghost" onClick={() => setStep(3)}>Retour</Button>
+                <Button onClick={() => setStep(5)}>{files.length === 0 ? "Passer" : "Suivant"}</Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 3: RGPD + Submit */}
-        {step === 3 && (
+        {/* ═══ STEP 5: RGPD + Submit ═══ */}
+        {step === 5 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Validation</CardTitle>
@@ -627,6 +906,11 @@ export default function ClientForm() {
                 <p className="font-medium text-foreground">Récapitulatif :</p>
                 {form.client_first_name && (
                   <p className="text-muted-foreground">Client : {form.client_first_name} {form.client_last_name}</p>
+                )}
+                {selectedTrades.length > 0 && (
+                  <p className="text-muted-foreground">
+                    Métier(s) : {selectedTrades.map(t => TRADE_TYPES.find(tt => tt.id === t)?.label ?? t).join(", ")}
+                  </p>
                 )}
                 {form.address && (
                   <p className="text-muted-foreground truncate">Adresse : {form.address}</p>
@@ -668,7 +952,7 @@ export default function ClientForm() {
               )}
 
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(2)}>Retour</Button>
+                <Button variant="ghost" onClick={() => setStep(4)}>Retour</Button>
                 <Button onClick={handleSubmit} disabled={submitting || !rgpdConsent} className="gap-2">
                   {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" />Envoi…</>) : "Envoyer"}
                 </Button>
