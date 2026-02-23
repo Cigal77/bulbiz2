@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,34 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(false);
 
+  const normalize = (s: string) =>
+    s
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "")
+      .toUpperCase();
+
+  // Pre-fill quote number with DEV-NOM-PRENOM on open
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data: dossier } = await supabase
+        .from("dossiers")
+        .select("client_last_name, client_first_name")
+        .eq("id", dossierId)
+        .single();
+      if (dossier) {
+        const parts = [
+          "DEV",
+          dossier.client_last_name ? normalize(dossier.client_last_name) : null,
+          dossier.client_first_name ? normalize(dossier.client_first_name) : null,
+        ].filter(Boolean);
+        setQuoteNumber(parts.join("-"));
+      }
+    })();
+  }, [open, dossierId]);
+
   const resetForm = () => {
     setFile(null);
     setQuoteNumber("");
@@ -39,13 +67,6 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
     setIssueDate(new Date().toISOString().split("T")[0]);
   };
 
-  const normalize = (s: string) =>
-    s
-      .trim()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") // enlève accents
-      .replace(/[^a-zA-Z0-9]+/g, "")   // enlève espaces/ponctuation
-      .toUpperCase();
 
   const handleSubmit = async () => {
     if (!file || !user) return;
