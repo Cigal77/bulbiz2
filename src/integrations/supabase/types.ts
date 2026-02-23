@@ -1253,18 +1253,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      generate_invoice_number:
-        | { Args: { p_user_id: string }; Returns: string }
-        | {
-            Args: { p_client_name?: string; p_user_id: string }
-            Returns: string
-          }
-      generate_quote_number:
-        | { Args: { p_user_id: string }; Returns: string }
-        | {
-            Args: { p_client_name?: string; p_user_id: string }
-            Returns: string
-          }
+      generate_invoice_number: {
+        Args: { p_client_name?: string; p_user_id: string }
+        Returns: string
+      }
+      generate_quote_number: {
+        Args: { p_client_name?: string; p_user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
