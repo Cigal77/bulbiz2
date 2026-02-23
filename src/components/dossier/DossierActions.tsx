@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +34,18 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   const [planOpen, setPlanOpen] = useState(false);
   const [importDevisOpen, setImportDevisOpen] = useState(false);
   const [importFactureOpen, setImportFactureOpen] = useState(false);
+
+  // Listen for custom events from NextStepBanner
+  useEffect(() => {
+    const openVoice = () => setVoiceOpen(true);
+    const openPhoto = () => setPhotoOpen(true);
+    window.addEventListener("open-voice-recorder", openVoice);
+    window.addEventListener("open-photo-upload", openPhoto);
+    return () => {
+      window.removeEventListener("open-voice-recorder", openVoice);
+      window.removeEventListener("open-photo-upload", openPhoto);
+    };
+  }, []);
 
   const status = dossier.status;
 
