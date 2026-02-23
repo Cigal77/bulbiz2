@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "npm:resend@2.0.0";
 
-// ── Helpers for sending confirmation email/SMS ──
 function formatDateFr(dateStr: string): string {
   const date = new Date(dateStr);
   const days = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -62,7 +61,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate token
     const { data: dossier, error: dossierError } = await supabase
       .from("dossiers")
       .select("*")
@@ -81,7 +79,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ACTION: get dossier info
+    // ── GET ──
     if (!action || action === "get") {
       const { data: slots } = await supabase
         .from("appointment_slots")
@@ -89,7 +87,6 @@ Deno.serve(async (req) => {
         .eq("dossier_id", dossier.id)
         .order("slot_date", { ascending: true });
 
-      // Fetch artisan profile for branding
       const { data: profile } = await supabase
         .from("profiles")
         .select("company_name, first_name, last_name, phone, email, logo_url")
@@ -115,12 +112,19 @@ Deno.serve(async (req) => {
         appointment_slots: slots || [],
         artisan_name,
         artisan_logo_url: profile?.logo_url || null,
+        // New fields
+        trade_types: dossier.trade_types || [],
+        problem_types: dossier.problem_types || [],
+        housing_type: dossier.housing_type,
+        occupant_type: dossier.occupant_type,
+        floor_number: dossier.floor_number,
+        has_elevator: dossier.has_elevator,
+        access_code: dossier.access_code,
+        availability: dossier.availability,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      
     }
 
-    // ACTION: submit client data (update ALL provided fields, track changes)
+    // ── SUBMIT ──
     if (action === "submit") {
       const { data: clientData, rgpd_consent, media_urls } = body;
 
@@ -130,7 +134,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Build update object and track what changed
       const updates: Record<string, unknown> = {};
       const changedFields: string[] = [];
 
@@ -158,11 +161,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Category & urgency
-      if (clientData?.category && clientData.category !== dossier.category) {
-        updates.category = clientData.category;
-        changedFields.push("Catégorie modifiée");
-      }
       if (clientData?.urgency && clientData.urgency !== dossier.urgency) {
         updates.urgency = clientData.urgency;
         changedFields.push("Urgence modifiée");
@@ -176,6 +174,77 @@ Deno.serve(async (req) => {
         if (clientData.postal_code) updates.postal_code = clientData.postal_code;
         if (clientData.city) updates.city = clientData.city;
         if (clientData.address_line) updates.address_line = clientData.address_line;
+      }
+
+      // ── New multi-trade fields ──
+      if (clientData?.trade_types && Array.isArray(clientData.trade_types)) {
+        const current = dossier.trade_types || [];
+        const incoming = clientData.trade_types as string[];
+        if (JSON.stringify(current.sort()) !== JSON.stringify([...incoming].sort())) {
+          updates.trade_types = incoming;
+          changedFields.push("Types d'intervention sélectionnés");
+        }
+      }
+
+      if (clientData?.problem_types && Array.isArray(clientData.problem_types)) {
+        const current = dossier.problem_types || [];
+        const incoming = clientData.problem_types as string[];
+        if (JSON.stringify(current.sort()) !== JSON.stringify([...incoming].sort())) {
+          updates.problem_types = incoming;
+          changedFields.push("Types de problème sélectionnés");
+        }
+      }
+
+      // Append other_trade / other_problem to description if provided
+      const extras: string[] = [];
+      if (clientData?.other_trade) extras.push(`Autre métier : ${clientData.other_trade}`);
+      if (clientData?.other_problem) extras.push(`Autre problème : ${clientData.other_problem}`);
+      if (extras.length > 0) {
+        const currentDesc = (updates.description as string) || dossier.description || "";
+        const separator = currentDesc ? "\n\n" : "";
+        updates.description = currentDesc + separator + extras.join("\n");
+        if (!changedFields.includes("Description modifié") && !changedFields.includes("Description ajouté")) {
+          changedFields.push("Description complétée");
+        }
+      }
+
+      // Practical info fields
+      const practicalFields = [
+        { key: "housing_type", label: "Type de logement" },
+        { key: "occupant_type", label: "Statut occupant" },
+        { key: "access_code", label: "Code d'accès" },
+        { key: "availability", label: "Disponibilités" },
+      ] as const;
+
+      let practicalChanged = false;
+      for (const { key, label } of practicalFields) {
+        const newVal = clientData?.[key];
+        if (newVal !== undefined && newVal !== null && newVal !== "") {
+          const currentVal = (dossier as Record<string, unknown>)[key];
+          if (newVal !== currentVal) {
+            updates[key] = typeof newVal === "string" ? newVal.trim() : newVal;
+            practicalChanged = true;
+          }
+        }
+      }
+
+      if (clientData?.floor_number !== undefined && clientData.floor_number !== null) {
+        const floorNum = typeof clientData.floor_number === "string" ? parseInt(clientData.floor_number, 10) : clientData.floor_number;
+        if (!isNaN(floorNum) && floorNum !== dossier.floor_number) {
+          updates.floor_number = floorNum;
+          practicalChanged = true;
+        }
+      }
+
+      if (clientData?.has_elevator !== undefined && clientData.has_elevator !== null) {
+        if (clientData.has_elevator !== dossier.has_elevator) {
+          updates.has_elevator = clientData.has_elevator;
+          practicalChanged = true;
+        }
+      }
+
+      if (practicalChanged) {
+        changedFields.push("Informations pratiques complétées");
       }
 
       // Update source
@@ -215,7 +284,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Log in historique with detailed changes
+      // Log in historique
       const details = changedFields.length > 0
         ? `Le client a mis à jour : ${changedFields.join(", ")}${media_urls?.length ? ` + ${media_urls.length} média(s)` : ""}`
         : `Le client a soumis le formulaire${media_urls?.length ? ` avec ${media_urls.length} média(s)` : ""}`;
@@ -236,7 +305,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Notify artisan by email when client fills the form
+      // Notify artisan
       try {
         const { data: profile } = await supabase
           .from("profiles")
@@ -280,7 +349,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ACTION: select appointment slot
+    // ── SELECT SLOT ──
     if (action === "select_slot") {
       const { slot_id } = body;
       if (!slot_id) {
@@ -301,19 +370,9 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Mark selected slot
-      await supabase
-        .from("appointment_slots")
-        .update({ selected_at: new Date().toISOString() })
-        .eq("id", slot_id);
+      await supabase.from("appointment_slots").update({ selected_at: new Date().toISOString() }).eq("id", slot_id);
+      await supabase.from("appointment_slots").update({ selected_at: null }).eq("dossier_id", dossier.id).neq("id", slot_id);
 
-      await supabase
-        .from("appointment_slots")
-        .update({ selected_at: null })
-        .eq("dossier_id", dossier.id)
-        .neq("id", slot_id);
-
-      // Count total slots for this dossier
       const { count: totalSlots } = await supabase
         .from("appointment_slots")
         .select("id", { count: "exact", head: true })
@@ -325,48 +384,34 @@ Deno.serve(async (req) => {
       const timeRange = `${slot.time_start.slice(0,5)}–${slot.time_end.slice(0,5)}`;
 
       if (isSingleSlot) {
-        // Auto-confirm: only 1 slot, no need for artisan to confirm again
-        await supabase
-          .from("dossiers")
-          .update({
-            appointment_status: "rdv_confirmed",
-            status: "rdv_pris",
-            status_changed_at: new Date().toISOString(),
-            appointment_date: slot.slot_date,
-            appointment_time_start: slot.time_start,
-            appointment_time_end: slot.time_end,
-            appointment_source: "client_selected",
-            appointment_confirmed_at: new Date().toISOString(),
-          })
-          .eq("id", dossier.id);
+        await supabase.from("dossiers").update({
+          appointment_status: "rdv_confirmed",
+          status: "rdv_pris",
+          status_changed_at: new Date().toISOString(),
+          appointment_date: slot.slot_date,
+          appointment_time_start: slot.time_start,
+          appointment_time_end: slot.time_end,
+          appointment_source: "client_selected",
+          appointment_confirmed_at: new Date().toISOString(),
+        }).eq("id", dossier.id);
 
         await supabase.from("historique").insert({
-          dossier_id: dossier.id,
-          user_id: null,
+          dossier_id: dossier.id, user_id: null,
           action: "client_slot_selected",
           details: `Le client a confirmé le créneau du ${slotDateShort} ${timeRange}`,
         });
 
         await supabase.from("historique").insert({
-          dossier_id: dossier.id,
-          user_id: null,
+          dossier_id: dossier.id, user_id: null,
           action: "rdv_confirmed",
           details: `Rendez-vous auto-confirmé : ${slotDateFr} ${timeRange}`,
         });
 
         // Send confirmation email + SMS
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", dossier.user_id)
-          .maybeSingle();
-
-        const artisanName = profile?.company_name
-          || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
-          || "Votre artisan";
+        const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", dossier.user_id).maybeSingle();
+        const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
         const clientName = dossier.client_first_name || "Bonjour";
 
-        // Email
         const clientEmail = dossier.client_email;
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (clientEmail && resendKey) {
@@ -388,18 +433,12 @@ Deno.serve(async (req) => {
               </div>`,
             });
             await supabase.from("notification_logs").insert({
-              dossier_id: dossier.id,
-              event_type: "APPOINTMENT_CONFIRMED",
-              channel: "email",
-              recipient: clientEmail,
-              status: "SENT",
+              dossier_id: dossier.id, event_type: "APPOINTMENT_CONFIRMED",
+              channel: "email", recipient: clientEmail, status: "SENT",
             });
-          } catch (e) {
-            console.error("Email error on auto-confirm:", e);
-          }
+          } catch (e) { console.error("Email error on auto-confirm:", e); }
         }
 
-        // SMS
         const clientPhone = dossier.client_phone;
         if (clientPhone) {
           const normalized = normalizePhone(clientPhone);
@@ -409,11 +448,8 @@ Deno.serve(async (req) => {
             );
             if (sent) {
               await supabase.from("notification_logs").insert({
-                dossier_id: dossier.id,
-                event_type: "APPOINTMENT_CONFIRMED",
-                channel: "sms",
-                recipient: normalized,
-                status: "SENT",
+                dossier_id: dossier.id, event_type: "APPOINTMENT_CONFIRMED",
+                channel: "sms", recipient: normalized, status: "SENT",
               });
             }
           }
@@ -423,15 +459,10 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } else {
-        // Multiple slots: keep current behavior — artisan must confirm
-        await supabase
-          .from("dossiers")
-          .update({ appointment_status: "client_selected" })
-          .eq("id", dossier.id);
+        await supabase.from("dossiers").update({ appointment_status: "client_selected" }).eq("id", dossier.id);
 
         await supabase.from("historique").insert({
-          dossier_id: dossier.id,
-          user_id: null,
+          dossier_id: dossier.id, user_id: null,
           action: "client_slot_selected",
           details: `Le client a choisi le créneau du ${slotDateShort} ${timeRange}`,
         });
@@ -445,8 +476,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Action inconnue" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err) {
+    console.error("submit-client-form error:", err);
+    return new Response(JSON.stringify({ error: "Erreur serveur" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

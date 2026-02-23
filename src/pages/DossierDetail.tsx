@@ -5,6 +5,7 @@ import { ClientBlock } from "@/components/dossier/ClientBlock";
 import { DossierProgressBanner } from "@/components/dossier/DossierProgressBanner";
 import { NextStepBanner } from "@/components/dossier/NextStepBanner";
 import { InterventionBlock } from "@/components/dossier/InterventionBlock";
+import { AccessBlock } from "@/components/dossier/AccessBlock";
 import { MediaGallery } from "@/components/dossier/MediaGallery";
 import { SummaryBlock } from "@/components/dossier/SummaryBlock";
 import { HistoriqueTimeline } from "@/components/dossier/HistoriqueTimeline";
@@ -234,6 +235,7 @@ export default function DossierDetail() {
                 <SummaryBlock dossier={dossier} />
                 <ClientBlock dossier={dossier} />
                 <InterventionBlock dossier={dossier} />
+                <AccessBlock dossier={dossier} />
               </div>
             </CollapsibleSection>
 
@@ -278,6 +280,7 @@ export default function DossierDetail() {
               <SummaryBlock dossier={dossier} />
               <ClientBlock dossier={dossier} />
               <InterventionBlock dossier={dossier} />
+              <AccessBlock dossier={dossier} />
               <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
               <HistoriqueTimeline historique={historique} isLoading={histLoading} />
             </div>
