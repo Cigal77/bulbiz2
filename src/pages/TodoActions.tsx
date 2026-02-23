@@ -185,7 +185,7 @@ export default function TodoActions() {
   }, [actions]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex flex-1 flex-col bg-background min-h-0">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-3 py-2.5 md:hidden">
         <BulbizLogo />
         <ThemeToggle />

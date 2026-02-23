@@ -217,7 +217,7 @@ export default function InvoiceEditor() {
 
   if (invLoading) {
     return (
-      <div className="min-h-screen bg-background p-6 max-w-4xl mx-auto space-y-4">
+      <div className="flex-1 bg-background p-6 max-w-4xl mx-auto space-y-4">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -226,7 +226,7 @@ export default function InvoiceEditor() {
 
   if (!invoice) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
+      <div className="flex flex-1 flex-col items-center justify-center bg-background gap-4">
         <p className="text-lg font-medium">Facture introuvable</p>
         <Button variant="outline" onClick={() => navigate(`/dossier/${dossierId}`)}>
           <ArrowLeft className="h-4 w-4 mr-2" /> Retour
@@ -238,7 +238,7 @@ export default function InvoiceEditor() {
   const isLocked = invoice.status !== "draft";
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex flex-1 flex-col bg-background min-h-0">
       {/* Header */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
         <div className="flex items-center gap-3">

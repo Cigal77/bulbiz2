@@ -123,7 +123,7 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
+      <div className="flex-1 bg-background p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-64 rounded-xl" />
         <Skeleton className="h-48 rounded-xl" />
@@ -132,7 +132,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex-1 bg-background">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 sm:px-6 py-3">
         <BulbizLogo />
         <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
