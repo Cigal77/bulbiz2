@@ -196,6 +196,7 @@ export default function Auth() {
                       <Input
                         id="firstName"
                         placeholder="Jean"
+                        autoComplete="given-name"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         required
@@ -206,6 +207,7 @@ export default function Auth() {
                       <Input
                         id="lastName"
                         placeholder="Dupont"
+                        autoComplete="family-name"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         required
@@ -220,6 +222,7 @@ export default function Auth() {
                         id="phone"
                         type="tel"
                         placeholder="06 12 34 56 78"
+                        autoComplete="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         className="pl-10"
@@ -233,10 +236,11 @@ export default function Auth() {
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
+                   <Input
                     id="email"
                     type="email"
                     placeholder="votre@email.com"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"

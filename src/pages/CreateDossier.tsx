@@ -165,7 +165,7 @@ export default function CreateDossier() {
                     <FormItem>
                       <FormLabel>Prénom <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Jean" {...field} />
+                        <Input placeholder="Jean" autoComplete="given-name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -178,7 +178,7 @@ export default function CreateDossier() {
                     <FormItem>
                       <FormLabel>Nom <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="Dupont" {...field} />
+                        <Input placeholder="Dupont" autoComplete="family-name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -192,7 +192,7 @@ export default function CreateDossier() {
                   <FormItem>
                     <FormLabel>Téléphone <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="06 12 34 56 78" type="tel" {...field} />
+                      <Input placeholder="06 12 34 56 78" type="tel" autoComplete="tel" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -205,7 +205,7 @@ export default function CreateDossier() {
                   <FormItem>
                     <FormLabel>Email <span className="text-muted-foreground font-normal">(optionnel)</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="client@email.com" type="email" {...field} />
+                      <Input placeholder="client@email.com" type="email" autoComplete="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -240,7 +240,7 @@ export default function CreateDossier() {
                     <FormItem>
                       <FormLabel>Code postal</FormLabel>
                       <FormControl>
-                        <Input placeholder="75001" {...field} />
+                        <Input placeholder="75001" autoComplete="postal-code" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -253,7 +253,7 @@ export default function CreateDossier() {
                     <FormItem>
                       <FormLabel>Ville</FormLabel>
                       <FormControl>
-                        <Input placeholder="Paris" {...field} />
+                        <Input placeholder="Paris" autoComplete="address-level2" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

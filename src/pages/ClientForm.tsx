@@ -618,14 +618,14 @@ export default function ClientForm() {
                       Prénom
                       {prefilled.has("client_first_name") && <PrefilledBadge />}
                     </Label>
-                    <Input placeholder="Jean" value={form.client_first_name} onChange={(e) => setForm({ ...form, client_first_name: e.target.value })} />
+                    <Input placeholder="Jean" autoComplete="given-name" value={form.client_first_name} onChange={(e) => setForm({ ...form, client_first_name: e.target.value })} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs flex items-center gap-1.5">
                       Nom
                       {prefilled.has("client_last_name") && <PrefilledBadge />}
                     </Label>
-                    <Input placeholder="Dupont" value={form.client_last_name} onChange={(e) => setForm({ ...form, client_last_name: e.target.value })} />
+                    <Input placeholder="Dupont" autoComplete="family-name" value={form.client_last_name} onChange={(e) => setForm({ ...form, client_last_name: e.target.value })} />
                   </div>
                 </div>
 
@@ -634,7 +634,7 @@ export default function ClientForm() {
                     Téléphone
                     {prefilled.has("client_phone") && <PrefilledBadge />}
                   </Label>
-                  <Input placeholder="06 12 34 56 78" type="tel" value={form.client_phone} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} />
+                  <Input placeholder="06 12 34 56 78" type="tel" autoComplete="tel" value={form.client_phone} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} />
                 </div>
 
                 <div className="space-y-1">
@@ -645,6 +645,7 @@ export default function ClientForm() {
                   <Input
                     placeholder="client@email.com"
                     type="email"
+                    autoComplete="email"
                     value={form.client_email}
                     onChange={(e) => { setForm({ ...form, client_email: e.target.value }); setEmailError(""); }}
                     className={emailError ? "border-destructive" : ""}
