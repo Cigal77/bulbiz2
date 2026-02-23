@@ -20,7 +20,7 @@ import { DeleteDossierDialog } from "@/components/dashboard/DeleteDossierDialog"
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Trash2, Phone, MapPin, ChevronDown, Navigation } from "lucide-react";
+import { ArrowLeft, Trash2, Phone, MapPin, ChevronDown, Navigation, Calendar } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { BulbizLogo } from "@/components/BulbizLogo";
+import { SmartSlotSheet } from "@/components/dossier/SmartSlotSheet";
 import { useRef, useState, useEffect } from "react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,7 @@ export default function DossierDetail() {
   const [importDevisOpen, setImportDevisOpen] = useState(false);
   const [importFactureOpen, setImportFactureOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [smartSlotOpen, setSmartSlotOpen] = useState(false);
 
   useEffect(() => {
     const openDevis = () => setImportDevisOpen(true);
@@ -317,6 +319,23 @@ export default function DossierDetail() {
         }}
         clientName={clientName}
       />
+
+      {/* Smart slot sheet */}
+      <SmartSlotSheet open={smartSlotOpen} onOpenChange={setSmartSlotOpen} dossier={dossier} />
+
+      {/* FAB – mobile only, visible when RDV not confirmed/done */}
+      {isMobile && ["none", "cancelled", "rdv_pending", "slots_proposed"].includes((dossier as any).appointment_status || "none") && (
+        <button
+          onClick={() => setSmartSlotOpen(true)}
+          className={cn(
+            "fixed bottom-24 right-4 z-20 flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-3 shadow-lg hover:bg-primary/90 transition-all",
+            (dossier as any).appointment_status === "rdv_pending" && "animate-pulse"
+          )}
+        >
+          <Calendar className="h-5 w-5" />
+          <span className="text-sm font-semibold">RDV</span>
+        </button>
+      )}
     </div>
   );
 }
