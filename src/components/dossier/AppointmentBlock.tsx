@@ -24,6 +24,7 @@ import {
 
 interface AppointmentBlockProps {
   dossier: Dossier;
+  onOpenSmartSheet?: () => void;
 }
 
 interface Slot {
@@ -80,7 +81,7 @@ const STATUS_CONFIG: Record<string, { bg: string; border: string; iconColor: str
   cancelled: { bg: "bg-destructive/5", border: "border-destructive/20", iconColor: "text-destructive", headerBg: "bg-destructive/10" },
 };
 
-export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
+export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlockProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -493,15 +494,15 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       <div className="flex flex-col sm:flex-row gap-2">
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
           <Button
-            className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-sm h-11 px-2" // Changé text-base en text-sm + px-2
-            onClick={() => setShowManualForm(true)}
+            className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md text-sm h-11 px-2"
+            onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}
           >
             <Calendar className="h-4 w-4 shrink-0" />
-            <span className="truncate">Fixer un rendez-vous</span> {/* Ajout de truncate au cas où */}
+            <span className="truncate">Fixer un rendez-vous</span>
           </Button>
         </motion.div>
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
-          <Button variant="outline" className="w-full gap-2 h-11 text-sm px-2" onClick={() => setShowSlotForm(true)}>
+          <Button variant="outline" className="w-full gap-2 h-11 text-sm px-2" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
             <Send className="h-4 w-4 shrink-0" />
             <span className="truncate">Proposer des créneaux</span>
           </Button>
@@ -516,12 +517,12 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
-              <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md h-11" onClick={() => setShowSlotForm(true)}>
+              <Button className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md h-11" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
                 <Send className="h-4 w-4" /> Proposer des créneaux
               </Button>
             </motion.div>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} className="flex-1">
-              <Button variant="outline" className="w-full gap-2 h-11" onClick={() => setShowManualForm(true)}>
+              <Button variant="outline" className="w-full gap-2 h-11" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
                 <Edit2 className="h-4 w-4" /> Fixer manuellement
               </Button>
             </motion.div>
@@ -546,10 +547,10 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
       <div className="flex flex-col gap-2">
         {status === "slots_proposed" && (
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowSlotForm(true)}>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
               <Plus className="h-3.5 w-3.5" /> Ajouter des créneaux
             </Button>
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowManualForm(true)}>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
               <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
             </Button>
           </div>
@@ -563,7 +564,7 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
                 Confirmer le rendez-vous
               </Button>
             </motion.div>
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowSlotForm(true)}>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
               <Plus className="h-3.5 w-3.5" /> Autres créneaux
             </Button>
           </div>
@@ -577,7 +578,7 @@ export function AppointmentBlock({ dossier }: AppointmentBlockProps) {
                 Intervention réalisée
               </Button>
             </motion.div>
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => setShowManualForm(true)}>
+            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
               <Edit2 className="h-3.5 w-3.5" /> Modifier
             </Button>
             <Button variant="outline" className="gap-1.5 text-destructive" onClick={() => cancelRdv.mutate()} disabled={cancelRdv.isPending}>
