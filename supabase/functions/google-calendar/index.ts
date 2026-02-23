@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("Google OAuth credentials not configured");
     }
 
-    const { action, code, redirect_uri, event, dossier_id } = await req.json();
+    const { action, code, redirect_uri, event, dossier_id, event_id } = await req.json();
     const authHeader = req.headers.get("Authorization");
 
     if (action === "authorize") {
@@ -219,6 +219,53 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(JSON.stringify({ success: true, event_id: calData.id, html_link: calData.htmlLink }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "delete_event") {
+      if (!event_id) throw new Error("Missing event_id");
+
+      const { data: connection, error: connErr } = await supabase
+        .from("google_calendar_connections")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (connErr || !connection) throw new Error("Google Calendar non connecté");
+
+      let accessToken = connection.access_token;
+      if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
+        const newTokens = await refreshToken(connection.refresh_token, googleClientId, googleClientSecret);
+        accessToken = newTokens.access_token;
+        const newExpiry = new Date(Date.now() + (newTokens.expires_in || 3600) * 1000).toISOString();
+        await supabase.from("google_calendar_connections").update({
+          access_token: accessToken,
+          token_expires_at: newExpiry,
+        }).eq("user_id", user.id);
+      }
+
+      const delResp = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${event_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!delResp.ok && delResp.status !== 404) {
+        const errData = await delResp.json();
+        console.error("Google Calendar delete error:", errData);
+        throw new Error(errData.error?.message || "Erreur suppression Google Calendar");
+      }
+
+      if (dossier_id) {
+        await supabase.from("historique").insert({
+          dossier_id,
+          user_id: user.id,
+          action: "google_calendar_deleted",
+          details: `RDV supprimé de Google Calendar (${connection.google_email})`,
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
