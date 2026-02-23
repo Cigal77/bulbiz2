@@ -129,6 +129,37 @@ export function SmartSlotSheet({ open, onOpenChange, dossier }: SmartSlotSheetPr
     });
   };
 
+  // Auto-sync to Google Calendar (silent, best-effort)
+  const syncToGoogleCalendar = async (date: string, startTime: string, endTime: string) => {
+    try {
+      const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ");
+      const { data, error } = await supabase.functions.invoke("google-calendar", {
+        body: {
+          action: "add_event",
+          dossier_id: dossier.id,
+          event: {
+            summary: `RDV${clientName ? ` – ${clientName}` : ""}`,
+            date,
+            start_time: startTime.slice(0, 5),
+            end_time: endTime.slice(0, 5),
+            location: dossier.address || "",
+            description: [
+              clientName && `Client : ${clientName}`,
+              dossier.client_phone && `Tél : ${dossier.client_phone}`,
+              dossier.description,
+            ].filter(Boolean).join("\n"),
+          },
+        },
+      });
+      if (!error && data?.success && data?.event_id) {
+        await supabase.from("dossiers").update({ google_calendar_event_id: data.event_id } as any).eq("id", dossier.id);
+        toast({ title: "📅 RDV ajouté à Google Calendar" });
+      }
+    } catch {
+      // Silent fail — Google Calendar is optional
+    }
+  };
+
   const sendNotification = async (eventType: string, extraPayload?: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke("send-appointment-notification", {
       body: { event_type: eventType, dossier_id: dossier.id, payload: extraPayload || {} },
@@ -215,6 +246,9 @@ export function SmartSlotSheet({ open, onOpenChange, dossier }: SmartSlotSheetPr
       try {
         await sendNotification("APPOINTMENT_CONFIRMED", { appointment_date: dateStr, appointment_time: `${manualStart}–${manualEnd}` });
       } catch (e) { console.error("Notification error:", e); }
+
+      // Auto-sync to Google Calendar
+      syncToGoogleCalendar(manualDate, manualStart, manualEnd);
     },
     onSuccess: () => {
       toast({ title: "Rendez-vous confirmé ✅" });
