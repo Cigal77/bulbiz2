@@ -158,7 +158,7 @@ export function MobileBottomNav() {
               )}
             >
               {item.isAction ? (
-                <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary shadow-lg -mt-4">
+                <div className="flex items-center justify-center h-11 w-11 rounded-full bg-primary shadow-lg -mt-5 pointer-events-auto">
                   <item.icon className="h-5 w-5 text-primary-foreground" />
                 </div>
               ) : (
