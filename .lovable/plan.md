@@ -1,50 +1,41 @@
 
 
-# Fix : Connexion Google Calendar
+# Fix : Erreur "Unauthorized" dans send-client-link
 
-## Probleme identifie
+## Probleme
 
-La connexion Google Calendar echoue car l'URL de redirection (`https://bulbiz2.lovable.app/settings`) n'est probablement pas configuree dans la console Google Cloud comme URI de redirection autorisee. C'est la meme raison pour laquelle Gmail OAuth montre aussi des erreurs "invalid_grant".
+La fonction backend `send-client-link` echoue avec "Unauthorized" car elle appelle `getUser()` pour verifier l'authentification. Cette methode fait un appel reseau au service d'authentification qui echoue dans le contexte Lovable Cloud.
 
-## Ce que tu dois faire (cote Google Cloud Console)
+D'autres fonctions du projet (comme `summarize-dossier`) fonctionnent correctement car elles n'appellent pas `getUser()` — elles passent simplement le header d'autorisation au client et laissent les politiques de securite (RLS) filtrer les donnees.
 
-1. Va sur [Google Cloud Console - Credentials](https://console.cloud.google.com/apis/credentials)
-2. Ouvre le client OAuth correspondant (ID: `1016933936014-...`)
-3. Dans **"URIs de redirection autorises"**, ajoute :
-   - `https://bulbiz2.lovable.app/settings`
-   - (optionnel pour les tests) `https://id-preview--2e27a371-0c34-4075-96a4-b8ddd74908dd.lovable.app/settings`
-4. Active les APIs suivantes si ce n'est pas deja fait :
-   - **Google Calendar API**
-   - **People API** (ou **Google+ API** pour userinfo)
-5. Si l'app est en mode "Test", ajoute les emails des artisans comme utilisateurs test
+## Solution
 
-## Ameliorations techniques (cote code)
+Modifier `send-client-link` pour extraire le `user_id` directement depuis le token JWT (qui est deja verifie par l'infrastructure), au lieu d'appeler `getUser()`.
 
-### 1. Meilleure gestion des erreurs dans l'edge function
+## Changement technique
 
-Ajouter du logging detaille lors de l'echange de token pour faciliter le debug :
+**Fichier** : `supabase/functions/send-client-link/index.ts`
 
-**Fichier** : `supabase/functions/google-calendar/index.ts`
-- Ajouter `console.error` avec le detail de la reponse Google en cas d'echec du token exchange
-- Retourner un message d'erreur plus explicite au frontend (ex: "L'URI de redirection n'est pas autorisee dans Google Cloud")
+Remplacer le bloc d'authentification actuel :
 
-### 2. Meilleur feedback utilisateur
+```text
+// Actuel (ne fonctionne pas)
+const supabaseUser = createClient(url, anonKey, { headers: { Authorization } });
+const { data: { user } } = await supabaseUser.auth.getUser();
+if (!user) throw new Error("Unauthorized");
+```
 
-**Fichier** : `src/components/settings/GoogleCalendarCard.tsx`
-- Afficher un message d'erreur clair si le callback echoue (ex: "La configuration Google Cloud n'est pas complete")
-- Ajouter un lien vers la documentation si l'erreur est liee a la configuration
+Par une extraction directe du JWT :
 
-### 3. Verification de la redirect_uri dans le callback
+```text
+// Nouveau (extraction du user_id depuis le JWT)
+const token = authHeader.replace("Bearer ", "");
+const payload = JSON.parse(atob(token.split(".")[1]));
+const userId = payload.sub;
+if (!userId) throw new Error("Unauthorized");
+```
 
-**Fichier** : `supabase/functions/google-calendar/index.ts`
-- S'assurer que la `redirect_uri` envoyee lors du callback correspond exactement a celle utilisee lors de l'autorisation (meme domaine, meme chemin)
+Puis remplacer toutes les references a `user.id` par `userId` dans le reste de la fonction.
 
-## Resume des actions
-
-| Action | Responsable |
-|--------|------------|
-| Ajouter l'URI de redirection dans Google Cloud Console | Toi (manuel) |
-| Activer Google Calendar API | Toi (manuel) |
-| Ameliorer le logging dans l'edge function | Code |
-| Ameliorer les messages d'erreur dans le frontend | Code |
+Aucun autre fichier n'est impacte. Le comportement fonctionnel reste identique.
 
