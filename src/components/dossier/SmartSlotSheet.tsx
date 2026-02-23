@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
+import { buildCalendarDescription, buildCalendarSummary } from "@/lib/calendar-event-helpers";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -132,22 +133,17 @@ export function SmartSlotSheet({ open, onOpenChange, dossier }: SmartSlotSheetPr
   // Auto-sync to Google Calendar (silent, best-effort)
   const syncToGoogleCalendar = async (date: string, startTime: string, endTime: string) => {
     try {
-      const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ");
       const { data, error } = await supabase.functions.invoke("google-calendar", {
         body: {
           action: "add_event",
           dossier_id: dossier.id,
           event: {
-            summary: `RDV${clientName ? ` – ${clientName}` : ""}`,
+            summary: buildCalendarSummary(dossier),
             date,
             start_time: startTime.slice(0, 5),
             end_time: endTime.slice(0, 5),
-            location: dossier.address || "",
-            description: [
-              clientName && `Client : ${clientName}`,
-              dossier.client_phone && `Tél : ${dossier.client_phone}`,
-              dossier.description,
-            ].filter(Boolean).join("\n"),
+            location: dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", "),
+            description: buildCalendarDescription(dossier),
           },
         },
       });
