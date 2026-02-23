@@ -154,15 +154,15 @@ export default function Settings() {
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">Prénom</Label>
-                <Input id="first_name" {...register("first_name")} />
+                <Input id="first_name" autoComplete="given-name" {...register("first_name")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="last_name">Nom</Label>
-                <Input id="last_name" {...register("last_name")} />
+                <Input id="last_name" autoComplete="family-name" {...register("last_name")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company_name">Entreprise</Label>
-                <Input id="company_name" {...register("company_name")} />
+                <Input id="company_name" autoComplete="organization" {...register("company_name")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone</Label>
@@ -170,7 +170,7 @@ export default function Settings() {
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="email">Email professionnel</Label>
-                <Input id="email" type="email" {...register("email")} />
+                <Input id="email" type="email" autoComplete="email" {...register("email")} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="siret">SIRET</Label>
@@ -178,7 +178,7 @@ export default function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Adresse</Label>
-                <Input id="address" {...register("address")} placeholder="12 rue des Artisans, 75001 Paris" />
+                <Input id="address" autoComplete="street-address" {...register("address")} placeholder="12 rue des Artisans, 75001 Paris" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
