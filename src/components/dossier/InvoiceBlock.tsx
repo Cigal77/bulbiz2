@@ -283,7 +283,7 @@ function InvoiceRow({
           </Button>
         )}
 
-        {/* Envoi email (si tu veux comme devis) */}
+        {/* Envoi email */}
         <Button
           variant={invoice.status === "draft" ? "default" : "outline"}
           size="sm"

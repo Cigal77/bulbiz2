@@ -19,9 +19,10 @@ import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
 function useActionBadges() {
   const { data: dossiers } = useDossiers();
   return useMemo(() => {
-    if (!dossiers) return { todo: 0, rdvToday: 0 };
+    if (!dossiers) return { todo: 0, rdvToday: 0, rdvPending: 0 };
     let todo = 0;
     let rdvToday = 0;
+    let rdvPending = 0;
     for (const d of dossiers) {
       // New flow: RDV → Intervention → Devis → Facture
       if (["nouveau", "a_qualifier", "en_attente_rdv"].includes(d.status) && d.appointment_status === "none") todo++;
@@ -33,8 +34,12 @@ function useActionBadges() {
         rdvToday++;
         todo++;
       }
+      // Count pending RDVs (slots proposed, client selected, or confirmed upcoming)
+      if (["rdv_pending", "slots_proposed", "client_selected"].includes(d.appointment_status as string)) {
+        rdvPending++;
+      }
     }
-    return { todo, rdvToday };
+    return { todo, rdvToday, rdvPending };
   }, [dossiers]);
 }
 
@@ -80,7 +85,7 @@ export function MobileBottomNav() {
     {
       id: "rdv", icon: Calendar, label: "RDV",
       path: "/rdv",
-      badge: badges.rdvToday > 0 ? badges.rdvToday : undefined,
+      badge: (badges.rdvToday + badges.rdvPending) > 0 ? (badges.rdvToday + badges.rdvPending) : undefined,
       isActive: location.pathname === "/rdv",
     },
     {

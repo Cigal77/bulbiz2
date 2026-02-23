@@ -76,17 +76,16 @@ export default function Settings() {
         relance_delay_devis_2: profile.relance_delay_devis_2,
         email_signature: profile.email_signature || [
           "Cordialement,",
-          [profile.first_name, profile.last_name].filter(Boolean).join(" "),
-          profile.company_name,
+          profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" "),
           profile.phone,
           profile.email,
         ].filter(Boolean).join("\n"),
-        auto_send_client_link: (profile as any).auto_send_client_link ?? true,
-        client_link_validity_days: (profile as any).client_link_validity_days ?? 7,
-        sms_enabled: (profile as any).sms_enabled ?? true,
-        tva_intracom: (profile as any).tva_intracom ?? "",
-        vat_applicable: (profile as any).vat_applicable ?? true,
-        payment_terms_default: (profile as any).payment_terms_default ?? "Paiement à réception de facture. Chèque, virement ou espèces.",
+        auto_send_client_link: profile.auto_send_client_link ?? true,
+        client_link_validity_days: profile.client_link_validity_days ?? 7,
+        sms_enabled: profile.sms_enabled ?? true,
+        tva_intracom: profile.tva_intracom ?? "",
+        vat_applicable: profile.vat_applicable ?? true,
+        payment_terms_default: profile.payment_terms_default ?? "Paiement à réception de facture. Chèque, virement ou espèces.",
       });
     }
   }, [profile, reset]);
@@ -166,7 +165,7 @@ export default function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone</Label>
-                <Input id="phone" type="tel" {...register("phone")} />
+                <Input id="phone" type="text" inputMode="tel" autoComplete="tel" {...register("phone")} />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="email">Email professionnel</Label>
@@ -318,6 +317,41 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* TVA & Facturation */}
+          <Card>
+            <CardHeader>
+              <CardTitle>TVA & Facturation</CardTitle>
+              <CardDescription>Paramètres de TVA et conditions de paiement</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>TVA applicable</Label>
+                  <p className="text-sm text-muted-foreground">Appliquer la TVA sur vos devis et factures</p>
+                </div>
+                <Switch
+                  checked={watch("vat_applicable")}
+                  onCheckedChange={(v) => setValue("vat_applicable", v)}
+                />
+              </div>
+              {watch("vat_applicable") && (
+                <div className="space-y-2">
+                  <Label htmlFor="tva_intracom">N° TVA intracommunautaire</Label>
+                  <Input id="tva_intracom" {...register("tva_intracom")} placeholder="FR 12 345678901" />
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="payment_terms_default">Conditions de paiement</Label>
+                <Textarea
+                  id="payment_terms_default"
+                  rows={2}
+                  placeholder="Paiement à réception de facture. Chèque, virement ou espèces."
+                  {...register("payment_terms_default")}
+                />
               </div>
             </CardContent>
           </Card>

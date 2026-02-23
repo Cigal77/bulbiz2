@@ -236,6 +236,45 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Notify artisan by email when client fills the form
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("email, first_name, last_name, company_name")
+          .eq("user_id", dossier.user_id)
+          .maybeSingle();
+
+        const artisanEmail = profile?.email;
+        if (artisanEmail) {
+          const resendKey = Deno.env.get("RESEND_API_KEY");
+          if (resendKey) {
+            const { Resend } = await import("npm:resend@2.0.0");
+            const resend = new Resend(resendKey);
+            const clientName = [
+              updates.client_first_name || dossier.client_first_name,
+              updates.client_last_name || dossier.client_last_name,
+            ].filter(Boolean).join(" ") || "Un client";
+
+            await resend.emails.send({
+              from: "Bulbiz <noreply@bulbiz.fr>",
+              to: [artisanEmail],
+              subject: `📋 ${clientName} a rempli son formulaire`,
+              html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#2563eb;">📋 Formulaire client rempli</h2>
+                <p><strong>${clientName}</strong> vient de remplir le formulaire de son dossier.</p>
+                ${changedFields.length > 0 ? `<p>Informations mises à jour : ${changedFields.join(", ")}</p>` : ""}
+                ${media_urls?.length ? `<p>${media_urls.length} média(s) ajouté(s).</p>` : ""}
+                ${updates.status === "devis_a_faire" ? '<p style="color:#16a34a;font-weight:bold;">✅ Le dossier est prêt pour établir un devis.</p>' : ""}
+                <p style="margin-top:24px;"><a href="https://bulbiz2.lovable.app/dossier/${dossier.id}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Voir le dossier</a></p>
+                <p style="font-size:13px;color:#6b7280;margin-top:24px;">Email envoyé automatiquement par Bulbiz.</p>
+              </div>`,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Error notifying artisan:", e);
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
