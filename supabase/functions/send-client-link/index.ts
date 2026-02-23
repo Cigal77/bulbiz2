@@ -98,15 +98,11 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    // Verify user
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseUser.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    // Extract user_id from JWT (already verified by infrastructure)
+    const token = authHeader.replace("Bearer ", "");
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const userId = payload.sub;
+    if (!userId) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -118,12 +114,12 @@ Deno.serve(async (req: Request) => {
       .from("dossiers")
       .select("*")
       .eq("id", dossier_id)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
     if (dErr || !dossier) throw new Error("Dossier introuvable");
 
     // Get profile
-    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
 
     const validityDays = profile?.client_link_validity_days || 7;
 
@@ -153,7 +149,7 @@ Deno.serve(async (req: Request) => {
       // Historique
       await supabase.from("historique").insert({
         dossier_id,
-        user_id: user.id,
+        user_id: userId,
         action: "client_link_generated",
         details: `Lien client généré (expire le ${new Date(expiresAt).toLocaleDateString("fr-FR")})`,
       });
@@ -172,7 +168,7 @@ Deno.serve(async (req: Request) => {
     let emailError: string | null = null;
 
     if (dossier.client_email) {
-      const gmailConn = await getGmailConnection(supabase, user.id);
+      const gmailConn = await getGmailConnection(supabase, userId);
       const artisanName =
         profile?.company_name ||
         [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
@@ -215,7 +211,7 @@ Deno.serve(async (req: Request) => {
 
       if (emailSent) {
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id, action: "client_link_sent_email",
+          dossier_id, user_id: userId, action: "client_link_sent_email",
           details: `Lien client envoyé par email à ${dossier.client_email}`,
         });
       }
@@ -237,7 +233,7 @@ Deno.serve(async (req: Request) => {
           smsSent = true;
           await supabase.from("historique").insert({
             dossier_id,
-            user_id: user.id,
+            user_id: userId,
             action: "client_link_sent_sms",
             details: `Lien client envoyé par SMS au ${dossier.client_phone}`,
           });
@@ -249,7 +245,7 @@ Deno.serve(async (req: Request) => {
     if (!dossier.client_email && !dossier.client_phone) {
       await supabase.from("historique").insert({
         dossier_id,
-        user_id: user.id,
+        user_id: userId,
         action: "client_link_not_sent",
         details: "Coordonnées manquantes : lien non envoyé",
       });
