@@ -207,14 +207,12 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseUser.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    const token = authHeader.replace("Bearer ", "");
+    const payloadBase64 = token.split(".")[1];
+    if (!payloadBase64) throw new Error("Invalid token");
+    const jwtPayload = JSON.parse(atob(payloadBase64));
+    const user = { id: jwtPayload.sub };
+    if (!user.id) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 

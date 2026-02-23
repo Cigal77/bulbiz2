@@ -95,17 +95,16 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    // ── JWT auth (consistent with other edge functions) ──
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseUser.auth.getUser();
-    if (authError || !user) throw new Error("Unauthorized");
+    const token = authHeader.replace("Bearer ", "");
+    const payloadBase64 = token.split(".")[1];
+    if (!payloadBase64) throw new Error("Invalid token");
+    const payload = JSON.parse(atob(payloadBase64));
+    const userId = payload.sub;
+    if (!userId) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -117,7 +116,7 @@ Deno.serve(async (req: Request) => {
       .from("invoices")
       .select("*")
       .eq("id", invoice_id)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
     if (invErr || !invoice) throw new Error("Facture introuvable");
 
@@ -158,27 +157,34 @@ Deno.serve(async (req: Request) => {
     // Update status to sent
     await supabase.from("invoices").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", invoice_id);
 
+    // ── Fetch profile for artisanName + signature ──
+    const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
+    const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || invoice.artisan_company || invoice.artisan_name || "Votre artisan";
+    const emailSignature = profile?.email_signature || `Cordialement,<br/>${artisanName}`;
+    const emailSubject = `${artisanName} - Facture ${invoice.invoice_number}`;
+
     let emailSent = false;
     let emailError: string | null = null;
+
+    // Build email HTML
+    const buildEmailHtml = () => `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <p>Bonjour ${invoice.client_first_name || ""},</p>
+      <p>Suite à notre intervention, veuillez trouver ci-joint votre facture <strong>${invoice.invoice_number}</strong>.</p>
+      ${pdfUrl ? `<p style="margin: 16px 0;"><a href="${pdfUrl}" style="color: #2563eb; text-decoration: underline;">Télécharger le PDF de votre facture</a></p>` : ""}
+      <p>N'hésitez pas à nous contacter pour toute question.</p>
+      ${invoice.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${invoice.artisan_email}</p>` : ""}
+      ${invoice.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${invoice.artisan_phone}</p>` : ""}
+      <br/>
+      <p>${emailSignature}</p>
+    </div>`;
 
     // Send email
     if (invoice.client_email) {
       // Try Gmail first
-      const gmailConn = await getGmailConnection(supabase, user.id);
+      const gmailConn = await getGmailConnection(supabase, userId);
 
       if (gmailConn) {
-        const artisanName = invoice.artisan_company || invoice.artisan_name || "Votre artisan";
-        const htmlContent = `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <p>Bonjour ${invoice.client_first_name || ""},</p>
-              <p>Suite à notre intervention, veuillez trouver ci-joint votre facture.</p>
-              ${pdfUrl ? `<p style="margin: 16px 0;"><a href="${pdfUrl}" style="color: #2563eb; text-decoration: underline;">Télécharger le PDF de votre facture</a></p>` : ""}
-              <p>N'hésitez pas à nous contacter pour toute question.</p>
-              ${invoice.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${invoice.artisan_email}</p>` : ""}
-              ${invoice.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${invoice.artisan_phone}</p>` : ""}
-              <br/>
-              <p>Cordialement,<br/>${artisanName}</p>
-            </div>`;
-        emailSent = await sendViaGmail(gmailConn.access_token, `${artisanName} <${gmailConn.gmail_address}>`, invoice.client_email, `Votre facture`, htmlContent);
+        emailSent = await sendViaGmail(gmailConn.access_token, `${artisanName} <${gmailConn.gmail_address}>`, invoice.client_email, emailSubject, buildEmailHtml());
       }
 
       if (!emailSent) {
@@ -186,21 +192,11 @@ Deno.serve(async (req: Request) => {
         if (resendKey) {
           try {
             const resend = new Resend(resendKey);
-            const artisanName = invoice.artisan_company || invoice.artisan_name || "Votre artisan";
             await resend.emails.send({
               from: `${artisanName} <noreply@bulbiz.fr>`,
               to: [invoice.client_email],
-              subject: `Votre facture`,
-              html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <p>Bonjour ${invoice.client_first_name || ""},</p>
-                <p>Suite à notre intervention, veuillez trouver ci-joint votre facture.</p>
-                ${pdfUrl ? `<p style="margin: 16px 0;"><a href="${pdfUrl}" style="color: #2563eb; text-decoration: underline;">Télécharger le PDF de votre facture</a></p>` : ""}
-                <p>N'hésitez pas à nous contacter pour toute question.</p>
-                ${invoice.artisan_email ? `<p style="font-size: 13px; color: #374151;">Email : ${invoice.artisan_email}</p>` : ""}
-                ${invoice.artisan_phone ? `<p style="font-size: 13px; color: #374151;">Tél : ${invoice.artisan_phone}</p>` : ""}
-                <br/>
-                <p>Cordialement,<br/>${artisanName}</p>
-              </div>`,
+              subject: emailSubject,
+              html: buildEmailHtml(),
             });
             emailSent = true;
           } catch (err: any) {
@@ -215,13 +211,13 @@ Deno.serve(async (req: Request) => {
     let smsSent = false;
     if (invoice.client_phone && isValidPhone(invoice.client_phone)) {
       const phone = normalizePhone(invoice.client_phone);
-      const smsBody = `Votre facture est disponible. N'hésitez pas à nous contacter. — ${artisanName}${invoice.artisan_phone ? ` (${invoice.artisan_phone})` : ""}`;
+      const smsBody = `Votre facture ${invoice.invoice_number} est disponible. N'hésitez pas à nous contacter. — ${artisanName}${invoice.artisan_phone ? ` (${invoice.artisan_phone})` : ""}`;
       const smsResult = await sendSms(phone, smsBody);
       if (smsResult.success) {
         smsSent = true;
         await supabase.from("historique").insert({
           dossier_id: invoice.dossier_id,
-          user_id: user.id,
+          user_id: userId,
           action: "invoice_sent_sms",
           details: `Facture ${invoice.invoice_number} envoyée par SMS au ${invoice.client_phone}`,
         });
@@ -231,7 +227,7 @@ Deno.serve(async (req: Request) => {
     // Historique
     await supabase.from("historique").insert({
       dossier_id: invoice.dossier_id,
-      user_id: user.id,
+      user_id: userId,
       action: "invoice_sent",
       details: emailSent
         ? `Facture ${invoice.invoice_number} envoyée par email à ${invoice.client_email}`
