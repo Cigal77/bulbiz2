@@ -29,12 +29,19 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    console.log("[Auth] Starting Google sign in, redirect_uri:", window.location.origin + "/auth");
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
+      const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin + "/auth",
       });
-      if (error) throw error;
+      console.log("[Auth] Google sign in result:", JSON.stringify(result, null, 2));
+      if (result.error) throw result.error;
+      if (!result.redirected) {
+        console.log("[Auth] Not redirected, session should be set. Navigating to /");
+        navigate("/");
+      }
     } catch (error: any) {
+      console.error("[Auth] Google sign in error:", error);
       toast({
         title: "Erreur",
         description: error.message || "Erreur lors de la connexion Google",
