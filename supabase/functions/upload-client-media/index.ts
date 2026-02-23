@@ -80,13 +80,10 @@ Deno.serve(async (req) => {
 
     if (uploadError) throw uploadError;
 
-    const { data: urlData } = supabase.storage
-      .from("dossier-medias")
-      .getPublicUrl(filePath);
-
+    // Return storage path (bucket is private, signed URLs generated on read)
     return new Response(
       JSON.stringify({
-        url: urlData.publicUrl,
+        url: filePath,
         name: file.name,
         type: file.type,
         size: file.size,

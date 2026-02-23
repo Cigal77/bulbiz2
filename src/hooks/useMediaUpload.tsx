@@ -46,18 +46,13 @@ export function useMediaUpload(dossierId: string) {
           .upload(storagePath, file, { contentType: fileType });
         if (uploadError) throw uploadError;
 
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from("dossier-medias")
-          .getPublicUrl(storagePath);
-
-        // Insert media record
+        // Insert media record with storage path (bucket is private, signed URLs generated on read)
         const { error: insertError } = await supabase.from("medias").insert({
           dossier_id: dossierId,
           user_id: user.id,
           file_name: fileName,
           file_type: fileType,
-          file_url: urlData.publicUrl,
+          file_url: storagePath,
           file_size: fileSize,
           media_category: category,
           duration: duration ?? null,

@@ -48,7 +48,20 @@ export function useDossierMedias(dossierId: string) {
         .eq("dossier_id", dossierId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Media[];
+
+      // Generate signed URLs for media files (bucket is private)
+      const mediasWithUrls = await Promise.all(
+        (data as Media[]).map(async (m) => {
+          if (!m.file_url || m.media_category === "note") return m;
+          // Check if it's already a full URL (legacy data) or a storage path
+          if (m.file_url.startsWith("http")) return m;
+          const { data: signedData } = await supabase.storage
+            .from("dossier-medias")
+            .createSignedUrl(m.file_url, 3600); // 1 hour expiry
+          return { ...m, file_url: signedData?.signedUrl ?? m.file_url };
+        })
+      );
+      return mediasWithUrls as Media[];
     },
     enabled: !!dossierId,
   });
