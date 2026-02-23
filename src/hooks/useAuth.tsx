@@ -9,17 +9,20 @@ export function useAuth() {
 
   useEffect(() => {
     // Set up the auth state change listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("[useAuth] onAuthStateChange:", event, "session:", !!session, "user:", session?.user?.email);
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        if (event === "PASSWORD_RECOVERY") {
-          window.location.href = "/reset-password";
-        }
+    console.log("[useAuth] mount - URL:", window.location.href);
+    console.log("[useAuth] hash:", window.location.hash);
+    console.log("[useAuth] search:", window.location.search);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[useAuth] onAuthStateChange:", event, "session:", !!session, "user:", session?.user?.email);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.href = "/reset-password";
       }
-    );
+    });
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
