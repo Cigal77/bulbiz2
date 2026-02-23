@@ -334,7 +334,7 @@ Deno.serve(async (req) => {
                 ${changedFields.length > 0 ? `<p>Informations mises à jour : ${changedFields.join(", ")}</p>` : ""}
                 ${media_urls?.length ? `<p>${media_urls.length} média(s) ajouté(s).</p>` : ""}
                 ${updates.status === "devis_a_faire" ? '<p style="color:#16a34a;font-weight:bold;">✅ Le dossier est prêt pour établir un devis.</p>' : ""}
-                <p style="margin-top:24px;"><a href="https://bulbiz2.lovable.app/dossier/${dossier.id}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Voir le dossier</a></p>
+                <p style="margin-top:24px;"><a href="https://app.bulbiz.io/dossier/${dossier.id}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Voir le dossier</a></p>
                 <p style="font-size:13px;color:#6b7280;margin-top:24px;">Email envoyé automatiquement par Bulbiz.</p>
               </div>`,
             });
@@ -439,6 +439,31 @@ Deno.serve(async (req) => {
           } catch (e) { console.error("Email error on auto-confirm:", e); }
         }
 
+        // Notify artisan about confirmed RDV
+        try {
+          const artisanEmail = profile?.email;
+          const resendKeyArtisan = Deno.env.get("RESEND_API_KEY");
+          if (artisanEmail && resendKeyArtisan) {
+            const resendArtisan = new Resend(resendKeyArtisan);
+            const clientFullName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
+            await resendArtisan.emails.send({
+              from: "Bulbiz <noreply@bulbiz.fr>",
+              to: [artisanEmail],
+              subject: `✅ RDV confirmé — ${clientFullName} le ${slotDateFr}`,
+              html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#16a34a;">✅ Rendez-vous confirmé</h2>
+                <p><strong>${clientFullName}</strong> a confirmé le créneau suivant :</p>
+                <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${slotDateFr} — 🕐 ${timeRange}</p>
+                ${dossier.address ? `<p>📍 ${dossier.address}</p>` : ""}
+                ${dossier.client_phone ? `<p>📞 ${dossier.client_phone}</p>` : ""}
+                ${dossier.client_email ? `<p>✉️ ${dossier.client_email}</p>` : ""}
+                <p style="margin-top:24px;"><a href="https://app.bulbiz.io/dossier/${dossier.id}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Voir le dossier</a></p>
+                <p style="font-size:13px;color:#6b7280;margin-top:24px;">Email envoyé automatiquement par Bulbiz.</p>
+              </div>`,
+            });
+          }
+        } catch (e) { console.error("Error notifying artisan about confirmed RDV:", e); }
+
         const clientPhone = dossier.client_phone;
         if (clientPhone) {
           const normalized = normalizePhone(clientPhone);
@@ -466,6 +491,31 @@ Deno.serve(async (req) => {
           action: "client_slot_selected",
           details: `Le client a choisi le créneau du ${slotDateShort} ${timeRange}`,
         });
+
+        // Notify artisan about client selection (multi-slots)
+        try {
+          const { data: profileMulti } = await supabase.from("profiles").select("email, company_name, first_name, last_name").eq("user_id", dossier.user_id).maybeSingle();
+          const artisanEmailMulti = profileMulti?.email;
+          const resendKeyMulti = Deno.env.get("RESEND_API_KEY");
+          if (artisanEmailMulti && resendKeyMulti) {
+            const resendMulti = new Resend(resendKeyMulti);
+            const clientFullName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
+            await resendMulti.emails.send({
+              from: "Bulbiz <noreply@bulbiz.fr>",
+              to: [artisanEmailMulti],
+              subject: `📅 ${clientFullName} a choisi un créneau — ${slotDateFr}`,
+              html: `<div style="font-family:-apple-system,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+                <h2 style="color:#2563eb;">📅 Créneau sélectionné</h2>
+                <p><strong>${clientFullName}</strong> a choisi le créneau suivant :</p>
+                <p style="font-size:18px;font-weight:bold;margin:16px 0;">📅 ${slotDateFr} — 🕐 ${timeRange}</p>
+                <p>Vous devez confirmer ce rendez-vous depuis le dossier.</p>
+                ${dossier.client_phone ? `<p>📞 ${dossier.client_phone}</p>` : ""}
+                <p style="margin-top:24px;"><a href="https://app.bulbiz.io/dossier/${dossier.id}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">Confirmer le RDV</a></p>
+                <p style="font-size:13px;color:#6b7280;margin-top:24px;">Email envoyé automatiquement par Bulbiz.</p>
+              </div>`,
+            });
+          }
+        } catch (e) { console.error("Error notifying artisan about slot selection:", e); }
 
         return new Response(JSON.stringify({ success: true, auto_confirmed: false }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
