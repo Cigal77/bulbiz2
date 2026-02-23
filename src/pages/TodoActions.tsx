@@ -186,12 +186,12 @@ export default function TodoActions() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-3 py-2.5">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur px-3 py-2.5 md:hidden">
         <BulbizLogo />
         <ThemeToggle />
       </header>
 
-      <main className="flex-1 p-3 sm:p-6 max-w-2xl mx-auto w-full space-y-4">
+      <main className="flex-1 p-3 sm:p-6 max-w-4xl mx-auto w-full space-y-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">À faire</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
