@@ -243,17 +243,10 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-3 sm:px-6 py-2.5">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-3 sm:px-6 py-2.5 md:hidden">
         <BulbizLogo />
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" className="text-muted-foreground hidden md:flex" onClick={() => navigate("/parametres")}>
-            <Settings className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground hidden md:inline">{user?.email}</span>
-          <Button variant="ghost" size="icon" onClick={signOut} className="text-muted-foreground hidden md:flex">
-            <LogOut className="h-4 w-4" />
-          </Button>
         </div>
       </header>
 
@@ -268,12 +261,7 @@ export default function Dashboard() {
               {showTrash ? " dans la corbeille" : ""}
             </p>
           </div>
-          {!showTrash && (
-            <Button className="gap-2 hidden md:flex" onClick={() => navigate("/nouveau")}>
-              <Plus className="h-4 w-4" />
-              <span>Nouveau dossier</span>
-            </Button>
-          )}
+        
         </div>
 
         {/* Appointment counters - desktop only */}
