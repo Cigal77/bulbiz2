@@ -34,18 +34,91 @@ const App = () => (
           <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth" element={<Test />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/client" element={<ClientForm />} />
               <Route path="/devis/validation" element={<QuoteValidation />} />
               <Route path="/facture/view" element={<InvoiceView />} />
-              <Route path="/" element={<ProtectedRoute><AppLayout><Index /></AppLayout></ProtectedRoute>} />
-              <Route path="/a-faire" element={<ProtectedRoute><AppLayout><TodoActions /></AppLayout></ProtectedRoute>} />
-              <Route path="/rdv" element={<ProtectedRoute><AppLayout><RdvList /></AppLayout></ProtectedRoute>} />
-              <Route path="/dossier/:id" element={<ProtectedRoute><AppLayout><DossierDetail /></AppLayout></ProtectedRoute>} />
-              <Route path="/nouveau" element={<ProtectedRoute><AppLayout><CreateDossier /></AppLayout></ProtectedRoute>} />
-              <Route path="/dossier/:dossierId/devis" element={<ProtectedRoute><AppLayout><QuoteEditor /></AppLayout></ProtectedRoute>} />
-              <Route path="/dossier/:id/facture/:invoiceId" element={<ProtectedRoute><AppLayout><InvoiceEditor /></AppLayout></ProtectedRoute>} />
-              <Route path="/parametres" element={<ProtectedRoute><AppLayout><Settings /></AppLayout></ProtectedRoute>} />
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Index />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/a-faire"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <TodoActions />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/rdv"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <RdvList />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dossier/:id"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <DossierDetail />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/nouveau"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <CreateDossier />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dossier/:dossierId/devis"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <QuoteEditor />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dossier/:id/facture/:invoiceId"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <InvoiceEditor />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/parametres"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Settings />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <MobileBottomNav />
