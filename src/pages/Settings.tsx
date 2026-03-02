@@ -386,8 +386,24 @@ export default function Settings() {
           </div>
         </form>
 
+        {/* Informations légales */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Informations légales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <a href="/cgu" className="text-primary hover:underline">CGU</a>
+              <a href="/mentions-legales" className="text-primary hover:underline">Mentions légales</a>
+              <a href="/politique-confidentialite" className="text-primary hover:underline">Confidentialité</a>
+              <a href="/dpa" className="text-primary hover:underline">DPA</a>
+              <a href="/cookies" className="text-primary hover:underline">Cookies</a>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Déconnexion */}
-        <div className="mt-8 mb-24">
+        <div className="mt-6 mb-24">
           <Button
             variant="outline"
             className="w-full justify-start gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"

@@ -128,7 +128,16 @@ export default function Auth() {
             Ne perdez plus aucune demande. Centralisez, suivez et relancez en quelques clics.
           </p>
         </div>
-        <p className="text-sm text-primary-foreground/60">© 2026 Bulbiz. Conçu pour les artisans du BTP.</p>
+        <div className="space-y-2">
+          <p className="text-sm text-primary-foreground/60">© 2026 Bulbiz. Conçu pour les artisans du BTP.</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-primary-foreground/50">
+            <a href="/cgu" className="hover:text-primary-foreground/80 underline">CGU</a>
+            <a href="/mentions-legales" className="hover:text-primary-foreground/80 underline">Mentions légales</a>
+            <a href="/politique-confidentialite" className="hover:text-primary-foreground/80 underline">Confidentialité</a>
+            <a href="/dpa" className="hover:text-primary-foreground/80 underline">DPA</a>
+            <a href="/cookies" className="hover:text-primary-foreground/80 underline">Cookies</a>
+          </div>
+        </div>
       </div>
 
       {/* Right panel - form */}
@@ -379,6 +388,15 @@ export default function Auth() {
                 </>
               )}
             </p>
+          </div>
+
+          {/* Legal links mobile */}
+          <div className="lg:hidden flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground pt-2">
+            <a href="/cgu" className="hover:text-foreground underline">CGU</a>
+            <a href="/mentions-legales" className="hover:text-foreground underline">Mentions légales</a>
+            <a href="/politique-confidentialite" className="hover:text-foreground underline">Confidentialité</a>
+            <a href="/dpa" className="hover:text-foreground underline">DPA</a>
+            <a href="/cookies" className="hover:text-foreground underline">Cookies</a>
           </div>
         </div>
       </div>
