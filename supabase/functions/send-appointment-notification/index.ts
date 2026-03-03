@@ -103,7 +103,6 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
   const artisanEmail = payload.artisan_email ? ` ou par email à ${payload.artisan_email}` : "";
 
   switch (eventType) {
-      console.log(eventType);
     case "APPOINTMENT_REQUESTED":
       return {
         subject: `${artisanName} souhaite convenir d'un rendez-vous`,
@@ -142,8 +141,7 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
     }
 
    case "APPOINTMENT_CONFIRMED": {
-       console.log("PAYLOAD CONFIRMED:", JSON.stringify({
-  const dateStr = (payload.appointment_date as string) || "";
+   const dateStr = (payload.appointment_date as string) || "";
   const rawDate = (payload.raw_date as string) || "";
   const timeStr = (payload.appointment_time as string) || "";
   const timeEnd = (payload.appointment_time_end as string) || "";
@@ -216,6 +214,8 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
       <p>Cordialement,<br/>${artisanName}</p>
     </div>`,
   };
+}
+  }
 }
 
 // ── SMS templates ──
