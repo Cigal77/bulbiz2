@@ -16,20 +16,58 @@ async function refreshGmailTokenFn(supabase: any, userId: string, connection: an
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: connection.refresh_token, grant_type: "refresh_token" }),
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: connection.refresh_token,
+        grant_type: "refresh_token",
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) return null;
-    await supabase.from("gmail_connections").update({ access_token: data.access_token, token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString() }).eq("user_id", userId);
+    await supabase
+      .from("gmail_connections")
+      .update({
+        access_token: data.access_token,
+        token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
+      })
+      .eq("user_id", userId);
     return data.access_token;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-async function sendViaGmailFn(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
-  const message = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`, `MIME-Version: 1.0`, `Content-Type: text/html; charset=UTF-8`, ``, html].join("\r\n");
-  const raw = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
-  if (!resp.ok) { const err = await resp.text(); console.error("Gmail API error:", err); return false; }
+async function sendViaGmailFn(
+  accessToken: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    html,
+  ].join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error("Gmail API error:", err);
+    return false;
+  }
   await resp.json();
   return true;
 }
@@ -39,7 +77,11 @@ async function getGmailConnectionFn(supabase: any, userId: string) {
   if (!conn) return null;
   if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
     const newToken = await refreshGmailTokenFn(supabase, userId, conn);
-    if (newToken) { conn.access_token = newToken; } else { return null; }
+    if (newToken) {
+      conn.access_token = newToken;
+    } else {
+      return null;
+    }
   }
   return conn;
 }
@@ -104,25 +146,46 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
       const timeEnd = (payload.appointment_time_end as string) || "";
       const address = (payload.address as string) || "";
 
-      // Format date for display
       let displayDate = dateStr;
       if (dateStr) {
         try {
-          const d = new Date(dateStr + "T00:00:00");
-          const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-          const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-          displayDate = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-        } catch { /* keep raw */ }
+          // Tente uniquement si ça ressemble à un format ISO (YYYY-MM-DD)
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            const d = new Date(dateStr.includes("T") ? dateStr : dateStr + "T12:00:00");
+            if (!isNaN(d.getTime())) {
+              const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+              const months = [
+                "janvier",
+                "février",
+                "mars",
+                "avril",
+                "mai",
+                "juin",
+                "juillet",
+                "août",
+                "septembre",
+                "octobre",
+                "novembre",
+                "décembre",
+              ];
+              displayDate = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+            }
+          }
+          // Sinon on garde dateStr directement (déjà formaté côté frontend)
+        } catch {
+          /* keep raw */
+        }
       }
 
       // Build calendar links
       const eventTitle = `RDV – ${artisanName}`;
       const eventDescription = `Rendez-vous avec ${artisanName}${artisanPhone ? `\nTél : ${payload.artisan_phone}` : ""}${payload.artisan_email ? `\nEmail : ${payload.artisan_email}` : ""}`;
-      
+
       let calendarLinksHtml = "";
       if (dateStr && timeStr) {
         const dtStart = dateStr.replace(/-/g, "") + "T" + timeStr.slice(0, 5).replace(":", "") + "00";
-        const endTime = timeEnd || timeStr.replace(/^(\d{2}):(\d{2})/, (_, h, m) => `${String(Number(h) + 1).padStart(2, "0")}:${m}`);
+        const endTime =
+          timeEnd || timeStr.replace(/^(\d{2}):(\d{2})/, (_, h, m) => `${String(Number(h) + 1).padStart(2, "0")}:${m}`);
         const dtEnd = dateStr.replace(/-/g, "") + "T" + endTime.slice(0, 5).replace(":", "") + "00";
 
         const gcalParams = new URLSearchParams({
@@ -346,16 +409,22 @@ Deno.serve(async (req: Request) => {
           `${artisanName} <${gmailConn.gmail_address}>`,
           clientEmail,
           template.subject,
-          template.html
+          template.html,
         );
       }
 
       if (gmailSent) {
         await supabase.from("notification_logs").insert({
-          dossier_id, event_type, channel: "email", recipient: clientEmail, status: "SENT",
+          dossier_id,
+          event_type,
+          channel: "email",
+          recipient: clientEmail,
+          status: "SENT",
         });
         await supabase.from("historique").insert({
-          dossier_id, user_id: user.id, action: "notification_sent",
+          dossier_id,
+          user_id: user.id,
+          action: "notification_sent",
           details: `Email envoyé via Gmail : ${label} → ${clientEmail}`,
         });
         result.email_status = "SENT";
@@ -460,45 +529,45 @@ Deno.serve(async (req: Request) => {
         });
         result.sms_status = "SKIPPED";
       } else {
-          const smsBody = getSmsTemplate(event_type as EventType, notifPayload);
-          const smsResult = await sendSms(normalized, smsBody);
+        const smsBody = getSmsTemplate(event_type as EventType, notifPayload);
+        const smsResult = await sendSms(normalized, smsBody);
 
-          if (smsResult.success) {
-            await supabase.from("notification_logs").insert({
-              dossier_id,
-              event_type,
-              channel: "sms",
-              recipient: normalized,
-              status: "SENT",
-            });
+        if (smsResult.success) {
+          await supabase.from("notification_logs").insert({
+            dossier_id,
+            event_type,
+            channel: "sms",
+            recipient: normalized,
+            status: "SENT",
+          });
+          await supabase.from("historique").insert({
+            dossier_id,
+            user_id: user.id,
+            action: "notification_sent",
+            details: `SMS envoyé : ${label} → ${normalized}`,
+          });
+          result.sms_status = "SENT";
+        } else {
+          const isNotConfigured = smsResult.error === "SMS_NOT_CONFIGURED";
+          await supabase.from("notification_logs").insert({
+            dossier_id,
+            event_type,
+            channel: "sms",
+            recipient: normalized,
+            status: isNotConfigured ? "SKIPPED" : "FAILED",
+            error_code: smsResult.error,
+            error_message: smsResult.error,
+          });
+          if (!isNotConfigured) {
             await supabase.from("historique").insert({
               dossier_id,
               user_id: user.id,
-              action: "notification_sent",
-              details: `SMS envoyé : ${label} → ${normalized}`,
+              action: "notification_failed",
+              details: `SMS non envoyé (${label}) : erreur technique`,
             });
-            result.sms_status = "SENT";
-          } else {
-            const isNotConfigured = smsResult.error === "SMS_NOT_CONFIGURED";
-            await supabase.from("notification_logs").insert({
-              dossier_id,
-              event_type,
-              channel: "sms",
-              recipient: normalized,
-              status: isNotConfigured ? "SKIPPED" : "FAILED",
-              error_code: smsResult.error,
-              error_message: smsResult.error,
-            });
-            if (!isNotConfigured) {
-              await supabase.from("historique").insert({
-                dossier_id,
-                user_id: user.id,
-                action: "notification_failed",
-                details: `SMS non envoyé (${label}) : erreur technique`,
-              });
-            }
-            result.sms_status = isNotConfigured ? "SKIPPED" : "FAILED";
           }
+          result.sms_status = isNotConfigured ? "SKIPPED" : "FAILED";
+        }
       }
     }
 
