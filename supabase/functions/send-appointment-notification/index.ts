@@ -142,42 +142,24 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
 
     case "APPOINTMENT_CONFIRMED": {
       const dateStr = (payload.appointment_date as string) || "";
+      const rawDate = (payload.raw_date as string) || "";
       const timeStr = (payload.appointment_time as string) || "";
       const timeEnd = (payload.appointment_time_end as string) || "";
       const address = (payload.address as string) || "";
-
-      console.log("DEBUG appointment_date:", JSON.stringify(payload.appointment_date));
-      console.log("DEBUG full payload:", JSON.stringify(payload));
+    
+      // Utilise raw_date (ISO) pour formatter, sinon dateStr directement
       let displayDate = dateStr;
-      if (dateStr) {
+      if (rawDate && /^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
         try {
-          // Tente uniquement si ça ressemble à un format ISO (YYYY-MM-DD)
-          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-            const d = new Date(dateStr.includes("T") ? dateStr : dateStr + "T12:00:00");
-            if (!isNaN(d.getTime())) {
-              const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-              const months = [
-                "janvier",
-                "février",
-                "mars",
-                "avril",
-                "mai",
-                "juin",
-                "juillet",
-                "août",
-                "septembre",
-                "octobre",
-                "novembre",
-                "décembre",
-              ];
-              displayDate = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-            }
+          const d = new Date(rawDate + "T12:00:00");
+          if (!isNaN(d.getTime())) {
+            const days = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+            const months = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+            displayDate = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
           }
-          // Sinon on garde dateStr directement (déjà formaté côté frontend)
-        } catch {
-          /* keep raw */
-        }
+        } catch { /* keep dateStr */ }
       }
+    }
 
       // Build calendar links
       const eventTitle = `RDV – ${artisanName}`;
