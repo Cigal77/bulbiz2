@@ -103,6 +103,7 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
   const artisanEmail = payload.artisan_email ? ` ou par email à ${payload.artisan_email}` : "";
 
   switch (eventType) {
+      console.log(eventType);
     case "APPOINTMENT_REQUESTED":
       return {
         subject: `${artisanName} souhaite convenir d'un rendez-vous`,
