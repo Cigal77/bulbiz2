@@ -10,7 +10,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Calendar, Clock, Info, Video, Building2, User, ArrowUpDown, KeyRound, CalendarDays } from "lucide-react";
+import {
+  Camera,
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  X,
+  Shield,
+  Calendar,
+  Clock,
+  Info,
+  Video,
+  Building2,
+  User,
+  ArrowUpDown,
+  KeyRound,
+  CalendarDays,
+} from "lucide-react";
 import { VideoRecorderWithTorch } from "@/components/VideoRecorderWithTorch";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { URGENCY_LABELS } from "@/lib/constants";
@@ -19,7 +36,7 @@ import { AddressAutocomplete, type AddressData } from "@/components/AddressAutoc
 import { cn } from "@/lib/utils";
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"];
 
 interface SlotData {
@@ -83,7 +100,9 @@ function ReassuranceBanner() {
       <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
       <div>
         <p className="font-medium text-foreground text-xs">Ces informations sont facultatives</p>
-        <p className="text-xs mt-0.5">Elles nous permettent simplement de mieux préparer l'intervention et d'éviter des allers-retours inutiles.</p>
+        <p className="text-xs mt-0.5">
+          Elles nous permettent simplement de mieux préparer l'intervention et d'éviter des allers-retours inutiles.
+        </p>
       </div>
     </div>
   );
@@ -135,8 +154,9 @@ export default function ClientForm() {
   const [availability, setAvailability] = useState("");
 
   const hasSlots = (dossier?.appointment_slots?.length ?? 0) > 0;
-  const isSlotMode = hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
-  const alreadySelected = dossier?.appointment_slots?.find(s => s.selected_at);
+  const isSlotMode =
+    hasSlots && (dossier?.appointment_status === "slots_proposed" || dossier?.appointment_status === "client_selected");
+  const alreadySelected = dossier?.appointment_slots?.find((s) => s.selected_at);
 
   const [prefilled, setPrefilled] = useState<Set<string>>(new Set());
 
@@ -160,13 +180,34 @@ export default function ClientForm() {
 
       const pf = new Set<string>();
       const newForm = { ...form };
-      if (data.client_first_name) { newForm.client_first_name = data.client_first_name; pf.add("client_first_name"); }
-      if (data.client_last_name) { newForm.client_last_name = data.client_last_name; pf.add("client_last_name"); }
-      if (data.client_phone) { newForm.client_phone = data.client_phone; pf.add("client_phone"); }
-      if (data.client_email) { newForm.client_email = data.client_email; pf.add("client_email"); }
-      if (data.address) { newForm.address = data.address; pf.add("address"); }
-      if (data.description) { newForm.description = data.description; pf.add("description"); }
-      if (data.urgency) { newForm.urgency = data.urgency; if (data.urgency !== "semaine") pf.add("urgency"); }
+      if (data.client_first_name) {
+        newForm.client_first_name = data.client_first_name;
+        pf.add("client_first_name");
+      }
+      if (data.client_last_name) {
+        newForm.client_last_name = data.client_last_name;
+        pf.add("client_last_name");
+      }
+      if (data.client_phone) {
+        newForm.client_phone = data.client_phone;
+        pf.add("client_phone");
+      }
+      if (data.client_email) {
+        newForm.client_email = data.client_email;
+        pf.add("client_email");
+      }
+      if (data.address) {
+        newForm.address = data.address;
+        pf.add("address");
+      }
+      if (data.description) {
+        newForm.description = data.description;
+        pf.add("description");
+      }
+      if (data.urgency) {
+        newForm.urgency = data.urgency;
+        if (data.urgency !== "semaine") pf.add("urgency");
+      }
       setForm(newForm);
       setPrefilled(pf);
 
@@ -219,21 +260,15 @@ export default function ClientForm() {
   const handleVideoRecorded = (file: File) => setFiles((prev) => [...prev, file].slice(0, MAX_FILES));
 
   const toggleTrade = (id: string) => {
-    setSelectedTrades((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    );
+    setSelectedTrades((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
   };
 
   const toggleProblem = (id: string) => {
-    setSelectedProblems((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
+    setSelectedProblems((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   };
 
   // Get available problems based on selected trades
-  const availableProblems = TRADE_TYPES
-    .filter((t) => selectedTrades.includes(t.id))
-    .flatMap((t) => t.problems);
+  const availableProblems = TRADE_TYPES.filter((t) => selectedTrades.includes(t.id)).flatMap((t) => t.problems);
 
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
@@ -260,7 +295,7 @@ export default function ClientForm() {
           const res = await fetch(`${supabaseUrl}/functions/v1/upload-client-media`, {
             method: "POST",
             headers: {
-              "apikey": anonKey,
+              apikey: anonKey,
             },
             body: formData,
           });
@@ -323,7 +358,20 @@ export default function ClientForm() {
   const formatSlotDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-    const months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    const months = [
+      "janvier",
+      "février",
+      "mars",
+      "avril",
+      "mai",
+      "juin",
+      "juillet",
+      "août",
+      "septembre",
+      "octobre",
+      "novembre",
+      "décembre",
+    ];
     return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
   };
 
@@ -351,7 +399,7 @@ export default function ClientForm() {
   }
 
   if (slotSuccess) {
-    const chosen = dossier?.appointment_slots?.find(s => s.id === selectedSlotId);
+    const chosen = dossier?.appointment_slots?.find((s) => s.id === selectedSlotId);
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -390,7 +438,9 @@ export default function ClientForm() {
           <CardContent className="pt-6 text-center space-y-4">
             <CheckCircle2 className="h-12 w-12 text-success mx-auto" />
             <h2 className="text-xl font-bold text-foreground">Merci !</h2>
-            <p className="text-muted-foreground">Vos informations ont été envoyées. Votre artisan reviendra vers vous rapidement.</p>
+            <p className="text-muted-foreground">
+              Vos informations ont été envoyées. Votre artisan reviendra vers vous rapidement.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -426,14 +476,18 @@ export default function ClientForm() {
                     onClick={() => setSelectedSlotId(slot.id)}
                     className={cn(
                       "w-full text-left rounded-xl border-2 p-4 min-h-[56px] transition-all active:scale-[0.98]",
-                      isSelected ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20" : "border-border hover:border-primary/40 bg-card"
+                      isSelected
+                        ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/40 bg-card",
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
-                        isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
-                      )}>
+                      <div
+                        className={cn(
+                          "h-6 w-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                          isSelected ? "border-primary bg-primary" : "border-muted-foreground/30",
+                        )}
+                      >
                         {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-white" />}
                       </div>
                       <div className="flex-1">
@@ -444,7 +498,9 @@ export default function ClientForm() {
                         </p>
                       </div>
                       {wasAlreadyChosen && (
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Choisi</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                          Choisi
+                        </span>
                       )}
                     </div>
                   </button>
@@ -454,11 +510,24 @@ export default function ClientForm() {
             </CardContent>
           </Card>
           <div className="sticky bottom-4 px-2">
-            <Button onClick={handleSlotSelect} disabled={!selectedSlotId || selectingSlot} className="w-full h-12 text-base gap-2 shadow-lg">
-              {selectingSlot ? (<><Loader2 className="h-4 w-4 animate-spin" />Confirmation…</>) : "Confirmer ce créneau"}
+            <Button
+              onClick={handleSlotSelect}
+              disabled={!selectedSlotId || selectingSlot}
+              className="w-full h-12 text-base gap-2 shadow-lg"
+            >
+              {selectingSlot ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Confirmation…
+                </>
+              ) : (
+                "Confirmer ce créneau"
+              )}
             </Button>
             {alreadySelected && selectedSlotId === alreadySelected.id && (
-              <p className="text-xs text-muted-foreground text-center mt-2">Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre.</p>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Vous avez déjà choisi ce créneau. Vous pouvez en sélectionner un autre.
+              </p>
             )}
           </div>
         </main>
@@ -495,14 +564,17 @@ export default function ClientForm() {
       <main className="p-4 max-w-lg mx-auto mt-4 space-y-4">
         <div className="space-y-2">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Étape {step}/{totalSteps}</span>
+            <span>
+              Étape {step}/{totalSteps}
+            </span>
             <span>{stepLabels[step]}</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
         </div>
 
         <p className="text-sm text-muted-foreground">
-          Bonjour{form.client_first_name ? ` ${form.client_first_name}` : ""}, complétez ce formulaire pour que votre artisan prépare au mieux son intervention.
+          Bonjour{form.client_first_name ? ` ${form.client_first_name}` : ""}, complétez ce formulaire pour que votre
+          artisan prépare au mieux son intervention.
         </p>
 
         {/* ═══ STEP 1: Type d'intervention ═══ */}
@@ -524,7 +596,7 @@ export default function ClientForm() {
                         "flex items-center gap-2.5 rounded-xl border-2 p-3.5 text-left transition-all active:scale-[0.97] min-h-[56px]",
                         isSelected
                           ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
-                          : "border-border hover:border-primary/30 bg-card"
+                          : "border-border hover:border-primary/30 bg-card",
                       )}
                     >
                       <span className="text-xl">{trade.icon}</span>
@@ -553,7 +625,9 @@ export default function ClientForm() {
                 <div className="space-y-3 pt-2">
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">Type de problème</h4>
-                    <p className="text-xs text-muted-foreground">Précisez la nature du problème (plusieurs choix possibles).</p>
+                    <p className="text-xs text-muted-foreground">
+                      Précisez la nature du problème (plusieurs choix possibles).
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {availableProblems.map((problem) => {
@@ -566,7 +640,7 @@ export default function ClientForm() {
                             "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
                             isSelected
                               ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                              : "border-border bg-card text-foreground hover:border-primary/40"
+                              : "border-border bg-card text-foreground hover:border-primary/40",
                           )}
                         >
                           {problem.label}
@@ -574,7 +648,7 @@ export default function ClientForm() {
                       );
                     })}
                   </div>
-                  {selectedProblems.some(p => p.startsWith("autre")) && (
+                  {selectedProblems.some((p) => p.startsWith("autre")) && (
                     <div className="space-y-1.5">
                       <Label className="text-xs">Précisez</Label>
                       <Input
@@ -618,14 +692,24 @@ export default function ClientForm() {
                       Prénom
                       {prefilled.has("client_first_name") && <PrefilledBadge />}
                     </Label>
-                    <Input placeholder="Jean" autoComplete="given-name" value={form.client_first_name} onChange={(e) => setForm({ ...form, client_first_name: e.target.value })} />
+                    <Input
+                      placeholder="Jean"
+                      autoComplete="given-name"
+                      value={form.client_first_name}
+                      onChange={(e) => setForm({ ...form, client_first_name: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs flex items-center gap-1.5">
                       Nom
                       {prefilled.has("client_last_name") && <PrefilledBadge />}
                     </Label>
-                    <Input placeholder="Dupont" autoComplete="family-name" value={form.client_last_name} onChange={(e) => setForm({ ...form, client_last_name: e.target.value })} />
+                    <Input
+                      placeholder="Dupont"
+                      autoComplete="family-name"
+                      value={form.client_last_name}
+                      onChange={(e) => setForm({ ...form, client_last_name: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -634,7 +718,13 @@ export default function ClientForm() {
                     Téléphone
                     {prefilled.has("client_phone") && <PrefilledBadge />}
                   </Label>
-                  <Input placeholder="06 12 34 56 78" type="tel" autoComplete="tel" value={form.client_phone} onChange={(e) => setForm({ ...form, client_phone: e.target.value })} />
+                  <Input
+                    placeholder="06 12 34 56 78"
+                    type="tel"
+                    autoComplete="tel"
+                    value={form.client_phone}
+                    onChange={(e) => setForm({ ...form, client_phone: e.target.value })}
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -647,7 +737,10 @@ export default function ClientForm() {
                     type="email"
                     autoComplete="email"
                     value={form.client_email}
-                    onChange={(e) => { setForm({ ...form, client_email: e.target.value }); setEmailError(""); }}
+                    onChange={(e) => {
+                      setForm({ ...form, client_email: e.target.value });
+                      setEmailError("");
+                    }}
                     className={emailError ? "border-destructive" : ""}
                   />
                   {emailError && <p className="text-xs text-destructive">{emailError}</p>}
@@ -660,8 +753,14 @@ export default function ClientForm() {
                   </Label>
                   <AddressAutocomplete
                     value={form.address}
-                    onChange={(val) => { setForm({ ...form, address: val }); setAddressData({}); }}
-                    onAddressSelect={(data) => { setForm({ ...form, address: data.address }); setAddressData(data); }}
+                    onChange={(val) => {
+                      setForm({ ...form, address: val });
+                      setAddressData({});
+                    }}
+                    onAddressSelect={(data) => {
+                      setForm({ ...form, address: data.address });
+                      setAddressData(data);
+                    }}
                   />
                 </div>
 
@@ -671,10 +770,14 @@ export default function ClientForm() {
                     {prefilled.has("urgency") && <PrefilledBadge />}
                   </Label>
                   <Select value={form.urgency} onValueChange={(v) => setForm({ ...form, urgency: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {Object.entries(URGENCY_LABELS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                        <SelectItem key={k} value={k}>
+                          {v}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -696,7 +799,9 @@ export default function ClientForm() {
                 </div>
 
                 <div className="flex justify-between">
-                  <Button variant="ghost" onClick={() => setStep(1)}>Retour</Button>
+                  <Button variant="ghost" onClick={() => setStep(1)}>
+                    Retour
+                  </Button>
                   <Button onClick={() => setStep(3)}>Suivant</Button>
                 </div>
               </CardContent>
@@ -711,7 +816,10 @@ export default function ClientForm() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Quelques infos pratiques</CardTitle>
-                <CardDescription>Pour intervenir dans les meilleures conditions. <span className="text-primary font-medium">Tout est facultatif.</span></CardDescription>
+                <CardDescription>
+                  Pour intervenir dans les meilleures conditions.{" "}
+                  <span className="text-primary font-medium">Tout est facultatif.</span>
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 {/* Housing type */}
@@ -729,7 +837,7 @@ export default function ClientForm() {
                           "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
                           housingType === h.id
                             ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-foreground hover:border-primary/40"
+                            : "border-border bg-card text-foreground hover:border-primary/40",
                         )}
                       >
                         {h.label}
@@ -753,7 +861,7 @@ export default function ClientForm() {
                           "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
                           occupantType === o.id
                             ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-foreground hover:border-primary/40"
+                            : "border-border bg-card text-foreground hover:border-primary/40",
                         )}
                       >
                         {o.label}
@@ -787,7 +895,9 @@ export default function ClientForm() {
                           onClick={() => setHasElevator(hasElevator === true ? null : true)}
                           className={cn(
                             "rounded-lg border px-3 py-1.5 text-sm transition-all",
-                            hasElevator === true ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+                            hasElevator === true
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card",
                           )}
                         >
                           Oui
@@ -796,7 +906,9 @@ export default function ClientForm() {
                           onClick={() => setHasElevator(hasElevator === false ? null : false)}
                           className={cn(
                             "rounded-lg border px-3 py-1.5 text-sm transition-all",
-                            hasElevator === false ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card"
+                            hasElevator === false
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card",
                           )}
                         >
                           Non
@@ -833,7 +945,7 @@ export default function ClientForm() {
                           "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
                           availability === a.id
                             ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-card text-foreground hover:border-primary/40"
+                            : "border-border bg-card text-foreground hover:border-primary/40",
                         )}
                       >
                         {a.label}
@@ -843,9 +955,13 @@ export default function ClientForm() {
                 </div>
 
                 <div className="flex justify-between pt-2">
-                  <Button variant="ghost" onClick={() => setStep(2)}>Retour</Button>
+                  <Button variant="ghost" onClick={() => setStep(2)}>
+                    Retour
+                  </Button>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setStep(4)}>Passer</Button>
+                    <Button variant="outline" onClick={() => setStep(4)}>
+                      Passer
+                    </Button>
                     <Button onClick={() => setStep(4)}>Continuer</Button>
                   </div>
                 </div>
@@ -887,10 +1003,22 @@ export default function ClientForm() {
                   <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
                     <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                     <span className="text-sm text-muted-foreground">Appuyez pour ajouter</span>
-                    <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 10 Mo</span>
-                    <input type="file" accept={ALLOWED_TYPES.join(",")} multiple className="hidden" onChange={handleFileAdd} capture="environment" />
+                    <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 50 Mo</span>
+                    <input
+                      type="file"
+                      accept={ALLOWED_TYPES.join(",")}
+                      multiple
+                      className="hidden"
+                      onChange={handleFileAdd}
+                      capture="environment"
+                    />
                   </label>
-                  <Button type="button" variant="outline" className="w-full gap-2" onClick={() => setVideoRecorderOpen(true)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => setVideoRecorderOpen(true)}
+                  >
                     <Video className="h-4 w-4" />
                     Filmer avec flash
                   </Button>
@@ -898,7 +1026,9 @@ export default function ClientForm() {
               )}
 
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(3)}>Retour</Button>
+                <Button variant="ghost" onClick={() => setStep(3)}>
+                  Retour
+                </Button>
                 <Button onClick={() => setStep(5)}>{files.length === 0 ? "Passer" : "Suivant"}</Button>
               </div>
             </CardContent>
@@ -916,16 +1046,17 @@ export default function ClientForm() {
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
                 <p className="font-medium text-foreground">Récapitulatif :</p>
                 {form.client_first_name && (
-                  <p className="text-muted-foreground">Client : {form.client_first_name} {form.client_last_name}</p>
+                  <p className="text-muted-foreground">
+                    Client : {form.client_first_name} {form.client_last_name}
+                  </p>
                 )}
                 {selectedTrades.length > 0 && (
                   <p className="text-muted-foreground">
-                    Métier(s) : {selectedTrades.map(t => TRADE_TYPES.find(tt => tt.id === t)?.label ?? t).join(", ")}
+                    Métier(s) :{" "}
+                    {selectedTrades.map((t) => TRADE_TYPES.find((tt) => tt.id === t)?.label ?? t).join(", ")}
                   </p>
                 )}
-                {form.address && (
-                  <p className="text-muted-foreground truncate">Adresse : {form.address}</p>
-                )}
+                {form.address && <p className="text-muted-foreground truncate">Adresse : {form.address}</p>}
                 {form.description && (
                   <p className="text-muted-foreground line-clamp-2">Description : {form.description}</p>
                 )}
@@ -940,8 +1071,8 @@ export default function ClientForm() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Protection de vos données</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Vos données sont traitées uniquement pour la gestion de votre demande d'intervention.
-                      Elles ne sont pas partagées avec des tiers.
+                      Vos données sont traitées uniquement pour la gestion de votre demande d'intervention. Elles ne
+                      sont pas partagées avec des tiers.
                     </p>
                   </div>
                 </div>
@@ -963,9 +1094,18 @@ export default function ClientForm() {
               )}
 
               <div className="flex justify-between">
-                <Button variant="ghost" onClick={() => setStep(4)}>Retour</Button>
+                <Button variant="ghost" onClick={() => setStep(4)}>
+                  Retour
+                </Button>
                 <Button onClick={handleSubmit} disabled={submitting || !rgpdConsent} className="gap-2">
-                  {submitting ? (<><Loader2 className="h-4 w-4 animate-spin" />Envoi…</>) : "Envoyer"}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Envoi…
+                    </>
+                  ) : (
+                    "Envoyer"
+                  )}
                 </Button>
               </div>
             </CardContent>
