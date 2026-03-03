@@ -6,6 +6,7 @@ import { Mail, Unplug, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSearchParams } from "react-router-dom";
+import { useRef } from "react";
 
 export function GmailConnectionCard() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,7 +17,9 @@ export function GmailConnectionCard() {
 
   const checkStatus = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
       const { data, error } = await supabase.functions.invoke("gmail-oauth", {
@@ -134,9 +137,7 @@ export function GmailConnectionCard() {
                 <Mail className="h-3 w-3" />
                 {gmailAddress}
               </Badge>
-              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                Connecté
-              </Badge>
+              <Badge className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Connecté</Badge>
             </div>
             <Button
               variant="outline"
@@ -152,13 +153,10 @@ export function GmailConnectionCard() {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Sans connexion Gmail, les emails sont envoyés depuis <span className="font-medium">noreply@bulbiz.fr</span>.
+              Sans connexion Gmail, les emails sont envoyés depuis{" "}
+              <span className="font-medium">noreply@bulbiz.fr</span>.
             </p>
-            <Button
-              onClick={handleConnect}
-              disabled={actionLoading}
-              className="gap-2"
-            >
+            <Button onClick={handleConnect} disabled={actionLoading} className="gap-2">
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Connecter mon Gmail
             </Button>
