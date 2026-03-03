@@ -215,6 +215,8 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
     </div>`,
   };
 }
+  }
+}
 
 // ── SMS templates ──
 function getSmsTemplate(eventType: EventType, payload: Record<string, unknown>): string {
