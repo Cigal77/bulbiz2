@@ -141,6 +141,7 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
     }
 
    case "APPOINTMENT_CONFIRMED": {
+       console.log("PAYLOAD CONFIRMED:", JSON.stringify({
   const dateStr = (payload.appointment_date as string) || "";
   const rawDate = (payload.raw_date as string) || "";
   const timeStr = (payload.appointment_time as string) || "";
