@@ -146,6 +146,8 @@ function getEmailTemplate(eventType: EventType, payload: Record<string, unknown>
       const timeEnd = (payload.appointment_time_end as string) || "";
       const address = (payload.address as string) || "";
 
+      console.log("DEBUG appointment_date:", JSON.stringify(payload.appointment_date));
+      console.log("DEBUG full payload:", JSON.stringify(payload));
       let displayDate = dateStr;
       if (dateStr) {
         try {
