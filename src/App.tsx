@@ -40,7 +40,7 @@ const App = () => (
           <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/client" element={<ClientForm />} />
               <Route path="/devis/validation" element={<QuoteValidation />} />
               <Route path="/facture/view" element={<InvoiceView />} />
