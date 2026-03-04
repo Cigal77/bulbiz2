@@ -41,6 +41,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/client" element={<ClientForm />} />
               <Route path="/devis/validation" element={<QuoteValidation />} />
               <Route path="/facture/view" element={<InvoiceView />} />
