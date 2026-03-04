@@ -1000,19 +1000,47 @@ export default function ClientForm() {
 
               {files.length < MAX_FILES && (
                 <div className="space-y-3">
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 cursor-pointer hover:border-primary/50 transition-colors">
-                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                    <span className="text-sm text-muted-foreground">Appuyez pour ajouter</span>
-                    <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 50 Mo</span>
-                    <input
-                      type="file"
-                      accept={ALLOWED_TYPES.join(",")}
-                      multiple
-                      className="hidden"
-                      onChange={handleFileAdd}
-                      capture="environment"
-                    />
-                  </label>
+                  {/* Input galerie */}
+                  <input
+                    ref={galleryRef}
+                    type="file"
+                    accept={ALLOWED_TYPES.join(",")}
+                    multiple
+                    className="hidden"
+                    onChange={handleFileAdd}
+                  />
+                  {/* Input caméra vidéo */}
+                  <input
+                    ref={camcorderRef}
+                    type="file"
+                    accept="video/*"
+                    capture="camcorder"
+                    className="hidden"
+                    onChange={handleFileAdd}
+                  />
+
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => galleryRef.current?.click()}
+                      className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 hover:border-primary/50 transition-colors"
+                    >
+                      <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">Photo / vidéo depuis la galerie</span>
+                      <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 50 Mo</span>
+                    </button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2"
+                      onClick={() => camcorderRef.current?.click()}
+                    >
+                      <Camera className="h-4 w-4" />
+                      Filmer une vidéo
+                    </Button>
+                  </div>
+
                   <Button
                     type="button"
                     variant="outline"
