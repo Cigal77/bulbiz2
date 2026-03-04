@@ -26,6 +26,7 @@ import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import DPA from "./pages/DPA";
 import Cookies from "./pages/Cookies";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
