@@ -23,7 +23,7 @@ const LABEL_MAP = {
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
-const MAX_PLAN_SIZE = 20 * 1024 * 1024;  // 20 MB
+const MAX_PLAN_SIZE = 20 * 1024 * 1024; // 20 MB
 
 function getMaxSize(file: File, mode: string) {
   if (mode === "plan") return MAX_PLAN_SIZE;
@@ -39,24 +39,27 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const addFiles = useCallback((newFiles: FileList | File[]) => {
-    const arr = Array.from(newFiles);
-    const valid: File[] = [];
-    for (const f of arr) {
-      const max = getMaxSize(f, mode);
-      if (f.size > max) {
-        setError(`${f.name} dépasse la taille max (${Math.round(max / 1024 / 1024)} MB)`);
-        return;
+  const addFiles = useCallback(
+    (newFiles: FileList | File[]) => {
+      const arr = Array.from(newFiles);
+      const valid: File[] = [];
+      for (const f of arr) {
+        const max = getMaxSize(f, mode);
+        if (f.size > max) {
+          setError(`${f.name} dépasse la taille max (${Math.round(max / 1024 / 1024)} MB)`);
+          return;
+        }
+        valid.push(f);
       }
-      valid.push(f);
-    }
-    setError(null);
-    setFiles((prev) => [...prev, ...valid]);
-    setPreviews((prev) => [
-      ...prev,
-      ...valid.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : "")),
-    ]);
-  }, [mode]);
+      setError(null);
+      setFiles((prev) => [...prev, ...valid]);
+      setPreviews((prev) => [
+        ...prev,
+        ...valid.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : "")),
+      ]);
+    },
+    [mode],
+  );
 
   const removeFile = (idx: number) => {
     if (previews[idx]) URL.revokeObjectURL(previews[idx]);
@@ -100,12 +103,19 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
         <div className="space-y-4">
           {/* Drop zone */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              addFiles(e.dataTransfer.files);
+            }}
             className={cn(
               "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer",
-              dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
+              dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
             )}
             onClick={() => inputRef.current?.click()}
           >
@@ -124,7 +134,6 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
               type="file"
               accept={ACCEPT_MAP[mode]}
               multiple={mode === "photo_video"}
-              capture={mode === "photo_video" ? "environment" : undefined}
               onChange={(e) => e.target.files && addFiles(e.target.files)}
               className="hidden"
             />
@@ -134,7 +143,10 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
           {files.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {files.map((f, i) => (
-                <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
+                <div
+                  key={i}
+                  className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border"
+                >
                   {previews[i] ? (
                     <img src={previews[i]} alt={f.name} className="h-full w-full object-cover" />
                   ) : (
@@ -148,7 +160,10 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
                     </div>
                   )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(i);
+                    }}
                     className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />
@@ -162,7 +177,9 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
 
           {/* Actions */}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={handleClose}>Annuler</Button>
+            <Button variant="outline" onClick={handleClose}>
+              Annuler
+            </Button>
             <Button onClick={handleUpload} disabled={uploading || files.length === 0} className="gap-2">
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               {uploading ? "Upload…" : `Enregistrer (${files.length})`}
