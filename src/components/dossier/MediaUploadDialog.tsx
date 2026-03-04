@@ -12,7 +12,7 @@ interface MediaUploadDialogProps {
 }
 
 const ACCEPT_MAP = {
-  photo_video: "image/jpeg,image/png,image/webp,video/mp4,video/quicktime",
+  photo_video: "image/*,video/*",
   plan: "image/jpeg,image/png,application/pdf",
 };
 
