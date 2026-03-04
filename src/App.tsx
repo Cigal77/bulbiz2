@@ -26,6 +26,7 @@ import MentionsLegales from "./pages/MentionsLegales";
 import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import DPA from "./pages/DPA";
 import Cookies from "./pages/Cookies";
+import AuthCallback from "./pages/AuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
           <div className="pb-16 md:pb-0">
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/client" element={<ClientForm />} />
               <Route path="/devis/validation" element={<QuoteValidation />} />
