@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Camera, Upload, X, Loader2, Image, Film } from "lucide-react";
+import { Upload, X, Loader2, Film, Image } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MediaUploadDialogProps {
@@ -33,6 +33,7 @@ function getMaxSize(file: File, mode: string) {
 
 export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUploadDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -114,21 +115,38 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
               addFiles(e.dataTransfer.files);
             }}
             className={cn(
-              "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors cursor-pointer",
-              dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/30",
+              "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors",
+              dragOver ? "border-primary bg-primary/5" : "border-border",
             )}
-            onClick={() => inputRef.current?.click()}
           >
             {mode === "photo_video" ? (
-              <Camera className="h-8 w-8 text-muted-foreground" />
+              <>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => inputRef.current?.click()} className="gap-2">
+                    <Image className="h-4 w-4" />
+                    Galerie
+                  </Button>
+                  <Button variant="outline" onClick={() => videoRef.current?.click()} className="gap-2">
+                    <Film className="h-4 w-4" />
+                    Filmer
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground text-center">Ou glissez vos fichiers ici</p>
+              </>
             ) : (
-              <Upload className="h-8 w-8 text-muted-foreground" />
+              <>
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground text-center">
+                  Glissez ou cliquez pour ajouter un plan (PDF ou image)
+                </p>
+                <Button variant="outline" onClick={() => inputRef.current?.click()} className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Choisir un fichier
+                </Button>
+              </>
             )}
-            <p className="text-sm text-muted-foreground text-center">
-              {mode === "photo_video"
-                ? "Glissez ou cliquez pour ajouter des photos/vidéos"
-                : "Glissez ou cliquez pour ajouter un plan (PDF ou image)"}
-            </p>
+
+            {/* Inputs cachés */}
             <input
               ref={inputRef}
               type="file"
@@ -137,6 +155,16 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
               onChange={(e) => e.target.files && addFiles(e.target.files)}
               className="hidden"
             />
+            {mode === "photo_video" && (
+              <input
+                ref={videoRef}
+                type="file"
+                accept="video/*"
+                capture="camcorder"
+                onChange={(e) => e.target.files && addFiles(e.target.files)}
+                className="hidden"
+              />
+            )}
           </div>
 
           {/* Previews */}
