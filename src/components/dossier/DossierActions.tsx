@@ -54,6 +54,35 @@ export function DossierActions({ dossier }: DossierActionsProps) {
 
   const status = dossier.status;
 
+  // Allow marking intervention as done from any pre-completion status
+  const canMarkDone = !["rdv_termine", "invoice_pending", "invoice_paid", "clos_signe", "clos_perdu"].includes(status);
+
+  const markDone = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({
+          status: "rdv_termine",
+          status_changed_at: new Date().toISOString(),
+          appointment_status: "done",
+        } as any)
+        .eq("id", dossier.id);
+      if (error) throw error;
+      await supabase.from("historique").insert({
+        dossier_id: dossier.id,
+        user_id: user?.id ?? null,
+        action: "intervention_done",
+        details: "Intervention marquée comme réalisée",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Intervention réalisée ✅" });
+      queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
+      queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
   const handleAddNote = () => {
     if (!noteText.trim()) return;
     addNote.mutate(noteText.trim(), {
