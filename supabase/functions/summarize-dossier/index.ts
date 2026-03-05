@@ -65,6 +65,26 @@ async function downloadMediaAsBase64(
   }
 }
 
+// For large files (videos), generate a signed URL instead of downloading
+async function getSignedUrl(
+  media: MediaRecord,
+  supabase: any,
+): Promise<{ signedUrl: string; mimeType: string; name: string; date: string } | null> {
+  try {
+    if (media.file_url.startsWith("http")) {
+      return { signedUrl: media.file_url, mimeType: media.file_type, name: media.file_name, date: media.created_at };
+    }
+    const { data, error } = await supabase.storage
+      .from("dossier-medias")
+      .createSignedUrl(media.file_url, 600); // 10 min
+    if (error || !data?.signedUrl) return null;
+    return { signedUrl: data.signedUrl, mimeType: media.file_type, name: media.file_name, date: media.created_at };
+  } catch (e) {
+    console.error(`Error signing URL for ${media.file_name}:`, e);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
