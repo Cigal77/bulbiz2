@@ -65,6 +65,26 @@ async function downloadMediaAsBase64(
   }
 }
 
+// For large files (videos), generate a signed URL instead of downloading
+async function getSignedUrl(
+  media: MediaRecord,
+  supabase: any,
+): Promise<{ signedUrl: string; mimeType: string; name: string; date: string } | null> {
+  try {
+    if (media.file_url.startsWith("http")) {
+      return { signedUrl: media.file_url, mimeType: media.file_type, name: media.file_name, date: media.created_at };
+    }
+    const { data, error } = await supabase.storage
+      .from("dossier-medias")
+      .createSignedUrl(media.file_url, 600); // 10 min
+    if (error || !data?.signedUrl) return null;
+    return { signedUrl: data.signedUrl, mimeType: media.file_type, name: media.file_name, date: media.created_at };
+  } catch (e) {
+    console.error(`Error signing URL for ${media.file_name}:`, e);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -103,10 +123,10 @@ serve(async (req) => {
     const imageMedias = imageMediasRes.data || [];
     const videoMedias = videoMediasRes.data || [];
 
-    const [audioResults, imageResults, videoResults] = await Promise.all([
+    const [audioResults, imageResults, videoSignedUrls] = await Promise.all([
       Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
       Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
-      Promise.all(videoMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 10))),
+      Promise.all(videoMedias.map(m => getSignedUrl(m, supabase))),
     ]);
 
     // Build multimodal content parts
@@ -124,15 +144,14 @@ serve(async (req) => {
       }
     }
 
-    // Videos
-    const validVideos = videoResults.filter(Boolean);
+    // Videos — use signed URLs (videos are too large for base64)
+    const validVideos = videoSignedUrls.filter(Boolean);
     if (validVideos.length > 0) {
       mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DU DOSSIER (${validVideos.length}) — Analyse le contenu visuel et audio de chaque vidéo pour comprendre le problème :` });
       for (const vid of validVideos) {
         if (!vid) continue;
-        const mime = toVideoMime(vid.mimeType);
         mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
-        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
+        mediaParts.push({ type: "image_url", image_url: { url: vid.signedUrl } });
       }
     }
 
@@ -415,7 +434,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: hasVideos ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
