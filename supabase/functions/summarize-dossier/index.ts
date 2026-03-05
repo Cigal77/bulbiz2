@@ -302,7 +302,7 @@ serve(async (req) => {
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
-    const hasVideos = validVideos.length > 0;
+    const hasVideos = videoMedias.length > 0; // metadata only, no content
     const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
     // Build empty fields list
