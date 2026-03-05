@@ -40,6 +40,8 @@ interface SettingsForm {
   relance_delay_info: number;
   relance_delay_devis_1: number;
   relance_delay_devis_2: number;
+  relance_delay_facture_1: number;
+  relance_delay_facture_2: number;
   email_signature: string;
   auto_send_client_link: boolean;
   client_link_validity_days: number;
@@ -59,7 +61,6 @@ export default function Settings() {
   const autoRelance = watch("auto_relance_enabled");
   const autoSendLink = watch("auto_send_client_link");
 
-
   useEffect(() => {
     if (profile) {
       reset({
@@ -75,6 +76,8 @@ export default function Settings() {
         relance_delay_info: profile.relance_delay_info,
         relance_delay_devis_1: profile.relance_delay_devis_1,
         relance_delay_devis_2: profile.relance_delay_devis_2,
+        relance_delay_facture_1: (profile as any).relance_delay_facture_1 ?? 3,
+        relance_delay_facture_2: (profile as any).relance_delay_facture_2 ?? 7,
         email_signature: profile.email_signature || [
           "Cordialement,",
           profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" "),
@@ -106,6 +109,8 @@ export default function Settings() {
         relance_delay_info: data.relance_delay_info,
         relance_delay_devis_1: data.relance_delay_devis_1,
         relance_delay_devis_2: data.relance_delay_devis_2,
+        relance_delay_facture_1: data.relance_delay_facture_1,
+        relance_delay_facture_2: data.relance_delay_facture_2,
         email_signature: data.email_signature || null,
         auto_send_client_link: data.auto_send_client_link,
         client_link_validity_days: data.client_link_validity_days,
@@ -113,7 +118,7 @@ export default function Settings() {
         vat_applicable: data.vat_applicable,
         payment_terms_default: data.payment_terms_default || null,
         client_slots_enabled: data.client_slots_enabled,
-      });
+      } as any);
       toast.success("Paramètres sauvegardés");
     } catch (e) {
       console.error("Settings save error:", e);
@@ -252,9 +257,9 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle>Relances automatiques</CardTitle>
-              <CardDescription>Configurez les délais et l'activation des relances email</CardDescription>
+              <CardDescription>Configurez les délais des relances email automatiques pour les devis et factures</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <Label>Activer les relances auto</Label>
@@ -266,11 +271,14 @@ export default function Settings() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Délai info manquante (jours)</Label>
+              {/* Info manquante */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">📋 Info manquante</p>
+                <p className="text-xs text-muted-foreground">Relance envoyée si le dossier reste en "nouveau" ou "à qualifier" sans réponse du client.</p>
+                <div className="max-w-[200px]">
+                  <Label className="text-xs">Délai après création</Label>
                   <Select
-                    value={String(watch("relance_delay_info") || 3)}
+                    value={String(watch("relance_delay_info") || 1)}
                     onValueChange={(v) => setValue("relance_delay_info", Number(v))}
                   >
                     <SelectTrigger>
@@ -279,47 +287,99 @@ export default function Settings() {
                     <SelectContent>
                       {DELAY_OPTIONS.map((n) => (
                         <SelectItem key={n} value={String(n)}>
-                          {n} jour{n > 1 ? "s" : ""}
+                          J+{n}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>1ère relance devis (jours)</Label>
-                  <Select
-                    value={String(watch("relance_delay_devis_1") || 7)}
-                    onValueChange={(v) => setValue("relance_delay_devis_1", Number(v))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DELAY_OPTIONS.map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n} jour{n > 1 ? "s" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              </div>
+
+              {/* Devis non signé */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-foreground">📝 Devis non signé</p>
+                <p className="text-xs text-muted-foreground">Jusqu'à 2 relances si le client n'a pas répondu au devis envoyé.</p>
+                <div className="grid grid-cols-2 gap-4 max-w-[400px]">
+                  <div className="space-y-1">
+                    <Label className="text-xs">1ère relance</Label>
+                    <Select
+                      value={String(watch("relance_delay_devis_1") || 2)}
+                      onValueChange={(v) => setValue("relance_delay_devis_1", Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DELAY_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            J+{n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">2ème relance</Label>
+                    <Select
+                      value={String(watch("relance_delay_devis_2") || 5)}
+                      onValueChange={(v) => setValue("relance_delay_devis_2", Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DELAY_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            J+{n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>2ème relance devis (jours)</Label>
-                  <Select
-                    value={String(watch("relance_delay_devis_2") || 14)}
-                    onValueChange={(v) => setValue("relance_delay_devis_2", Number(v))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DELAY_OPTIONS.map((n) => (
-                        <SelectItem key={n} value={String(n)}>
-                          {n} jour{n > 1 ? "s" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              </div>
+
+              {/* Facture non payée */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-foreground">💰 Facture non payée</p>
+                <p className="text-xs text-muted-foreground">Jusqu'à 2 relances après l'envoi de la facture si elle n'est pas marquée comme payée.</p>
+                <div className="grid grid-cols-2 gap-4 max-w-[400px]">
+                  <div className="space-y-1">
+                    <Label className="text-xs">1ère relance</Label>
+                    <Select
+                      value={String(watch("relance_delay_facture_1") || 3)}
+                      onValueChange={(v) => setValue("relance_delay_facture_1", Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DELAY_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            J+{n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">2ème relance</Label>
+                    <Select
+                      value={String(watch("relance_delay_facture_2") || 7)}
+                      onValueChange={(v) => setValue("relance_delay_facture_2", Number(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DELAY_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            J+{n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -370,7 +430,7 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle>Signature email</CardTitle>
-              <CardDescription>Texte ajouté en bas de chaque email de relance</CardDescription>
+              <CardDescription>Texte ajouté en bas de chaque email envoyé</CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea

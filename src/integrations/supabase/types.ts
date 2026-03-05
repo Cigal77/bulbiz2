@@ -964,6 +964,8 @@ export type Database = {
           public_client_slug: string | null
           relance_delay_devis_1: number
           relance_delay_devis_2: number
+          relance_delay_facture_1: number
+          relance_delay_facture_2: number
           relance_delay_info: number
           siret: string | null
           sms_enabled: boolean
@@ -994,6 +996,8 @@ export type Database = {
           public_client_slug?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
+          relance_delay_facture_1?: number
+          relance_delay_facture_2?: number
           relance_delay_info?: number
           siret?: string | null
           sms_enabled?: boolean
@@ -1024,6 +1028,8 @@ export type Database = {
           public_client_slug?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
+          relance_delay_facture_1?: number
+          relance_delay_facture_2?: number
           relance_delay_info?: number
           siret?: string | null
           sms_enabled?: boolean
