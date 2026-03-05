@@ -43,7 +43,6 @@ interface SettingsForm {
   email_signature: string;
   auto_send_client_link: boolean;
   client_link_validity_days: number;
-  sms_enabled: boolean;
   tva_intracom: string;
   vat_applicable: boolean;
   payment_terms_default: string;
@@ -59,7 +58,6 @@ export default function Settings() {
 
   const autoRelance = watch("auto_relance_enabled");
   const autoSendLink = watch("auto_send_client_link");
-  const smsEnabled = watch("sms_enabled");
 
 
   useEffect(() => {
@@ -85,7 +83,6 @@ export default function Settings() {
         ].filter(Boolean).join("\n"),
         auto_send_client_link: profile.auto_send_client_link ?? true,
         client_link_validity_days: profile.client_link_validity_days ?? 7,
-        sms_enabled: profile.sms_enabled ?? true,
         tva_intracom: profile.tva_intracom ?? "",
         vat_applicable: profile.vat_applicable ?? true,
         payment_terms_default: profile.payment_terms_default ?? "Paiement à réception de facture. Chèque, virement ou espèces.",
@@ -112,7 +109,6 @@ export default function Settings() {
         email_signature: data.email_signature || null,
         auto_send_client_link: data.auto_send_client_link,
         client_link_validity_days: data.client_link_validity_days,
-        sms_enabled: data.sms_enabled,
         tva_intracom: data.tva_intracom || null,
         vat_applicable: data.vat_applicable,
         payment_terms_default: data.payment_terms_default || null,
@@ -248,26 +244,6 @@ export default function Settings() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SMS - simplified, no Twilio mention */}
-          <Card>
-            <CardHeader>
-              <CardTitle>SMS</CardTitle>
-              <CardDescription>Envoi de SMS au client en complément des emails</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Envoyer aussi par SMS</Label>
-                  <p className="text-sm text-muted-foreground">Quand un numéro de téléphone client est disponible</p>
-                </div>
-                <Switch
-                  checked={smsEnabled}
-                  onCheckedChange={(v) => setValue("sms_enabled", v)}
-                />
               </div>
             </CardContent>
           </Card>
