@@ -1,79 +1,17 @@
 
-# Audit et corrections des automatisations email/notifications
 
-## Problemes identifies
+## Ajouter une page "Bientôt disponible" pour `/devis/new` et `/facture/new`
 
-### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
-**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
-- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
-- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
+Les boutons "Créer un devis" et "Créer une facture" dans le NextStepBanner naviguent vers `/devis/new` et `/facture/new` qui n'existent pas → 404. On garde les boutons tels quels et on ajoute une page d'accueil pour ces routes.
 
-### 2. Bug `send-invoice` : authentification inconsistante
-**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
-- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
+### Changements
 
-### 3. Bug `send-appointment-notification` : authentification inconsistante
-**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
-- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
+**1. `src/pages/ComingSoon.tsx`** (nouveau) :
+- Page avec emoji ⏳, titre "Cette fonctionnalité arrive bientôt"
+- Message : "Si vous êtes intéressé, contactez-nous au +33 7 61 39 71 63"
+- Bouton "Importer un devis/facture PDF" qui redirige vers le dossier avec `?import=devis` ou `?import=facture` (selon la route)
+- Bouton retour
 
-### 4. Notification artisan manquante sur confirmation RDV
-**Fichier** : `supabase/functions/submit-client-form/index.ts`
-- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
-- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
+**2. `src/App.tsx`** :
+- Ajouter deux routes protégées : `/devis/new` → `ComingSoon` et `/facture/new` → `ComingSoon`
 
-### 5. Notification artisan manquante sur selection de creneau (multi-slots)
-- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
-
-### 6. Lien dossier hardcode dans `submit-client-form`
-**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
-- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
-
-### 7. Email facture sans signature personnalisee
-**Fichier** : `supabase/functions/send-invoice/index.ts`
-- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
-
-### 8. Email facture sans numero de facture dans le sujet
-- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
-
----
-
-## Plan de corrections
-
-### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
-- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-- Ajouter la signature personnalisee
-- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
-
-### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-
-### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
-- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
-- Remplacer le lien hardcode par `app.bulbiz.io`
-- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
-
----
-
-## Details techniques
-
-### `send-invoice/index.ts` - Changements
-```text
-Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
-Ligne 170-218 : Remonter artisanName + signature au bon scope
-Ligne 181      : Ajouter signature personnalisee dans l'email
-Ligne 218      : Fixer la reference artisanName dans le SMS
-Sujet email    : Ajouter numero facture
-```
-
-### `send-appointment-notification/index.ts` - Changements
-```text
-Lignes 210-217 : Remplacer auth getUser() par decodage JWT
-```
-
-### `submit-client-form/index.ts` - Changements
-```text
-Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
-Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
-Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
-```
