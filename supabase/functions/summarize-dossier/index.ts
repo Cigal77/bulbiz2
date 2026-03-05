@@ -520,28 +520,88 @@ ${hasEmptyFields ? `- extracted_fields — RÈGLES CRITIQUES :
         floor_number: "Étage", access_code: "Code accès", availability: "Disponibilités",
       };
 
+      // Cross-validate extracted fields against actual source data
+      // Build a set of "known" values from structured data (invoices, quotes) for cross-checking
+      const knownPhones = new Set<string>();
+      const knownEmails = new Set<string>();
+      const knownNames = new Set<string>();
+      const knownAddresses = new Set<string>();
+      for (const inv of invoices) {
+        if (inv.client_phone) knownPhones.add(inv.client_phone.replace(/[\s.\-()]/g, ""));
+        if (inv.client_email) knownEmails.add(inv.client_email.toLowerCase());
+        if (inv.client_first_name) knownNames.add(inv.client_first_name.toLowerCase());
+        if (inv.client_last_name) knownNames.add(inv.client_last_name.toLowerCase());
+        if (inv.client_address) knownAddresses.add(inv.client_address.toLowerCase());
+      }
+
       for (const [key, value] of Object.entries(args)) {
-        if (value !== null && value !== undefined && value !== "" && emptyFields.includes(key)) {
-          // Validate phone numbers - must look like a real phone number
-          if (key === "client_phone") {
-            const phone = String(value).replace(/[\s.\-()]/g, "");
-            const isValidPhone = /^(\+?\d{10,15}|0\d{9})$/.test(phone);
-            if (!isValidPhone) {
-              console.log("Skipping suspicious phone number:", value);
-              continue;
-            }
+        if (value === null || value === undefined || value === "" || !emptyFields.includes(key)) continue;
+        const strValue = String(value).trim();
+        if (!strValue) continue;
+
+        // Validate phone numbers
+        if (key === "client_phone") {
+          const phone = strValue.replace(/[\s.\-()]/g, "");
+          const isValidFormat = /^(\+?\d{10,15}|0\d{9})$/.test(phone);
+          if (!isValidFormat) {
+            console.log("Skipping invalid phone format:", value);
+            continue;
           }
-          // Validate email
-          if (key === "client_email") {
-            const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value));
-            if (!isValidEmail) {
-              console.log("Skipping suspicious email:", value);
-              continue;
-            }
+          // Extra check: if we have structured invoice data, phone should match one of them
+          // If no invoices have phones, we accept it but log a warning
+          if (knownPhones.size > 0 && !knownPhones.has(phone)) {
+            console.log("Skipping phone not found in any structured source:", value);
+            continue;
           }
-          updatePayload[key] = value;
-          updatedFields.push(fieldLabels[key] || key);
         }
+
+        // Validate email
+        if (key === "client_email") {
+          const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strValue);
+          if (!isValidEmail) {
+            console.log("Skipping invalid email:", value);
+            continue;
+          }
+          if (knownEmails.size > 0 && !knownEmails.has(strValue.toLowerCase())) {
+            console.log("Skipping email not found in any structured source:", value);
+            continue;
+          }
+        }
+
+        // Validate postal code (French format)
+        if (key === "postal_code") {
+          if (!/^\d{5}$/.test(strValue)) {
+            console.log("Skipping invalid postal code:", value);
+            continue;
+          }
+        }
+
+        // Validate floor number
+        if (key === "floor_number") {
+          const num = Number(value);
+          if (!Number.isInteger(num) || num < -5 || num > 50) {
+            console.log("Skipping suspicious floor number:", value);
+            continue;
+          }
+        }
+
+        // Validate housing type
+        if (key === "housing_type") {
+          const validTypes = ["appartement", "maison", "local_commercial", "bureau", "commerce", "atelier", "cave", "parking", "immeuble"];
+          if (!validTypes.some(t => strValue.toLowerCase().includes(t))) {
+            console.log("Skipping suspicious housing type:", value);
+            continue;
+          }
+        }
+
+        // Limit string lengths to prevent garbage data
+        if (typeof value === "string" && value.length > 500) {
+          console.log(`Skipping suspiciously long value for ${key}: ${value.length} chars`);
+          continue;
+        }
+
+        updatePayload[key] = value;
+        updatedFields.push(fieldLabels[key] || key);
       }
 
       if (Object.keys(updatePayload).length > 0) {
