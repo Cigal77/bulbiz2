@@ -13,12 +13,13 @@ interface ActionItem {
   dossierId: string;
   clientName: string;
   clientPhone: string | null;
-  type: "rdv_today" | "rdv_to_fix" | "nouveau" | "devis_to_make" | "devis_pending" | "invoice_to_send" | "invoice_unpaid" | "link_to_send";
+  type: "rdv_today" | "rdv_to_fix" | "slots_pending" | "nouveau" | "devis_to_make" | "devis_pending" | "invoice_to_send" | "invoice_unpaid" | "link_to_send";
   label: string;
   sublabel: string;
   icon: React.ReactNode;
   iconBg: string;
   urgency: number;
+  createdAt: string;
 }
 
 function getClientName(d: Dossier) {
@@ -45,6 +46,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
           icon: <Calendar className="h-4 w-4" />,
           iconBg: "bg-success/15 text-success",
           urgency: 10,
+          createdAt: d.created_at,
         });
       }
     }
@@ -59,6 +61,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <FolderOpen className="h-4 w-4" />,
         iconBg: "bg-primary/15 text-primary",
         urgency: 7,
+        createdAt: d.created_at,
       });
     }
 
@@ -77,6 +80,21 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <Calendar className="h-4 w-4" />,
         iconBg: "bg-warning/15 text-warning",
         urgency: 8,
+        createdAt: d.created_at,
+      });
+    }
+
+    // Slots pending — client proposed slots or waiting for confirmation
+    if (["slots_proposed", "rdv_pending", "client_selected"].includes(d.appointment_status as string)) {
+      items.push({
+        id: `slots-pending-${d.id}`, dossierId: d.id, clientName: name, clientPhone: d.client_phone,
+        type: "slots_pending",
+        label: "Créneaux à traiter",
+        sublabel: d.appointment_status === "client_selected" ? "Client a choisi un créneau" : "Créneaux proposés",
+        icon: <Calendar className="h-4 w-4" />,
+        iconBg: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+        urgency: 8,
+        createdAt: d.created_at,
       });
     }
 
@@ -90,6 +108,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <FileText className="h-4 w-4" />,
         iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
         urgency: 7,
+        createdAt: d.created_at,
       });
     }
 
@@ -104,6 +123,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <FileText className="h-4 w-4" />,
         iconBg: daysSince > 3 ? "bg-warning/15 text-warning" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
         urgency: daysSince > 3 ? 7 : 3,
+        createdAt: d.created_at,
       });
     }
 
@@ -117,6 +137,7 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <Receipt className="h-4 w-4" />,
         iconBg: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
         urgency: 7,
+        createdAt: d.created_at,
       });
     }
 
@@ -131,18 +152,23 @@ function buildActions(dossiers: Dossier[]): ActionItem[] {
         icon: <Receipt className="h-4 w-4" />,
         iconBg: daysSince > 7 ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning",
         urgency: daysSince > 7 ? 9 : 5,
+        createdAt: d.created_at,
       });
     }
   }
 
-  return items.sort((a, b) => b.urgency - a.urgency);
+  return items.sort((a, b) => {
+    if (b.urgency !== a.urgency) return b.urgency - a.urgency;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 const SECTION_ORDER: ActionItem["type"][] = [
-  "rdv_today", "nouveau", "rdv_to_fix", "devis_to_make", "devis_pending", "invoice_to_send", "invoice_unpaid", "link_to_send",
+  "rdv_today", "slots_pending", "nouveau", "rdv_to_fix", "devis_to_make", "devis_pending", "invoice_to_send", "invoice_unpaid", "link_to_send",
 ];
 const SECTION_LABELS: Record<ActionItem["type"], string> = {
   rdv_today: "📅 RDV aujourd'hui",
+  slots_pending: "📅 Créneaux à traiter",
   nouveau: "🆕 Nouveaux dossiers",
   rdv_to_fix: "📅 RDV à fixer",
   devis_to_make: "📄 Devis à faire",

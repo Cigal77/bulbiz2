@@ -37,6 +37,7 @@ function useActionBadges() {
       // Count pending RDVs (slots proposed, client selected, or confirmed upcoming)
       if (["rdv_pending", "slots_proposed", "client_selected"].includes(d.appointment_status as string)) {
         rdvPending++;
+        todo++;
       }
     }
     return { todo, rdvToday, rdvPending };
