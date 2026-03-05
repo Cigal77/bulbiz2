@@ -393,12 +393,13 @@ ${hasEmptyFields ? `\n⚠️ CHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFi
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Build extraction schema
+    // Build extraction schema — use tool calling for structured extraction to reduce hallucination
     const extractionSchema = hasEmptyFields ? `,
    "extracted_fields": {
      // Uniquement les champs trouvés dans les médias, devis ou factures parmi: ${emptyFields.join(", ")}
-     // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
-     // Sources possibles : notes vocales, photos, notes écrites, PDF de devis/factures, données structurées des devis/factures (nom client, adresse, email, téléphone)
+     // RÈGLE ABSOLUE : ne remplis un champ QUE si tu peux CITER la source exacte (ex: "facture FAC-2026-001", "note vocale du 05/03", "photo IMG_001")
+     // Si tu n'as PAS de source précise → n'inclus PAS le champ
+     // Préfère ne PAS remplir plutôt que risquer une erreur
    }` : "";
 
     const systemPrompt = `Tu es l'assistant IA de terrain d'un artisan (plombier/chauffagiste/multi-services). Ton rôle est de générer un résumé OPÉRATIONNEL qui aide l'artisan à :
@@ -425,30 +426,43 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) :
   ]${extractionSchema}
 }
 
+⚠️ RÈGLE ANTI-HALLUCINATION (PRIORITÉ MAXIMALE) :
+- Tu ne dois JAMAIS inventer, deviner, supposer ou fabriquer une information qui n'est PAS EXPLICITEMENT présente dans les données fournies.
+- Si une information n'est pas dans les données → écris "Non renseigné" ou omet le champ. JAMAIS de valeur inventée.
+- Pour le résumé (headline, bullets) : ne décris QUE ce qui est dans les données. Si tu n'as pas assez d'info, dis-le clairement.
+- Pour material_list : n'inclus QUE le matériel EXPLICITEMENT mentionné dans un devis, une facture, une note vocale, une note écrite ou visible sur une photo. Si aucun matériel n'est mentionné → material_list = []
+
 RÈGLES STRICTES :
 - headline : max 15 mots, situation actuelle + problème
 - bullets : 3 à 7 points, PAS d'emoji, max 25 mots chacun. Priorise : problème technique → matériel → accès → admin → client
+- Si tu manques d'information pour un bullet, écris "Information non disponible" plutôt qu'inventer
 - next_action : action CONCRÈTE (ex: "Commander le ballon Thermor 200L avant intervention", "Appeler le client pour confirmer le créneau")
-- material_list : Extrais le matériel depuis TOUTES les sources disponibles :
+- material_list :
   * Devis et factures : chaque ligne de matériel/fourniture
-  * Notes vocales : tout matériel mentionné oralement (ex: "il faudra un joint de 40", "prendre un flexible inox")
+  * Notes vocales : UNIQUEMENT le matériel CLAIREMENT dicté (ex: "il faudra un joint de 40")
   * Notes écrites : tout matériel listé par l'artisan
-  * Photos : matériel identifiable visuellement (marque, modèle visible sur l'équipement)
+  * Photos : matériel identifiable visuellement UNIQUEMENT si la marque/modèle est LISIBLE sur la photo
   * label : nom exact (garde les marques, modèles, dimensions)
   * qty : quantité (1 par défaut si non précisée)
   * ref : référence fabricant, marque ou "n/a"
   * N'inclus PAS la main d'œuvre, déplacement, ou frais administratifs
   * Si aucun matériel identifié nulle part : material_list = []
-- Ne JAMAIS inventer de détails non présents dans les données
-- Les photos : décris ce que tu VOIS réellement (type de tuyau, marque visible, état, dégâts)
-- Les notes vocales : transcris les infos UTILES pour le chantier ET extrais le matériel mentionné
+- Les photos : décris ce que tu VOIS réellement (type de tuyau, marque visible, état, dégâts). Ne déduis PAS une marque ou un modèle si ce n'est pas lisible.
+- Les notes vocales : transcris les infos UTILES pour le chantier. N'ajoute PAS d'information que tu n'entends pas clairement.
 - Les notes écrites : intègre dans le résumé ET extrais le matériel mentionné
-- Les devis et factures : extrais le matériel ET les informations client (nom, prénom, email, téléphone, adresse) pour remplir les champs manquants du dossier
+- Les devis et factures : extrais le matériel ET les informations client (nom, prénom, email, téléphone, adresse) UNIQUEMENT depuis les données structurées fournies
 - Ignore les erreurs techniques dans l'historique
-${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias, devis ou factures.
-- client_phone : UNIQUEMENT un numéro dicté mot à mot dans une note vocale, écrit dans une note, ou présent dans un devis/facture. Ne JAMAIS deviner ou inventer un numéro de téléphone. Si tu n'es pas SÛR À 100% que ce numéro a été explicitement mentionné, ne le mets PAS.
-- client_email : même règle, uniquement si explicitement présent dans les sources.
-- Les infos client des factures/devis structurés (client_first_name, client_last_name, client_email, client_phone, address) sont des sources fiables.` : ""}`;
+${hasEmptyFields ? `- extracted_fields — RÈGLES CRITIQUES :
+  * N'inclus un champ QUE si l'information est EXPLICITEMENT et LITTÉRALEMENT présente dans une source
+  * client_phone : UNIQUEMENT un numéro dicté MOT À MOT dans une note vocale, ÉCRIT dans une note, ou PRÉSENT dans les données structurées d'un devis/facture. JAMAIS deviner. En cas de doute → NE PAS inclure.
+  * client_email : UNIQUEMENT si LITTÉRALEMENT présent dans une source (pas de déduction)
+  * address, postal_code, city : UNIQUEMENT si présents dans un devis/facture structuré ou dictés clairement
+  * description : UNIQUEMENT un résumé fidèle de ce que l'artisan a dit/écrit, pas d'interprétation
+  * housing_type : UNIQUEMENT si explicitement mentionné ("appartement", "maison", "local commercial")
+  * floor_number : UNIQUEMENT si un numéro d'étage est explicitement dit/écrit
+  * access_code : UNIQUEMENT si un code est explicitement donné
+  * PRÉFÈRE NE PAS REMPLIR plutôt que risquer une information fausse` : ""}`;
+
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
