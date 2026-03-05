@@ -208,24 +208,15 @@ export default function DossierDetail() {
             {/* Résumé de la demande — always visible */}
             <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
 
-            {/* Actions — open by default on mobile, placed before devis */}
-            <CollapsibleSection title="⚙️ Actions" defaultOpen={true}>
-              <div className="space-y-3">
-                <DossierActions dossier={dossier} />
-                <ClientLinkBlock dossier={dossier} />
-              </div>
-            </CollapsibleSection>
+            {/* Actions rapides — above everything else */}
+            <DossierActions dossier={dossier} />
 
-            {/* RDV block — always visible, priority */}
-            <div ref={appointmentRef}>
-              <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
-            </div>
             <AppointmentBanner
               dossier={dossier}
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
 
-            {/* RDV before Devis */}
+            {/* Devis */}
             <CollapsibleSection title="📝 Devis" defaultOpen={["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe"].includes(dossier.status)}>
               <QuoteBlock dossier={dossier} />
             </CollapsibleSection>
@@ -249,6 +240,14 @@ export default function DossierDetail() {
             <CollapsibleSection title="📜 Historique">
               <HistoriqueTimeline historique={historique} isLoading={histLoading} />
             </CollapsibleSection>
+
+            {/* Rendez-vous — en bas */}
+            <div ref={appointmentRef}>
+              <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
+            </div>
+
+            {/* Lien client — au dessus de supprimer */}
+            <ClientLinkBlock dossier={dossier} />
 
             {/* Delete */}
             <div className="rounded-xl border border-destructive/20 bg-card p-4">
