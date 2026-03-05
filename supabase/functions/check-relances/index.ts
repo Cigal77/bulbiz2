@@ -231,6 +231,107 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // ── 3. Facture non payée ──
+    const { data: factureDossiers } = await supabase
+      .from("dossiers")
+      .select("*, invoices!inner(id, invoice_number, sent_at, status, client_email)")
+      .eq("relance_active", true)
+      .not("client_email", "is", null);
+
+    if (factureDossiers && factureDossiers.length > 0) {
+      for (const dossier of factureDossiers) {
+        const unpaidInvoices = (dossier.invoices || []).filter((inv: any) => inv.status === "sent" && inv.sent_at);
+        if (unpaidInvoices.length === 0) continue;
+
+        const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", dossier.user_id).single();
+        if (!profile?.auto_relance_enabled) continue;
+
+        const delay1 = profile?.relance_delay_facture_1 ?? 3;
+        const delay2 = profile?.relance_delay_facture_2 ?? 7;
+
+        for (const invoice of unpaidInvoices) {
+          // Check how many relances already sent for this invoice
+          const { count: relanceCount } = await supabase
+            .from("relances")
+            .select("*", { count: "exact", head: true })
+            .eq("dossier_id", dossier.id)
+            .eq("type", "facture_non_payee")
+            .ilike("email_to", invoice.client_email || dossier.client_email);
+
+          const currentCount = relanceCount || 0;
+          if (currentCount >= 2) continue;
+
+          const sentDate = new Date(invoice.sent_at);
+          const daysSinceSent = (now.getTime() - sentDate.getTime()) / (24 * 60 * 60 * 1000);
+
+          const shouldSend =
+            (currentCount === 0 && daysSinceSent >= delay1) ||
+            (currentCount === 1 && daysSinceSent >= delay2);
+          if (!shouldSend) continue;
+
+          // Anti-spam: check last relance for this dossier
+          if (dossier.last_relance_at) {
+            const hoursSince = (now.getTime() - new Date(dossier.last_relance_at).getTime()) / (60 * 60 * 1000);
+            if (hoursSince < 20) continue;
+          }
+
+          const artisanName =
+            profile?.company_name ||
+            [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+            "Votre artisan";
+          const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
+          const clientEmail = invoice.client_email || dossier.client_email;
+
+          try {
+            const gmailConn3 = await getGmailConnection(supabase, dossier.user_id);
+            const factureSubject = `${artisanName} – Rappel facture ${invoice.invoice_number}`;
+            const factureHtml = `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <p>Bonjour ${dossier.client_first_name || ""},</p>
+                <p>Nous nous permettons de vous rappeler que la facture <strong>${invoice.invoice_number}</strong> est en attente de règlement.</p>
+                <p>Si vous avez déjà procédé au paiement, veuillez ne pas tenir compte de ce message.</p>
+                <p>Nous restons à votre disposition pour toute question.</p>
+                <br/><p style="white-space: pre-line;">${signature}</p>
+              </div>`;
+
+            let emailSentOk = false;
+            if (gmailConn3) {
+              emailSentOk = await sendViaGmail(gmailConn3.access_token, `${artisanName} <${gmailConn3.gmail_address}>`, clientEmail!, factureSubject, factureHtml);
+            }
+            if (!emailSentOk) {
+              await resend.emails.send({
+                from: `${artisanName} <noreply@bulbiz.fr>`,
+                to: [clientEmail!],
+                subject: factureSubject,
+                html: factureHtml,
+              });
+            }
+
+            await supabase.from("historique").insert({
+              dossier_id: dossier.id,
+              user_id: dossier.user_id,
+              action: "relance_sent",
+              details: `Relance auto "Facture non payée" (${currentCount + 1}/2) – ${invoice.invoice_number} envoyée à ${clientEmail}`,
+            });
+
+            await supabase.from("relances").insert({
+              dossier_id: dossier.id,
+              user_id: dossier.user_id,
+              type: "facture_non_payee",
+              email_to: clientEmail!,
+              status: "sent",
+            });
+            await supabase
+              .from("dossiers")
+              .update({ last_relance_at: now.toISOString() })
+              .eq("id", dossier.id);
+            totalSent++;
+          } catch (e) {
+            console.error(`Failed to send facture relance for dossier ${dossier.id}, invoice ${invoice.invoice_number}:`, e);
+          }
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, relances_sent: totalSent }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
