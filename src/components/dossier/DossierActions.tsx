@@ -6,10 +6,13 @@ import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   Phone, MessageSquarePlus, FileText, Bell, BellOff, Calendar, RefreshCw, Loader2,
-  Mic, Camera, Map, Receipt,
+  Mic, Camera, Map, Receipt, CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
