@@ -100,7 +100,7 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader ?? "" } } }
     );
 
-    // Fetch all data in parallel — now also fetch images and videos
+    // Fetch all data in parallel
     const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, videoMediasRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
@@ -110,7 +110,7 @@ serve(async (req) => {
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
-        .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(5),
+        .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, file_size, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "video/%").order("created_at", { ascending: false }).limit(2),
     ]);
@@ -118,20 +118,14 @@ serve(async (req) => {
     if (dossierRes.error) throw dossierRes.error;
     const d = dossierRes.data;
 
-    // Download all media types in parallel
     const audioMedias = audioMediasRes.data || [];
     const imageMedias = imageMediasRes.data || [];
     const videoMedias = videoMediasRes.data || [];
 
-    // Filter videos: only attempt download for videos <= 20MB to avoid OOM
-    const MAX_VIDEO_DOWNLOAD_MB = 20;
-    const downloadableVideos = videoMedias.filter((m: any) => !m.file_size || m.file_size <= MAX_VIDEO_DOWNLOAD_MB * 1024 * 1024);
-    const skippedVideos = videoMedias.filter((m: any) => m.file_size && m.file_size > MAX_VIDEO_DOWNLOAD_MB * 1024 * 1024);
-
-    const [audioResults, imageResults, videoResults] = await Promise.all([
-      Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
-      Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
-      Promise.all(downloadableVideos.map(m => downloadMediaAsBase64(m, supabaseUrl, MAX_VIDEO_DOWNLOAD_MB))),
+    // Download images (max 2MB each) and audio (max 3MB each) — NO video downloads to avoid OOM
+    const [audioResults, imageResults] = await Promise.all([
+      Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 3))),
+      Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 2))),
     ]);
 
     // Build multimodal content parts
@@ -149,22 +143,11 @@ serve(async (req) => {
       }
     }
 
-    // Videos — base64 data URL (gateway requires data URLs for non-image formats)
-    const validVideos = videoResults.filter(Boolean);
-    if (validVideos.length > 0) {
-      mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DU DOSSIER (${validVideos.length}) — Analyse le contenu visuel et audio de chaque vidéo pour comprendre le problème :` });
-      for (const vid of validVideos) {
-        if (!vid) continue;
-        const mime = toVideoMime(vid.mimeType);
-        mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
-        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
-      }
-    }
-
-    // Mention skipped videos in text context so the AI knows they exist
-    if (skippedVideos.length > 0) {
-      const skippedInfo = skippedVideos.map((v: any) => `"${v.file_name}" (${Math.round(v.file_size / 1024 / 1024)} MB)`).join(", ");
-      mediaParts.push({ type: "text", text: `\n\n⚠️ VIDÉOS NON ANALYSÉES (trop volumineuses pour l'analyse IA) : ${skippedInfo}. Mentionne dans le résumé que des vidéos sont disponibles mais n'ont pas pu être analysées automatiquement.` });
+    // Videos — metadata only (no download to avoid memory limit)
+    const validVideos: any[] = []; // no actual video content
+    if (videoMedias.length > 0) {
+      const videoInfo = videoMedias.map((v: any) => `"${v.file_name}" (${v.file_size ? Math.round(v.file_size / 1024 / 1024) + ' MB' : 'taille inconnue'}, ${v.created_at.slice(0, 16)})`).join(", ");
+      mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DISPONIBLES (${videoMedias.length}, non analysables automatiquement) : ${videoInfo}. Mentionne dans le résumé que des vidéos du chantier sont disponibles dans le dossier.` });
     }
 
     // Audio
