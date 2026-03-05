@@ -28,6 +28,7 @@ import PolitiqueConfidentialite from "./pages/PolitiqueConfidentialite";
 import DPA from "./pages/DPA";
 import Cookies from "./pages/Cookies";
 import AuthCallback from "./pages/AuthCallback";
+import ComingSoon from "./pages/ComingSoon";
 
 const queryClient = new QueryClient();
 
@@ -122,6 +123,26 @@ const App = () => (
                   <ProtectedRoute>
                     <AppLayout>
                       <Settings />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/devis/new"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ComingSoon />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facture/new"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ComingSoon />
                     </AppLayout>
                   </ProtectedRoute>
                 }
