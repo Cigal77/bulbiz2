@@ -793,13 +793,23 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       {/* Action buttons for slots_proposed / client_selected / rdv_confirmed */}
       <div className="flex flex-col gap-2">
         {status === "slots_proposed" && (
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
-              <Plus className="h-3.5 w-3.5" /> Ajouter des créneaux
-            </Button>
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
-              <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
-            </Button>
+          <div className="flex flex-col gap-2">
+            {selectedSlotId && (
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                <Button className="w-full gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11" onClick={() => confirmProposedSlot.mutate()} disabled={confirmProposedSlot.isPending}>
+                  {confirmProposedSlot.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Confirmer ce créneau
+                </Button>
+              </motion.div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
+                <Plus className="h-3.5 w-3.5" /> Proposer d'autres créneaux
+              </Button>
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
+                <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
+              </Button>
+            </div>
           </div>
         )}
 
