@@ -133,24 +133,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
 
   return (
     <div className="space-y-4">
-      {/* Status + meta */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Infos dossier</h3>
-
-        <div className="flex items-center gap-2">
-          <Badge className={cn("text-xs", STATUS_COLORS[status])}>
-            {STATUS_LABELS[status]}
-          </Badge>
-        </div>
-
-        <div className="text-xs text-muted-foreground space-y-1">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3" />
-            Créé le {format(new Date(dossier.created_at), "d MMMM yyyy", { locale: fr })}
-          </div>
-        </div>
-      </div>
-
       {/* Quick actions */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
