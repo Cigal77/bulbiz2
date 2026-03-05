@@ -19,6 +19,7 @@ interface SummaryBlockProps {
 interface MaterialItem {
   label: string;
   qty: number;
+  unit?: string;
   ref?: string;
 }
 
@@ -223,7 +224,11 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
                       onClick={() => toggleItem(i)}
                     >
                       <span className="text-foreground/90">
-                        {item.qty > 1 && <span className="font-medium text-primary">{item.qty}× </span>}
+                        {item.qty > 1 && (
+                          <span className="font-medium text-primary">
+                            {item.qty}{item.unit && item.unit !== "u" ? ` ${item.unit} ` : "× "}
+                          </span>
+                        )}
                         {item.label}
                       </span>
                       {item.ref && item.ref !== "n/a" && (
