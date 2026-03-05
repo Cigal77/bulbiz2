@@ -420,16 +420,20 @@ RÈGLES STRICTES :
 - headline : max 15 mots, situation actuelle + problème
 - bullets : 3 à 7 points, PAS d'emoji, max 25 mots chacun. Priorise : problème technique → matériel → accès → admin → client
 - next_action : action CONCRÈTE (ex: "Commander le ballon Thermor 200L avant intervention", "Appeler le client pour confirmer le créneau")
-- material_list : OBLIGATOIRE si un devis ou une facture existe. Extrais CHAQUE ligne de matériel/fourniture avec :
-  * label : nom exact tel qu'écrit dans le devis (garde les marques, modèles, dimensions)
-  * qty : quantité
+- material_list : Extrais le matériel depuis TOUTES les sources disponibles :
+  * Devis et factures : chaque ligne de matériel/fourniture
+  * Notes vocales : tout matériel mentionné oralement (ex: "il faudra un joint de 40", "prendre un flexible inox")
+  * Notes écrites : tout matériel listé par l'artisan
+  * Photos : matériel identifiable visuellement (marque, modèle visible sur l'équipement)
+  * label : nom exact (garde les marques, modèles, dimensions)
+  * qty : quantité (1 par défaut si non précisée)
   * ref : référence fabricant, marque ou "n/a"
-  * N'inclus PAS la main d'œuvre, déplacement, ou frais administratifs dans la material_list
-  * Si aucun devis/facture : material_list = []
+  * N'inclus PAS la main d'œuvre, déplacement, ou frais administratifs
+  * Si aucun matériel identifié nulle part : material_list = []
 - Ne JAMAIS inventer de détails non présents dans les données
 - Les photos : décris ce que tu VOIS réellement (type de tuyau, marque visible, état, dégâts)
-- Les notes vocales : transcris les infos UTILES pour le chantier
-- Les notes écrites : intègre dans le résumé
+- Les notes vocales : transcris les infos UTILES pour le chantier ET extrais le matériel mentionné
+- Les notes écrites : intègre dans le résumé ET extrais le matériel mentionné
 - Ignore les erreurs techniques dans l'historique
 ${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias` : ""}`;
 
