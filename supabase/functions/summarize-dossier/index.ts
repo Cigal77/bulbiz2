@@ -476,7 +476,7 @@ ${hasEmptyFields ? `- extracted_fields — RÈGLES CRITIQUES :
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        temperature: 0.2,
+        temperature: 0.1,
       }),
     });
 
