@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("Google OAuth credentials not configured");
     }
 
-    const { action, code, redirect_uri } = await req.json();
+    const { action, code, redirect_uri, state } = await req.json();
 
     // For authorize and status/disconnect, we need the user
     const authHeader = req.headers.get("Authorization");
@@ -41,6 +41,7 @@ Deno.serve(async (req: Request) => {
         scope: scopes,
         access_type: "offline",
         prompt: "consent",
+        state: state || "gmail",
       });
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -56,7 +57,10 @@ Deno.serve(async (req: Request) => {
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseUser.auth.getUser();
     if (authError || !user) throw new Error("Unauthorized");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -97,15 +101,16 @@ Deno.serve(async (req: Request) => {
       const expiresAt = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
       // Upsert gmail connection
-      const { error: upsertErr } = await supabase
-        .from("gmail_connections")
-        .upsert({
+      const { error: upsertErr } = await supabase.from("gmail_connections").upsert(
+        {
           user_id: user.id,
           gmail_address: userinfo.email,
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token || "",
           token_expires_at: expiresAt,
-        }, { onConflict: "user_id" });
+        },
+        { onConflict: "user_id" },
+      );
 
       if (upsertErr) {
         console.error("Upsert error:", upsertErr);
@@ -131,12 +136,15 @@ Deno.serve(async (req: Request) => {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      return new Response(JSON.stringify({
-        connected: !!connection,
-        gmail_address: connection?.gmail_address || null,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          connected: !!connection,
+          gmail_address: connection?.gmail_address || null,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     throw new Error(`Unknown action: ${action}`);

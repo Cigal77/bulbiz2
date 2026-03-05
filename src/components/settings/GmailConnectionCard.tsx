@@ -37,10 +37,10 @@ export function GmailConnectionCard() {
 
   // Handle OAuth callback
   const callbackCalledRef = useRef(false);
-
   useEffect(() => {
     const code = searchParams.get("code");
-    if (code && !callbackCalledRef.current) {
+    const state = searchParams.get("state");
+    if (code && state === "gmail" && !callbackCalledRef.current) {
       callbackCalledRef.current = true;
       handleCallback(code);
     }
@@ -76,12 +76,11 @@ export function GmailConnectionCard() {
     try {
       const redirectUri = `${window.location.origin}/parametres`;
       const { data, error } = await supabase.functions.invoke("gmail-oauth", {
-        body: { action: "authorize", redirect_uri: redirectUri },
+        body: { action: "authorize", redirect_uri: redirectUri, state: "gmail" }, // ← ajouter state
       });
       if (error) throw error;
       window.location.href = data.auth_url;
     } catch (e: any) {
-      console.error("Gmail auth error:", e);
       toast.error("Erreur lors de l'autorisation Gmail");
       setActionLoading(false);
     }
