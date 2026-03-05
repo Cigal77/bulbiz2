@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,9 +36,12 @@ export function GmailConnectionCard() {
   }, []);
 
   // Handle OAuth callback
+  const callbackCalledRef = useRef(false);
+
   useEffect(() => {
     const code = searchParams.get("code");
-    if (code && searchParams.get("gmail") !== "done") {
+    if (code && !callbackCalledRef.current) {
+      callbackCalledRef.current = true;
       handleCallback(code);
     }
   }, [searchParams]);
