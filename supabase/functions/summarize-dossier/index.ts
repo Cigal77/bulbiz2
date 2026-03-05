@@ -404,10 +404,10 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) :
 {
   "headline": "phrase courte résumant la situation et le problème principal (max 15 mots)",
   "bullets": [
-    "🔧 Problème : description technique précise du problème identifié",
-    "📍 Accès : étage, code, parking, conditions d'accès chantier",
-    "📋 Admin : statut devis/facture/RDV en 1 ligne",
-    "📞 Client : disponibilités et moyen de contact",
+    "Problème : description technique précise du problème identifié",
+    "Accès : étage, code, parking, conditions d'accès chantier",
+    "Admin : statut devis/facture/RDV en 1 ligne",
+    "Client : disponibilités et moyen de contact",
     "... autres points importants identifiés dans les médias"
   ],
   "next_action": "action concrète prioritaire pour l'artisan (max 20 mots)",
