@@ -1,4 +1,5 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { FloatingVoiceButton } from "@/components/dossier/FloatingVoiceButton";
 import { useDossier, useDossierHistorique, useDossierMedias } from "@/hooks/useDossier";
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { ClientBlock } from "@/components/dossier/ClientBlock";
@@ -341,6 +342,9 @@ export default function DossierDetail() {
           <span className="text-sm font-semibold">RDV</span>
         </button>
       )}
+
+      {/* Floating voice note button – always visible */}
+      <FloatingVoiceButton dossierId={id!} />
     </div>
   );
 }
