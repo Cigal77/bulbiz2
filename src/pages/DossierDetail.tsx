@@ -216,6 +216,15 @@ export default function DossierDetail() {
               onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
 
+            {/* Client & Intervention */}
+            <CollapsibleSection title="📋 Client & Intervention" defaultOpen>
+              <div className="space-y-3">
+                <ClientBlock dossier={dossier} />
+                <InterventionBlock dossier={dossier} />
+                <AccessBlock dossier={dossier} />
+              </div>
+            </CollapsibleSection>
+
             {/* Devis */}
             <CollapsibleSection title="📝 Devis" defaultOpen={["rdv_termine", "devis_a_faire", "devis_envoye", "devis_signe"].includes(dossier.status)}>
               <QuoteBlock dossier={dossier} />
@@ -223,14 +232,6 @@ export default function DossierDetail() {
 
             <CollapsibleSection title="🧾 Facture" defaultOpen={["devis_signe", "invoice_pending", "invoice_paid"].includes(dossier.status)}>
               <InvoiceBlock dossier={dossier} />
-            </CollapsibleSection>
-
-            <CollapsibleSection title="📋 Client & Intervention">
-              <div className="space-y-3">
-                <ClientBlock dossier={dossier} />
-                <InterventionBlock dossier={dossier} />
-                <AccessBlock dossier={dossier} />
-              </div>
             </CollapsibleSection>
 
             <CollapsibleSection title="📷 Médias">
@@ -275,11 +276,11 @@ export default function DossierDetail() {
                 dossier={dossier}
                 onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
-              <QuoteBlock dossier={dossier} />
-              <InvoiceBlock dossier={dossier} />
               <ClientBlock dossier={dossier} />
               <InterventionBlock dossier={dossier} />
               <AccessBlock dossier={dossier} />
+              <QuoteBlock dossier={dossier} />
+              <InvoiceBlock dossier={dossier} />
               <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
               <HistoriqueTimeline historique={historique} isLoading={histLoading} />
               <div ref={appointmentRef}>
