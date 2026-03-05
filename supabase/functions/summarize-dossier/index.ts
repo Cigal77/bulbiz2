@@ -159,6 +159,8 @@ Règles:
 - Adapte ton résumé au statut du dossier (nouveau → qualifier, devis envoyé → relancer, etc.)
 - IGNORE les erreurs techniques dans l'historique (ex: "Impossible d'envoyer SMS", "erreur notification", etc.) — ne les mentionne jamais dans le résumé
 - Ne répète pas les labels bruts, reformule intelligemment
+- Ne suggère JAMAIS "écouter la note vocale" ou "réécouter les notes" comme action — tu les as déjà écoutées et intégrées dans le résumé
+- Les next_action doivent être des actions concrètes de l'artisan envers le client ou le chantier (ex: "Appeler le client", "Planifier l'intervention", "Envoyer le devis")
 ${hasAudio ? `- Des notes vocales de l'artisan sont jointes. ÉCOUTE-LES ATTENTIVEMENT et intègre les informations clés qu'elles contiennent dans les bullets du résumé (observations terrain, diagnostic, détails techniques, etc.)
 - Si une note vocale contient des infos sur le problème, le diagnostic ou les travaux à faire, ajoute-les en priorité dans les bullets` : ""}`;
 
