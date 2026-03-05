@@ -123,10 +123,10 @@ serve(async (req) => {
     const imageMedias = imageMediasRes.data || [];
     const videoMedias = videoMediasRes.data || [];
 
-    const [audioResults, imageResults, videoResults] = await Promise.all([
+    const [audioResults, imageResults, videoSignedUrls] = await Promise.all([
       Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
       Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
-      Promise.all(videoMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 10))),
+      Promise.all(videoMedias.map(m => getSignedUrl(m, supabase))),
     ]);
 
     // Build multimodal content parts
