@@ -148,6 +148,11 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
                   <FileText className="h-3 w-3" /> {mediaInfo!.quotes} devis
                 </span>
               )}
+              {(mediaInfo!.invoices ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Receipt className="h-3 w-3" /> {mediaInfo!.invoices} facture{mediaInfo!.invoices! > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           )}
 
