@@ -13,6 +13,7 @@ interface SummaryBlockProps {
   dossier: Dossier;
   mediaCount?: number;
   historiqueCount?: number;
+  quotesCount?: number;
 }
 
 interface MaterialItem {
@@ -30,7 +31,7 @@ interface AiSummary {
   media_analyzed?: { images: number; videos: number; audio: number; notes?: number; quotes?: number; invoices?: number };
 }
 
-export function SummaryBlock({ dossier, mediaCount, historiqueCount }: SummaryBlockProps) {
+export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount }: SummaryBlockProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fallback = generateStructuredSummary(dossier);
@@ -47,7 +48,7 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount }: SummaryBl
     refetch,
     isError,
   } = useQuery<AiSummary>({
-    queryKey: ["ai-summary", dossier.id, dossier.status, dossier.appointment_status, mediaCount, historiqueCount],
+    queryKey: ["ai-summary", dossier.id, dossier.status, dossier.appointment_status, mediaCount, historiqueCount, quotesCount],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("summarize-dossier", {
         body: { dossier_id: dossier.id },

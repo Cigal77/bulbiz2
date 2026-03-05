@@ -170,6 +170,7 @@ export function ImportDevisDialog({ open, onClose, dossierId, clientEmail }: Imp
       queryClient.invalidateQueries({ queryKey: ["dossier", dossierId] });
       queryClient.invalidateQueries({ queryKey: ["historique", dossierId] });
       queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-summary"] });
       resetForm();
       onClose();
     } catch (err: any) {
