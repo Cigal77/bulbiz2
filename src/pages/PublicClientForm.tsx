@@ -20,14 +20,13 @@ import { cn } from "@/lib/utils";
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
-const TOTAL_STEPS = 5;
-
 interface ArtisanProfile {
   first_name: string | null;
   last_name: string | null;
   company_name: string | null;
   phone: string | null;
   email: string | null;
+  client_slots_enabled?: boolean;
 }
 
 interface ProposedSlot {
@@ -78,7 +77,7 @@ export default function PublicClientForm() {
       if (!slug) { setNotFound(true); setLoading(false); return; }
       const { data, error } = await supabase
         .from("profiles")
-        .select("first_name, last_name, company_name, phone, email")
+        .select("first_name, last_name, company_name, phone, email, client_slots_enabled")
         .eq("public_client_slug", slug)
         .maybeSingle();
       if (error || !data) { setNotFound(true); } else { setArtisan(data); }
