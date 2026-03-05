@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
 import { generateStructuredSummary } from "@/lib/summary";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, RefreshCw, Loader2, Zap, Mic } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,6 +15,7 @@ interface AiSummary {
   bullets: string[];
   next_action: string;
   auto_filled?: string[];
+  media_analyzed?: { images: number; videos: number; audio: number };
 }
 
 export function SummaryBlock({ dossier }: SummaryBlockProps) {
@@ -57,6 +58,8 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const summary = aiSummary || fallback;
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
+  const mediaInfo = aiSummary?.media_analyzed;
+  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.videos > 0 || mediaInfo.audio > 0);
 
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
@@ -119,6 +122,27 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
                 </p>
                 <p className="text-sm text-foreground/80">{aiSummary!.auto_filled!.join(", ")}</p>
               </div>
+            </div>
+          )}
+
+          {hasMediaAnalyzed && (
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <span className="text-[10px] text-muted-foreground">Médias analysés :</span>
+              {mediaInfo!.images > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Camera className="h-3 w-3" /> {mediaInfo!.images} photo{mediaInfo!.images > 1 ? "s" : ""}
+                </span>
+              )}
+              {mediaInfo!.videos > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Video className="h-3 w-3" /> {mediaInfo!.videos} vidéo{mediaInfo!.videos > 1 ? "s" : ""}
+                </span>
+              )}
+              {mediaInfo!.audio > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Mic className="h-3 w-3" /> {mediaInfo!.audio} vocal{mediaInfo!.audio > 1 ? "es" : "e"}
+                </span>
+              )}
             </div>
           )}
 
