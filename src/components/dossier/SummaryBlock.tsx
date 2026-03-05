@@ -57,10 +57,6 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
       if (data?.error) throw new Error(data.error);
 
       if (data?.auto_filled?.length > 0) {
-        toast({
-          title: "🤖 Dossier mis à jour automatiquement",
-          description: `Champs remplis depuis les notes vocales : ${data.auto_filled.join(", ")}`,
-        });
         queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
         queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
       }
