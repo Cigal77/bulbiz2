@@ -2,6 +2,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FloatingVoiceButton } from "@/components/dossier/FloatingVoiceButton";
 import { useDossier, useDossierHistorique, useDossierMedias } from "@/hooks/useDossier";
 import { useDossierActions } from "@/hooks/useDossierActions";
+import { useQuotes } from "@/hooks/useQuotes";
 import { ClientBlock } from "@/components/dossier/ClientBlock";
 import { DossierProgressBanner } from "@/components/dossier/DossierProgressBanner";
 import { NextStepBanner } from "@/components/dossier/NextStepBanner";
@@ -61,6 +62,7 @@ export default function DossierDetail() {
   const { data: dossier, isLoading } = useDossier(id!);
   const { data: historique = [], isLoading: histLoading } = useDossierHistorique(id!);
   const { data: medias = [], isLoading: mediasLoading } = useDossierMedias(id!);
+  const { data: quotes = [] } = useQuotes(id!);
   const { softDelete } = useDossierActions(id!);
   const { toast } = useToast();
   const appointmentRef = useRef<HTMLDivElement>(null);
@@ -206,7 +208,7 @@ export default function DossierDetail() {
             />
 
             {/* Résumé de la demande — always visible */}
-            <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
+            <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} quotesCount={quotes?.length ?? 0} />
 
             {/* Actions rapides — above everything else */}
             <DossierActions dossier={dossier} />
@@ -271,7 +273,7 @@ export default function DossierDetail() {
                 dossier={dossier}
                 onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
-              <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
+              <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} quotesCount={quotes?.length ?? 0} />
               <AppointmentBanner
                 dossier={dossier}
                 onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}

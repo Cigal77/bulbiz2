@@ -63,6 +63,7 @@ export function useQuoteActions(dossierId: string) {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["quotes", dossierId] });
     queryClient.invalidateQueries({ queryKey: ["dossier-historique", dossierId] });
+    queryClient.invalidateQueries({ queryKey: ["ai-summary"] });
   };
 
   const importPdf = useMutation({
