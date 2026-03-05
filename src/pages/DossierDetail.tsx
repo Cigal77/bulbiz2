@@ -262,7 +262,7 @@ export default function DossierDetail() {
             </div>
           </div>
         ) : (
-          /* ═══ DESKTOP LAYOUT ═══ */
+          /* ═══ DESKTOP LAYOUT — same order as mobile ═══ */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <DossierProgressBanner dossier={dossier} />
@@ -270,14 +270,11 @@ export default function DossierDetail() {
                 dossier={dossier}
                 onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
-              <div ref={appointmentRef}>
-                <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
-              </div>
+              <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
               <AppointmentBanner
                 dossier={dossier}
                 onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
-              <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
               <QuoteBlock dossier={dossier} />
               <InvoiceBlock dossier={dossier} />
               <ClientBlock dossier={dossier} />
@@ -285,6 +282,9 @@ export default function DossierDetail() {
               <AccessBlock dossier={dossier} />
               <MediaGallery medias={medias} isLoading={mediasLoading} dossierId={dossier.id} />
               <HistoriqueTimeline historique={historique} isLoading={histLoading} />
+              <div ref={appointmentRef}>
+                <AppointmentBlock dossier={dossier} onOpenSmartSheet={() => setSmartSlotOpen(true)} />
+              </div>
             </div>
             <div className="space-y-4">
               <DossierActions dossier={dossier} />
