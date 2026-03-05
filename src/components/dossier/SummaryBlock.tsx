@@ -125,6 +125,27 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
             </div>
           )}
 
+          {hasMediaAnalyzed && (
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              <span className="text-[10px] text-muted-foreground">Médias analysés :</span>
+              {mediaInfo!.images > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Camera className="h-3 w-3" /> {mediaInfo!.images} photo{mediaInfo!.images > 1 ? "s" : ""}
+                </span>
+              )}
+              {mediaInfo!.videos > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Video className="h-3 w-3" /> {mediaInfo!.videos} vidéo{mediaInfo!.videos > 1 ? "s" : ""}
+                </span>
+              )}
+              {mediaInfo!.audio > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <Mic className="h-3 w-3" /> {mediaInfo!.audio} vocal{mediaInfo!.audio > 1 ? "es" : "e"}
+                </span>
+              )}
+            </div>
+          )}
+
           {isError && !aiSummary && (
             <p className="text-[10px] text-muted-foreground italic">Résumé basique affiché (IA indisponible)</p>
           )}
