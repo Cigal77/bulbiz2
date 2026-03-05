@@ -164,10 +164,28 @@ ${publicUrl}`;
                 {copiedMessage ? <Check className="h-4 w-4 text-primary" /> : <MessageSquare className="h-4 w-4" />}
                 {copiedMessage ? "Message copié" : "Copier le message"}
               </Button>
-              <Button variant="outline" onClick={handleShare} className="flex-1 gap-2">
-                <Share2 className="h-4 w-4" />
-                Partager
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex-1 gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Partager
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleShareWhatsApp} className="gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareSMS} className="gap-2">
+                    <Phone className="h-4 w-4" />
+                    SMS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareEmail} className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <p className="text-xs text-muted-foreground">
