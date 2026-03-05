@@ -160,7 +160,7 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
                 ref={videoRef}
                 type="file"
                 accept="video/*"
-                capture="camcorder"
+                capture="environment"
                 onChange={(e) => e.target.files && addFiles(e.target.files)}
                 className="hidden"
               />
