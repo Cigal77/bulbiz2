@@ -144,15 +144,14 @@ serve(async (req) => {
       }
     }
 
-    // Videos
-    const validVideos = videoResults.filter(Boolean);
+    // Videos — use signed URLs (videos are too large for base64)
+    const validVideos = videoSignedUrls.filter(Boolean);
     if (validVideos.length > 0) {
       mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DU DOSSIER (${validVideos.length}) — Analyse le contenu visuel et audio de chaque vidéo pour comprendre le problème :` });
       for (const vid of validVideos) {
         if (!vid) continue;
-        const mime = toVideoMime(vid.mimeType);
         mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
-        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
+        mediaParts.push({ type: "image_url", image_url: { url: vid.signedUrl } });
       }
     }
 
