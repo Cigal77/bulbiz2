@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
 
 interface ArtisanProfile {
   first_name: string | null;

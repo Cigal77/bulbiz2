@@ -13,20 +13,21 @@ Deno.serve(async (req) => {
 
   try {
     const formData = await req.formData();
-    const token = formData.get("token") as string;
+    const token = formData.get("token") as string | null;
+    const slug = formData.get("slug") as string | null;
     const file = formData.get("file") as File;
 
-    if (!token || !file) {
+    if ((!token && !slug) || !file) {
       return new Response(
-        JSON.stringify({ error: `Token et fichier requis (token: ${!!token}, file: ${!!file})` }),
+        JSON.stringify({ error: `Token/slug et fichier requis (token: ${!!token}, slug: ${!!slug}, file: ${!!file})` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate file size (max 20MB)
-    if (file.size > 20 * 1024 * 1024) {
+    // Validate file size (max 50MB to match client limit)
+    if (file.size > 50 * 1024 * 1024) {
       return new Response(
-        JSON.stringify({ error: "Fichier trop volumineux (max 20 MB)" }),
+        JSON.stringify({ error: "Fichier trop volumineux (max 50 MB)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -51,31 +52,54 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Validate token
-    const { data: dossier, error: dossierError } = await supabase
-      .from("dossiers")
-      .select("id, user_id, client_token_expires_at")
-      .eq("client_token", token)
-      .single();
+    let userId: string;
+    let filePath: string;
+    const ext = file.name.split(".").pop() || "bin";
 
-    if (dossierError || !dossier) {
-      return new Response(
-        JSON.stringify({ error: "Lien invalide ou expiré" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (token) {
+      // ── Existing flow: validate client_token from dossiers ──
+      const { data: dossier, error: dossierError } = await supabase
+        .from("dossiers")
+        .select("id, user_id, client_token_expires_at")
+        .eq("client_token", token)
+        .single();
 
-    if (dossier.client_token_expires_at && new Date(dossier.client_token_expires_at) < new Date()) {
-      return new Response(
-        JSON.stringify({ error: "Ce lien a expiré" }),
-        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (dossierError || !dossier) {
+        return new Response(
+          JSON.stringify({ error: "Lien invalide ou expiré" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (dossier.client_token_expires_at && new Date(dossier.client_token_expires_at) < new Date()) {
+        return new Response(
+          JSON.stringify({ error: "Ce lien a expiré" }),
+          { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      userId = dossier.user_id;
+      filePath = `${userId}/${dossier.id}/client_${Date.now()}.${ext}`;
+    } else {
+      // ── New flow: validate slug from profiles ──
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("public_client_slug", slug!)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        return new Response(
+          JSON.stringify({ error: "Artisan introuvable" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      userId = profile.user_id;
+      filePath = `${userId}/public-uploads/client_${Date.now()}.${ext}`;
     }
 
     // Upload file using service role (bypasses storage RLS)
-    const ext = file.name.split(".").pop();
-    const filePath = `${dossier.user_id}/${dossier.id}/client_${Date.now()}.${ext}`;
-
     const { error: uploadError } = await supabase.storage
       .from("dossier-medias")
       .upload(filePath, file, { contentType: file.type });
