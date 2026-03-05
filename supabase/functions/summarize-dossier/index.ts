@@ -302,7 +302,7 @@ serve(async (req) => {
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
-    const hasVideos = videoMedias.length > 0; // metadata only, no content
+    const hasVideoFiles = videoMedias.length > 0; // metadata only, no content
     const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
     // Build empty fields list
@@ -321,7 +321,8 @@ serve(async (req) => {
     if (!d.access_code) emptyFields.push("access_code");
     if (!d.availability) emptyFields.push("availability");
 
-    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasVideos);
+    // Only allow extraction from media that is actually analyzed (images/audio)
+    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages);
 
     // Build text context
     const context = `
@@ -379,11 +380,10 @@ ${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.jo
   * Les dégâts visibles et leur gravité estimée
   * Tout détail utile pour préparer l'intervention (accès, espace de travail...)`);
     }
-    if (hasVideos) {
-      mediaInstructions.push(`- Des VIDÉOS sont jointes. ANALYSE l'image ET le son pour comprendre :
-  * Le problème montré (bruit de fuite, écoulement, dysfonctionnement...)
-  * Les explications verbales du client ou de l'artisan dans la vidéo
-  * Les détails visuels du problème en mouvement`);
+    if (hasVideoFiles) {
+      mediaInstructions.push(`- Des VIDÉOS existent dans le dossier mais ne sont PAS analysées automatiquement.
+  * N'invente AUCUN détail visuel/sonore issu des vidéos
+  * Mentionne simplement que des vidéos sont disponibles dans le dossier`);
     }
     if (hasAudio) {
       mediaInstructions.push(`- Des NOTES VOCALES sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets`);
@@ -429,7 +429,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -493,7 +493,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
-          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
+          const sourceLabel = [hasImages && "photos", hasVideoFiles && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
             details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
