@@ -1,79 +1,61 @@
 
-# Audit et corrections des automatisations email/notifications
 
-## Problemes identifies
+## Diagnostic
 
-### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
-**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
-- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
-- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
+The `summarize-dossier` edge function has several issues:
 
-### 2. Bug `send-invoice` : authentification inconsistante
-**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
-- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
+1. **Runtime crash**: `videoMedias` is referenced (lines 280, 358, 484) but never defined — the variable was deleted in a previous cleanup but references remain. This causes a **500 error**.
 
-### 3. Bug `send-appointment-notification` : authentification inconsistante
-**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
-- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
+2. **Text notes not analyzed**: The function fetches audio and images but **ignores text notes** (`media_category = 'note'`), which artisans use frequently to jot down observations.
 
-### 4. Notification artisan manquante sur confirmation RDV
-**Fichier** : `supabase/functions/submit-client-form/index.ts`
-- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
-- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
+3. **Prompt not optimized for artisan workflow**: The current prompt is generic. It needs to be restructured to prioritize:
+   - Material list with references, quantities, and brands (from quotes/invoices)
+   - Practical field info (access, parking, floor, equipment to bring)
+   - Administrative status (quote sent? signed? invoice pending?)
+   - Client availability and contact readiness
 
-### 5. Notification artisan manquante sur selection de creneau (multi-slots)
-- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
+## Plan
 
-### 6. Lien dossier hardcode dans `submit-client-form`
-**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
-- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
+### 1. Fix the `videoMedias` crash
+- Remove all references to `videoMedias` / `hasVideoFiles` since video analysis was intentionally removed.
+- Set `videos: 0` in `media_analyzed`.
 
-### 7. Email facture sans signature personnalisee
-**Fichier** : `supabase/functions/send-invoice/index.ts`
-- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
+### 2. Add text notes fetching
+- Add a query for `medias` where `media_category = 'note'` to fetch written notes.
+- Include note content in the text context sent to the AI.
 
-### 8. Email facture sans numero de facture dans le sujet
-- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+### 3. Rewrite the system prompt for artisan optimization
+Structure the AI output into artisan-centric sections:
 
----
-
-## Plan de corrections
-
-### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
-- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-- Ajouter la signature personnalisee
-- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
-
-### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-
-### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
-- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
-- Remplacer le lien hardcode par `app.bulbiz.io`
-- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
-
----
-
-## Details techniques
-
-### `send-invoice/index.ts` - Changements
-```text
-Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
-Ligne 170-218 : Remonter artisanName + signature au bon scope
-Ligne 181      : Ajouter signature personnalisee dans l'email
-Ligne 218      : Fixer la reference artisanName dans le SMS
-Sujet email    : Ajouter numero facture
+```
+{
+  "headline": "Situation en 1 phrase",
+  "bullets": [
+    "🔧 Problème identifié + détails techniques",
+    "📦 Matériel nécessaire (marques, réf, quantités)",
+    "📍 Accès chantier (étage, code, parking...)",
+    "📋 Statut administratif (devis/facture)",
+    "📞 Client (dispo, contact)"
+  ],
+  "next_action": "Action concrète prioritaire",
+  "material_list": [
+    { "label": "...", "qty": 1, "ref": "..." }
+  ]
+}
 ```
 
-### `send-appointment-notification/index.ts` - Changements
-```text
-Lignes 210-217 : Remplacer auth getUser() par decodage JWT
-```
+The new prompt will instruct the AI to:
+- **Extract a detailed material list** from quotes/invoices/PDFs with brands, references, quantities
+- **Prioritize practical chantier info**: what to bring, access details, equipment visible in photos
+- **Summarize admin status clearly**: quote signed/pending, invoice sent/paid
+- **Use bullet prefixes** (emoji) for quick scanning on mobile
+- **Never hallucinate** details not present in the data
 
-### `submit-client-form/index.ts` - Changements
-```text
-Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
-Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
-Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
-```
+### 4. Update `SummaryBlock.tsx` to display material list
+- Add a new `material_list` section in the UI when the AI returns material details.
+- Display as a compact checklist the artisan can reference on-site.
+
+### Files modified
+- `supabase/functions/summarize-dossier/index.ts` — fix crash, add notes, rewrite prompt, add material_list output
+- `src/components/dossier/SummaryBlock.tsx` — display material_list section
+
