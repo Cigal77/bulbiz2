@@ -664,7 +664,7 @@ export default function PublicClientForm() {
                 {files.length > 0 && <p><strong>Médias :</strong> {files.length} fichier(s)</p>}
 
                 {/* Proposed slots summary */}
-                {getValidSlots().length > 0 && (
+                {slotsEnabled && getValidSlots().length > 0 && (
                   <div>
                     <strong>Créneaux proposés :</strong>
                     <ul className="mt-1 space-y-1">
