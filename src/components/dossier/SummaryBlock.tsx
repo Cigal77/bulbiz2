@@ -15,6 +15,7 @@ interface AiSummary {
   bullets: string[];
   next_action: string;
   auto_filled?: string[];
+  media_analyzed?: { images: number; videos: number; audio: number };
 }
 
 export function SummaryBlock({ dossier }: SummaryBlockProps) {
