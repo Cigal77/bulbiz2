@@ -127,6 +127,26 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/devis/new"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ComingSoon />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facture/new"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ComingSoon />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/cgu" element={<CGU />} />
               <Route path="/mentions-legales" element={<MentionsLegales />} />
               <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
