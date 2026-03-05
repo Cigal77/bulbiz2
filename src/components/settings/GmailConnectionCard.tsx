@@ -40,7 +40,8 @@ export function GmailConnectionCard() {
   useEffect(() => {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
-    if (code && state === "gmail" && !callbackCalledRef.current) {
+    const isGmailCallback = state === "gmail" || (searchParams.get("scope") || "").includes("gmail.send");
+    if (code && isGmailCallback && !callbackCalledRef.current) {
       callbackCalledRef.current = true;
       handleCallback(code);
     }
