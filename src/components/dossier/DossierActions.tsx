@@ -6,10 +6,13 @@ import { STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Dossier } from "@/hooks/useDossier";
 import { useDossierActions } from "@/hooks/useDossierActions";
 import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   Phone, MessageSquarePlus, FileText, Bell, BellOff, Calendar, RefreshCw, Loader2,
-  Mic, Camera, Map, Receipt,
+  Mic, Camera, Map, Receipt, CheckCircle2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -26,6 +29,8 @@ interface DossierActionsProps {
 export function DossierActions({ dossier }: DossierActionsProps) {
   const { toggleRelance, sendRelance, addNote } = useDossierActions(dossier.id);
   const { uploadFiles } = useMediaUpload(dossier.id);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -48,6 +53,35 @@ export function DossierActions({ dossier }: DossierActionsProps) {
   }, []);
 
   const status = dossier.status;
+
+  // Allow marking intervention as done from any pre-completion status
+  const canMarkDone = !["rdv_termine", "invoice_pending", "invoice_paid", "clos_signe", "clos_perdu"].includes(status);
+
+  const markDone = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("dossiers")
+        .update({
+          status: "rdv_termine",
+          status_changed_at: new Date().toISOString(),
+          appointment_status: "done",
+        } as any)
+        .eq("id", dossier.id);
+      if (error) throw error;
+      await supabase.from("historique").insert({
+        dossier_id: dossier.id,
+        user_id: user?.id ?? null,
+        action: "intervention_done",
+        details: "Intervention marquée comme réalisée",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Intervention réalisée ✅" });
+      queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
+      queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
@@ -120,6 +154,18 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       {/* Quick actions */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
+
+        {/* Intervention terminée - always visible if not already done */}
+        {canMarkDone && (
+          <Button
+            className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+            onClick={() => markDone.mutate()}
+            disabled={markDone.isPending}
+          >
+            {markDone.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Intervention terminée
+          </Button>
+        )}
 
         {/* 1. Phone */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
