@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Share2, Link2, Loader2 } from "lucide-react";
+import { Copy, Check, Share2, Link2, Loader2, MessageSquare } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
@@ -20,6 +20,7 @@ export function PublicLinkCard() {
   const { profile, update } = useProfile();
   const [slug, setSlug] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copiedMessage, setCopiedMessage] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -31,6 +32,16 @@ export function PublicLinkCard() {
   }, [profile]);
 
   const publicUrl = `https://app.bulbiz.io/${slug}`;
+
+  const clientMessage = `Bonjour,
+
+Afin d'intervenir rapidement, merci de cliquer sur ce lien et de remplir les informations nécessaires.
+
+Si possible, vous pouvez également ajouter des photos ou une vidéo du problème (facultatif).
+
+Je regarderai votre demande et je vous recontacterai rapidement.
+
+${publicUrl}`;
 
   async function handleSave() {
     if (!slug.trim()) return;
@@ -64,15 +75,21 @@ export function PublicLinkCard() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function handleCopyMessage() {
+    navigator.clipboard.writeText(clientMessage);
+    setCopiedMessage(true);
+    toast.success("Message copié !");
+    setTimeout(() => setCopiedMessage(false), 2000);
+  }
+
   function handleShare() {
     if (navigator.share) {
       navigator.share({
         title: "Envoyez-moi vos photos et infos",
-        text: "Utilisez ce lien pour m'envoyer les détails de votre problème :",
-        url: publicUrl,
+        text: clientMessage,
       }).catch(() => {});
     } else {
-      handleCopy();
+      handleCopyMessage();
     }
   }
 
@@ -81,10 +98,12 @@ export function PublicLinkCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Link2 className="h-5 w-5" />
-          Lien client public
+          Votre lien client Bulbiz
         </CardTitle>
         <CardDescription>
-          Envoyez ce lien à vos clients pour qu'ils vous envoient leurs photos et informations. Chaque demande crée automatiquement un dossier.
+          Quand un client vous appelle, copiez le message ci-dessous et envoyez-le lui par SMS ou WhatsApp.
+          Le client remplira les informations nécessaires (photo, description, adresse…).
+          Sa demande sera automatiquement créée dans votre application Bulbiz sous forme de dossier.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -113,6 +132,7 @@ export function PublicLinkCard() {
 
         {profile?.public_client_slug && (
           <>
+            {/* Lien */}
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
               <span className="text-sm font-mono truncate flex-1">{publicUrl}</span>
               <Button variant="ghost" size="icon" onClick={handleCopy} className="flex-shrink-0">
@@ -120,10 +140,23 @@ export function PublicLinkCard() {
               </Button>
             </div>
 
-            <div className="flex gap-2">
+            {/* Message prêt à envoyer */}
+            <div className="space-y-2">
+              <Label>Message prêt à envoyer</Label>
+              <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-line text-foreground">
+                {clientMessage}
+              </div>
+            </div>
+
+            {/* Boutons d'action */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <Button variant="outline" onClick={handleCopy} className="flex-1 gap-2">
-                <Copy className="h-4 w-4" />
-                Copier
+                {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+                {copied ? "Lien copié" : "Copier le lien"}
+              </Button>
+              <Button variant="outline" onClick={handleCopyMessage} className="flex-1 gap-2">
+                {copiedMessage ? <Check className="h-4 w-4 text-primary" /> : <MessageSquare className="h-4 w-4" />}
+                {copiedMessage ? "Message copié" : "Copier le message"}
               </Button>
               <Button variant="outline" onClick={handleShare} className="flex-1 gap-2">
                 <Share2 className="h-4 w-4" />
@@ -132,7 +165,7 @@ export function PublicLinkCard() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              💡 Envoyez toujours le même message : "Envoyez-moi les photos et infos ici :" suivi de votre lien.
+              💡 Envoyez toujours le même message : copiez-le et collez-le dans SMS ou WhatsApp quand un client vous appelle.
             </p>
           </>
         )}
