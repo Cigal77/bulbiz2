@@ -120,6 +120,8 @@ export default function Dashboard() {
           .filter(d => d.status === "invoice_pending")
           .sort((a, b) => new Date(a.status_changed_at).getTime() - new Date(b.status_changed_at).getTime())
           .concat(list.filter(d => d.status !== "invoice_pending"));
+      case "chronological":
+        return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       case "recent":
       default:
         return list.sort((a, b) => {
@@ -165,6 +167,7 @@ export default function Dashboard() {
           (d.client_first_name ?? "").toLowerCase().includes(q) ||
           (d.client_last_name ?? "").toLowerCase().includes(q) ||
           (d.client_phone ?? "").includes(q) ||
+          (d.client_email ?? "").toLowerCase().includes(q) ||
           (d.address ?? "").toLowerCase().includes(q)
       );
     }
