@@ -187,7 +187,7 @@ export default function PublicClientForm() {
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
           <CardContent className="flex flex-col items-center gap-4 pt-8 pb-8">
-            <CheckCircle2 className="h-14 w-14 text-green-500" />
+            <CheckCircle2 className="h-14 w-14 text-primary" />
             <h2 className="text-xl font-bold text-foreground">Demande envoyée !</h2>
             <p className="text-muted-foreground text-center">
               Votre demande a été transmise à <strong>{artisanName}</strong>.
@@ -197,8 +197,8 @@ export default function PublicClientForm() {
               {artisanName} reviendra vers vous rapidement.
             </p>
             {existingDossier && (
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-center w-full">
-                <Info className="h-4 w-4 inline mr-1 text-amber-600" />
+              <div className="bg-accent/50 border border-accent rounded-lg p-3 text-sm text-center w-full">
+                <Info className="h-4 w-4 inline mr-1 text-accent-foreground" />
                 Une demande précédente existe déjà pour ces coordonnées. Votre nouvelle demande a bien été créée séparément.
               </div>
             )}

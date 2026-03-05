@@ -116,7 +116,7 @@ export function PublicLinkCard() {
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
               <span className="text-sm font-mono truncate flex-1">{publicUrl}</span>
               <Button variant="ghost" size="icon" onClick={handleCopy} className="flex-shrink-0">
-                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
 
