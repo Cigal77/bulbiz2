@@ -506,7 +506,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
     parsed.auto_filled = updatedFields;
     parsed.media_analyzed = {
       images: validImages.length,
-      videos: validVideos.length,
+      videos: videoMedias.length, // metadata only, not analyzed
       audio: validAudios.length,
       quotes: quotePdfCount + (quotesTextContext.length > 0 ? quotes.filter(q => q.items && Array.isArray(q.items) && (q.items as any[]).length > 0).length : 0),
       invoices: invoicePdfCount + (invoicesTextContext.length > 0 ? 1 : 0),
