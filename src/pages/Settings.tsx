@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { GmailConnectionCard } from "@/components/settings/GmailConnectionCard";
 import { GoogleCalendarCard } from "@/components/settings/GoogleCalendarCard";
+import { PublicLinkCard } from "@/components/settings/PublicLinkCard";
 
 const DELAY_OPTIONS = Array.from({ length: 30 }, (_, i) => i + 1);
 const VALIDITY_OPTIONS = [1, 2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90];
@@ -145,6 +146,9 @@ export default function Settings() {
         <h1 className="text-2xl font-bold text-foreground mb-6">Paramètres</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Lien client public */}
+          <PublicLinkCard />
+
           {/* Profil */}
           <Card>
             <CardHeader>
