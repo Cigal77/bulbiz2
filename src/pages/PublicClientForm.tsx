@@ -565,8 +565,8 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 4: Slot proposals */}
-        {step === 4 && (
+        {/* Step 4: Slot proposals (only if enabled) */}
+        {slotsEnabled && step === slotStep && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -646,8 +646,8 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 5: RGPD + Submit */}
-        {step === 5 && (
+        {/* Validation step */}
+        {step === validationStep && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Confirmation</CardTitle>
@@ -709,7 +709,7 @@ export default function PublicClientForm() {
             </Button>
           )}
           {step < TOTAL_STEPS ? (
-            step === 4 ? (
+            step === slotStep ? (
               <Button
                 onClick={handleNextFromSlots}
                 disabled={!canGoNext() || checkingSlots}
