@@ -445,7 +445,10 @@ RÈGLES STRICTES :
 - Les notes écrites : intègre dans le résumé ET extrais le matériel mentionné
 - Les devis et factures : extrais le matériel ET les informations client (nom, prénom, email, téléphone, adresse) pour remplir les champs manquants du dossier
 - Ignore les erreurs techniques dans l'historique
-${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias, devis ou factures. Les infos client des factures (client_first_name, client_last_name, client_email, client_phone, address) sont des sources fiables.` : ""}`;
+${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias, devis ou factures.
+- client_phone : UNIQUEMENT un numéro dicté mot à mot dans une note vocale, écrit dans une note, ou présent dans un devis/facture. Ne JAMAIS deviner ou inventer un numéro de téléphone. Si tu n'es pas SÛR À 100% que ce numéro a été explicitement mentionné, ne le mets PAS.
+- client_email : même règle, uniquement si explicitement présent dans les sources.
+- Les infos client des factures/devis structurés (client_first_name, client_last_name, client_email, client_phone, address) sont des sources fiables.` : ""}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -505,6 +508,23 @@ ${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce q
 
       for (const [key, value] of Object.entries(args)) {
         if (value !== null && value !== undefined && value !== "" && emptyFields.includes(key)) {
+          // Validate phone numbers - must look like a real phone number
+          if (key === "client_phone") {
+            const phone = String(value).replace(/[\s.\-()]/g, "");
+            const isValidPhone = /^(\+?\d{10,15}|0\d{9})$/.test(phone);
+            if (!isValidPhone) {
+              console.log("Skipping suspicious phone number:", value);
+              continue;
+            }
+          }
+          // Validate email
+          if (key === "client_email") {
+            const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value));
+            if (!isValidEmail) {
+              console.log("Skipping suspicious email:", value);
+              continue;
+            }
+          }
           updatePayload[key] = value;
           updatedFields.push(fieldLabels[key] || key);
         }
