@@ -161,6 +161,37 @@ Deno.serve(async (req) => {
       await supabase.from("medias").insert(mediaInserts);
     }
 
+    // Insert proposed appointment slots
+    let slotsHtml = "";
+    if (proposed_slots?.length) {
+      const slotInserts = proposed_slots.map((s: { date: string; time_start: string; time_end: string }) => ({
+        dossier_id: dossierId,
+        slot_date: s.date,
+        time_start: s.time_start,
+        time_end: s.time_end,
+      }));
+      await supabase.from("appointment_slots").insert(slotInserts);
+
+      // Set appointment_status to slots_proposed
+      await supabase.from("dossiers").update({
+        appointment_status: "slots_proposed",
+      }).eq("id", dossierId);
+
+      // Build HTML for email
+      const dateFormatter = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+      slotsHtml = proposed_slots.map((s: any) => {
+        const d = new Date(s.date + "T00:00:00");
+        const dateStr = dateFormatter.format(d);
+        return `<li style="padding:4px 0;">${dateStr} à ${s.time_start.slice(0, 5)}</li>`;
+      }).join("");
+
+      await supabase.from("historique").insert({
+        dossier_id: dossierId,
+        action: "Créneaux proposés par le client",
+        details: `${proposed_slots.length} créneau(x) proposé(s) via lien public`,
+      });
+    }
+
     // Log historique
     await supabase.from("historique").insert({
       dossier_id: dossierId,
@@ -171,8 +202,10 @@ Deno.serve(async (req) => {
     // Auto-advance status if we have enough info
     const hasContact = data.client_email || data.client_phone;
     const hasDescription = data.description?.trim();
-    if (hasContact && hasDescription) {
+    if (hasContact && hasDescription && !proposed_slots?.length) {
       await supabase.from("dossiers").update({ status: "devis_a_faire", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
+    } else if (proposed_slots?.length) {
+      await supabase.from("dossiers").update({ status: "en_attente_rdv", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
     }
 
     // ── Send emails ──
