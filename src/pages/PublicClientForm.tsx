@@ -263,16 +263,16 @@ export default function PublicClientForm() {
               <div className="grid grid-cols-2 gap-2">
                 {TRADE_TYPES.map((trade) => (
                   <button
-                    key={trade.value}
+                    key={trade.id}
                     type="button"
                     onClick={() => {
                       setSelectedTrades((prev) =>
-                        prev.includes(trade.value) ? prev.filter((t) => t !== trade.value) : [...prev, trade.value]
+                        prev.includes(trade.id) ? prev.filter((t) => t !== trade.id) : [...prev, trade.id]
                       );
                     }}
                     className={cn(
                       "flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors",
-                      selectedTrades.includes(trade.value)
+                      selectedTrades.includes(trade.id)
                         ? "border-primary bg-primary/10 text-primary font-medium"
                         : "border-border hover:border-primary/40"
                     )}
@@ -341,8 +341,9 @@ export default function PublicClientForm() {
               <div className="space-y-1.5">
                 <Label>Adresse d'intervention</Label>
                 <AddressAutocomplete
-                  defaultValue={addressInput}
-                  onSelect={(data) => {
+                  value={addressInput}
+                  onChange={(v) => setAddressInput(v)}
+                  onAddressSelect={(data) => {
                     setAddressData(data);
                     setAddressInput(data.address || "");
                   }}
@@ -443,7 +444,7 @@ export default function PublicClientForm() {
             <CardContent className="space-y-4">
               {/* Summary */}
               <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
-                <p><strong>Type :</strong> {selectedTrades.map(t => TRADE_TYPES.find(tt => tt.value === t)?.label).join(", ") || "—"}</p>
+                <p><strong>Type :</strong> {selectedTrades.map(t => TRADE_TYPES.find(tt => tt.id === t)?.label).join(", ") || "—"}</p>
                 <p><strong>Nom :</strong> {form.client_first_name} {form.client_last_name}</p>
                 {form.client_phone && <p><strong>Tél :</strong> {form.client_phone}</p>}
                 {form.client_email && <p><strong>Email :</strong> {form.client_email}</p>}
