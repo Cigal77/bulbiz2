@@ -17,11 +17,11 @@ const ComingSoon = () => {
           Cette fonctionnalité arrive bientôt
         </h1>
         <p className="text-muted-foreground">
-          Si vous êtes intéressé, contactez-nous au{" "}
-          <a href="tel:+33761397163" className="font-semibold text-primary hover:underline">
-            +33 7 61 39 71 63
-          </a>
+          Si vous êtes intéressé, contactez-nous au
         </p>
+        <a href="tel:+33761397163" className="block font-semibold text-primary hover:underline text-lg">
+          +33 7 61 39 71 63
+        </a>
 
         <div className="flex flex-col gap-3 pt-2">
           {dossierId && (
