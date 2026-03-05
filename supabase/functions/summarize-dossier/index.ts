@@ -87,7 +87,7 @@ serve(async (req) => {
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("id, quote_number, status, total_ht, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
-      supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes").eq("dossier_id", dossier_id),
+      supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes, client_first_name, client_last_name, client_email, client_phone, client_address").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
@@ -316,7 +316,7 @@ serve(async (req) => {
     if (!d.access_code) emptyFields.push("access_code");
     if (!d.availability) emptyFields.push("availability");
 
-    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes);
+    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes || hasQuoteContent || hasInvoiceContent);
 
     // Build text notes context
     let notesTextContext = "";
@@ -365,7 +365,15 @@ ${quotes.map(q => `  • ${q.quote_number}: ${q.status} — ${q.total_ttc ?? 0}�
 ${quotesTextContext}
 
 🧾 FACTURES (${invoices.length}):
-${invoices.map(f => `  • ${f.invoice_number}: ${f.status} — ${f.total_ttc ?? 0}€ TTC${f.paid_at ? " ✅ payée" : f.sent_at ? " ✉️ envoyée" : ""}`).join("\n") || "  Aucune facture"}
+${invoices.map(f => {
+  let info = `  • ${f.invoice_number}: ${f.status} — ${f.total_ttc ?? 0}€ TTC${f.paid_at ? " ✅ payée" : f.sent_at ? " ✉️ envoyée" : ""}`;
+  const clientInfo = [f.client_first_name, f.client_last_name].filter(Boolean).join(" ");
+  if (clientInfo) info += `\n    Client facture: ${clientInfo}`;
+  if (f.client_email) info += ` | Email: ${f.client_email}`;
+  if (f.client_phone) info += ` | Tél: ${f.client_phone}`;
+  if (f.client_address) info += `\n    Adresse facture: ${f.client_address}`;
+  return info;
+}).join("\n") || "  Aucune facture"}
 ${invoicesTextContext}
 
 📅 CRÉNEAUX PROPOSÉS (${slotsRes.data?.length || 0}):
@@ -387,10 +395,11 @@ ${hasEmptyFields ? `\n⚠️ CHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFi
 
     // Build extraction schema
     const extractionSchema = hasEmptyFields ? `,
-  "extracted_fields": {
-    // Uniquement les champs trouvés dans les médias parmi: ${emptyFields.join(", ")}
-    // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
-  }` : "";
+   "extracted_fields": {
+     // Uniquement les champs trouvés dans les médias, devis ou factures parmi: ${emptyFields.join(", ")}
+     // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
+     // Sources possibles : notes vocales, photos, notes écrites, PDF de devis/factures, données structurées des devis/factures (nom client, adresse, email, téléphone)
+   }` : "";
 
     const systemPrompt = `Tu es l'assistant IA de terrain d'un artisan (plombier/chauffagiste/multi-services). Ton rôle est de générer un résumé OPÉRATIONNEL qui aide l'artisan à :
 1. Comprendre le problème en 3 secondes
@@ -434,8 +443,9 @@ RÈGLES STRICTES :
 - Les photos : décris ce que tu VOIS réellement (type de tuyau, marque visible, état, dégâts)
 - Les notes vocales : transcris les infos UTILES pour le chantier ET extrais le matériel mentionné
 - Les notes écrites : intègre dans le résumé ET extrais le matériel mentionné
+- Les devis et factures : extrais le matériel ET les informations client (nom, prénom, email, téléphone, adresse) pour remplir les champs manquants du dossier
 - Ignore les erreurs techniques dans l'historique
-${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias` : ""}`;
+${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias, devis ou factures. Les infos client des factures (client_first_name, client_last_name, client_email, client_phone, address) sont des sources fiables.` : ""}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
