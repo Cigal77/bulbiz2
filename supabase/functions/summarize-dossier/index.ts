@@ -123,10 +123,10 @@ serve(async (req) => {
     const imageMedias = imageMediasRes.data || [];
     const videoMedias = videoMediasRes.data || [];
 
-    const [audioResults, imageResults, videoSignedUrls] = await Promise.all([
+    const [audioResults, imageResults, videoResults] = await Promise.all([
       Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
       Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
-      Promise.all(videoMedias.map(m => getSignedUrl(m, supabase))),
+      Promise.all(videoMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 100))),
     ]);
 
     // Build multimodal content parts
@@ -144,14 +144,15 @@ serve(async (req) => {
       }
     }
 
-    // Videos — use signed URLs (videos are too large for base64)
-    const validVideos = videoSignedUrls.filter(Boolean);
+    // Videos — base64 data URL (gateway requires data URLs for non-image formats)
+    const validVideos = videoResults.filter(Boolean);
     if (validVideos.length > 0) {
       mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DU DOSSIER (${validVideos.length}) — Analyse le contenu visuel et audio de chaque vidéo pour comprendre le problème :` });
       for (const vid of validVideos) {
         if (!vid) continue;
+        const mime = toVideoMime(vid.mimeType);
         mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
-        mediaParts.push({ type: "image_url", image_url: { url: vid.signedUrl } });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
       }
     }
 
