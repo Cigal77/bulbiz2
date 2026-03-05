@@ -111,7 +111,7 @@ serve(async (req) => {
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(5),
-      supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
+      supabase.from("medias").select("file_url, file_type, file_name, file_size, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "video/%").order("created_at", { ascending: false }).limit(2),
     ]);
 
