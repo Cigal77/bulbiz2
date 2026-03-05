@@ -43,6 +43,8 @@ export function GmailConnectionCard() {
     if (code && state === "gmail" && !callbackCalledRef.current) {
       callbackCalledRef.current = true;
       handleCallback(code);
+    } else {
+      checkStatus();
     }
   }, []);
 
