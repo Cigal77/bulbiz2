@@ -328,7 +328,8 @@ DEVIS (${quotesRes.data?.length || 0}):
 ${(quotesRes.data || []).map(q => `- ${q.quote_number}: ${q.status}, ${q.total_ttc ?? 0}€ TTC${q.sent_at ? ", envoyé" : ""}${q.signed_at ? ", signé" : ""}`).join("\n") || "Aucun devis"}
 ${quotesTextContext}
 FACTURES (${invoicesRes.data?.length || 0}):
-${(invoicesRes.data || []).map(f => `- ${f.invoice_number}: ${f.status}, ${f.total_ttc ?? 0}€ TTC${f.paid_at ? ", payée" : ""}`).join("\n") || "Aucune facture"}
+${(invoicesRes.data || []).map(f => `- ${f.invoice_number}: ${f.status}, ${f.total_ht ?? 0}€ HT, TVA ${f.total_tva ?? 0}€, ${f.total_ttc ?? 0}€ TTC${f.paid_at ? ", payée" : ""}`).join("\n") || "Aucune facture"}
+${invoicesTextContext}
 
 CRÉNEAUX PROPOSÉS (${slotsRes.data?.length || 0}):
 ${(slotsRes.data || []).map(s => `- ${s.slot_date} ${s.time_start.slice(0, 5)}-${s.time_end.slice(0, 5)}${s.selected_at ? " ✅ sélectionné" : ""}`).join("\n") || "Aucun"}
