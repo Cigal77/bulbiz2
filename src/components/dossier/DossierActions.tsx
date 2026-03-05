@@ -223,6 +223,8 @@ export function DossierActions({ dossier }: DossierActionsProps) {
             )}
             Relancer maintenant
           </Button>
+        )}
+
         {/* Intervention terminée */}
         {canMarkDone && (
           <Button
