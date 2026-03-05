@@ -84,6 +84,7 @@ Règles:
 - Utilise un ton professionnel mais accessible
 - Mentionne les infos manquantes si pertinent (tel, adresse, etc.)
 - Adapte ton résumé au statut du dossier (nouveau → qualifier, devis envoyé → relancer, etc.)
+- IGNORE les erreurs techniques dans l'historique (ex: "Impossible d'envoyer SMS", "erreur notification", etc.) — ne les mentionne jamais dans le résumé
 - Ne répète pas les labels bruts, reformule intelligemment`
           },
           {
