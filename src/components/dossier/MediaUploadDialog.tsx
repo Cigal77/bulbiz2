@@ -2,7 +2,9 @@ import { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Upload, X, Loader2, Film, Image } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { compressVideoIfNeeded, type CompressionProgress } from "@/lib/video-compression";
 
 interface MediaUploadDialogProps {
   open: boolean;
@@ -21,9 +23,9 @@ const LABEL_MAP = {
   plan: "Plan",
 };
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
-const MAX_PLAN_SIZE = 20 * 1024 * 1024; // 20 MB
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
+const MAX_PLAN_SIZE = 20 * 1024 * 1024;
 
 function getMaxSize(file: File, mode: string) {
   if (mode === "plan") return MAX_PLAN_SIZE;
@@ -37,6 +39,8 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<CompressionProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -71,14 +75,33 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
   const handleUpload = async () => {
     if (files.length === 0) return;
     setUploading(true);
+    setError(null);
     try {
-      await onUpload(files);
+      // Compress videos before upload
+      setCompressing(true);
+      const processed: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f.type.startsWith("video/") && f.size > 18 * 1024 * 1024) {
+          setCompressionProgress({ phase: "loading", percent: 0 });
+          const compressed = await compressVideoIfNeeded(f, setCompressionProgress);
+          processed.push(compressed instanceof File ? compressed : new File([compressed], f.name, { type: compressed.type }));
+        } else {
+          processed.push(f);
+        }
+      }
+      setCompressing(false);
+      setCompressionProgress(null);
+
+      await onUpload(processed);
       cleanup();
       onClose();
     } catch (e: any) {
       setError(e.message || "Erreur lors de l'upload");
     } finally {
       setUploading(false);
+      setCompressing(false);
+      setCompressionProgress(null);
     }
   };
 
@@ -94,6 +117,12 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
     onClose();
   };
 
+  const compressionLabel = compressionProgress?.phase === "loading"
+    ? "Chargement de la vidéo…"
+    : compressionProgress?.phase === "compressing"
+      ? `Compression en cours… ${compressionProgress.percent}%`
+      : null;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -104,16 +133,9 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
         <div className="space-y-4">
           {/* Drop zone */}
           <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              addFiles(e.dataTransfer.files);
-            }}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
             className={cn(
               "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-8 transition-colors",
               dragOver ? "border-primary bg-primary/5" : "border-border",
@@ -123,12 +145,10 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
               <>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => inputRef.current?.click()} className="gap-2">
-                    <Image className="h-4 w-4" />
-                    Galerie
+                    <Image className="h-4 w-4" /> Galerie
                   </Button>
                   <Button variant="outline" onClick={() => videoRef.current?.click()} className="gap-2">
-                    <Film className="h-4 w-4" />
-                    Filmer
+                    <Film className="h-4 w-4" /> Filmer
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground text-center">Ou glissez vos fichiers ici</p>
@@ -140,30 +160,14 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
                   Glissez ou cliquez pour ajouter un plan (PDF ou image)
                 </p>
                 <Button variant="outline" onClick={() => inputRef.current?.click()} className="gap-2">
-                  <Upload className="h-4 w-4" />
-                  Choisir un fichier
+                  <Upload className="h-4 w-4" /> Choisir un fichier
                 </Button>
               </>
             )}
 
-            {/* Inputs cachés */}
-            <input
-              ref={inputRef}
-              type="file"
-              accept={ACCEPT_MAP[mode]}
-              multiple={mode === "photo_video"}
-              onChange={(e) => e.target.files && addFiles(e.target.files)}
-              className="hidden"
-            />
+            <input ref={inputRef} type="file" accept={ACCEPT_MAP[mode]} multiple={mode === "photo_video"} onChange={(e) => e.target.files && addFiles(e.target.files)} className="hidden" />
             {mode === "photo_video" && (
-              <input
-                ref={videoRef}
-                type="file"
-                accept="video/*"
-                capture="environment"
-                onChange={(e) => e.target.files && addFiles(e.target.files)}
-                className="hidden"
-              />
+              <input ref={videoRef} type="file" accept="video/*" capture="environment" onChange={(e) => e.target.files && addFiles(e.target.files)} className="hidden" />
             )}
           </div>
 
@@ -171,27 +175,17 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
           {files.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {files.map((f, i) => (
-                <div
-                  key={i}
-                  className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border"
-                >
+                <div key={i} className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border">
                   {previews[i] ? (
                     <img src={previews[i]} alt={f.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
-                      {f.type.startsWith("video/") ? (
-                        <Film className="h-6 w-6 text-muted-foreground" />
-                      ) : (
-                        <Upload className="h-6 w-6 text-muted-foreground" />
-                      )}
+                      {f.type.startsWith("video/") ? <Film className="h-6 w-6 text-muted-foreground" /> : <Upload className="h-6 w-6 text-muted-foreground" />}
                       <span className="text-[10px] text-muted-foreground text-center truncate w-full">{f.name}</span>
                     </div>
                   )}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(i);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                     className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />
@@ -201,16 +195,24 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
             </div>
           )}
 
+          {/* Compression progress */}
+          {compressing && compressionLabel && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">{compressionLabel}</p>
+              <Progress value={compressionProgress?.percent ?? 0} className="h-2" />
+            </div>
+          )}
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           {/* Actions */}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={handleClose}>
+            <Button variant="outline" onClick={handleClose} disabled={compressing}>
               Annuler
             </Button>
-            <Button onClick={handleUpload} disabled={uploading || files.length === 0} className="gap-2">
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {uploading ? "Upload…" : `Enregistrer (${files.length})`}
+            <Button onClick={handleUpload} disabled={uploading || compressing || files.length === 0} className="gap-2">
+              {(uploading || compressing) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {compressing ? "Compression…" : uploading ? "Upload…" : `Enregistrer (${files.length})`}
             </Button>
           </div>
         </div>
