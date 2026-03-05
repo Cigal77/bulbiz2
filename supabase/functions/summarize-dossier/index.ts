@@ -423,7 +423,7 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) :
   ],
   "next_action": "action concrète prioritaire pour l'artisan (max 20 mots)",
   "material_list": [
-    { "label": "Nom exact du matériel/fourniture", "qty": 1, "ref": "référence ou marque si connue" }
+    { "label": "Nom exact du matériel/fourniture", "qty": 1, "unit": "u", "ref": "référence ou marque si connue" }
   ]${extractionSchema}
 }
 
@@ -445,6 +445,7 @@ RÈGLES STRICTES :
   * Photos : matériel identifiable visuellement UNIQUEMENT si la marque/modèle est LISIBLE sur la photo
   * label : nom exact (garde les marques, modèles, dimensions)
   * qty : quantité (1 par défaut si non précisée)
+  * unit : unité de mesure (u, m, m², m³, kg, L, lot, forfait). Par défaut "u" si non précisé dans le devis/facture/note
   * ref : référence fabricant, marque ou "n/a"
   * N'inclus PAS la main d'œuvre, déplacement, ou frais administratifs
   * Si aucun matériel identifié nulle part : material_list = []
