@@ -1,79 +1,41 @@
 
-# Audit et corrections des automatisations email/notifications
 
-## Problemes identifies
+## Problem
 
-### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
-**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
-- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
-- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
+When a client proposes time slots via the public link, the artisan currently sees them listed but has **no way to select one directly**. The only options are "Ajouter des créneaux" or "Fixer manuellement". The artisan should be able to simply check one of the client's proposed slots and confirm it with one click, automatically sending a confirmation email.
 
-### 2. Bug `send-invoice` : authentification inconsistante
-**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
-- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
+## Plan
 
-### 3. Bug `send-appointment-notification` : authentification inconsistante
-**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
-- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
+### 1. Add selectable slot list in AppointmentBlock (slots_proposed status)
 
-### 4. Notification artisan manquante sur confirmation RDV
-**Fichier** : `supabase/functions/submit-client-form/index.ts`
-- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
-- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
+**File: `src/components/dossier/AppointmentBlock.tsx`**
 
-### 5. Notification artisan manquante sur selection de creneau (multi-slots)
-- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
+Replace the static slot list (lines 700-711) with interactive checkable slots when status is `slots_proposed`:
+- Each slot gets a radio button the artisan can select
+- Add state `selectedSlotId` to track which slot the artisan picked
+- Show a "Confirmer ce créneau" button when a slot is selected
+- Keep existing "Fixer manuellement" as fallback for proposing a different time
 
-### 6. Lien dossier hardcode dans `submit-client-form`
-**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
-- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
+### 2. Add `confirmProposedSlot` mutation
 
-### 7. Email facture sans signature personnalisee
-**Fichier** : `supabase/functions/send-invoice/index.ts`
-- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
+**File: `src/components/dossier/AppointmentBlock.tsx`**
 
-### 8. Email facture sans numero de facture dans le sujet
-- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+New mutation similar to `confirmSlot` but works with any slot (not just client-selected ones):
+- Takes the selected slot ID
+- Checks for conflicts with existing RDVs
+- Updates dossier: `status: "rdv_pris"`, `appointment_status: "rdv_confirmed"`, appointment date/time from the selected slot
+- Adds historique entry
+- Sends `APPOINTMENT_CONFIRMED` notification (email + SMS) automatically
+- Syncs to Google Calendar
 
----
+### 3. Update slot list UI for both statuses
 
-## Plan de corrections
+For `slots_proposed`: Radio buttons to select + confirm button + "Proposer d'autres créneaux" button
+For `client_selected`: Keep current behavior (client's choice highlighted, confirm button)
 
-### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
-- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-- Ajouter la signature personnalisee
-- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+### Technical details
 
-### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+- Reuse existing `sendNotification("APPOINTMENT_CONFIRMED", ...)` and `syncToGoogleCalendar()` helpers already in the component
+- The confirmation mutation mirrors the existing `confirmSlot` mutation but selects the slot by ID rather than requiring `selected_at`
+- No backend changes needed — all existing edge functions and DB schema support this flow
 
-### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
-- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
-- Remplacer le lien hardcode par `app.bulbiz.io`
-- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
-
----
-
-## Details techniques
-
-### `send-invoice/index.ts` - Changements
-```text
-Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
-Ligne 170-218 : Remonter artisanName + signature au bon scope
-Ligne 181      : Ajouter signature personnalisee dans l'email
-Ligne 218      : Fixer la reference artisanName dans le SMS
-Sujet email    : Ajouter numero facture
-```
-
-### `send-appointment-notification/index.ts` - Changements
-```text
-Lignes 210-217 : Remplacer auth getUser() par decodage JWT
-```
-
-### `submit-client-form/index.ts` - Changements
-```text
-Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
-Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
-Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
-```
