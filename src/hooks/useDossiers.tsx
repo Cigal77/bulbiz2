@@ -4,7 +4,7 @@ import type { Tables } from "@/integrations/supabase/types";
 
 export type Dossier = Tables<"dossiers">;
 
-export type SortOption = "recent" | "activity" | "rdv_next" | "devis_oldest" | "invoice_oldest";
+export type SortOption = "recent" | "activity" | "rdv_next" | "devis_oldest" | "invoice_oldest" | "chronological";
 
 interface UseDossiersOptions {
   showTrash?: boolean;
