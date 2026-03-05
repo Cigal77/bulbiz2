@@ -32,7 +32,11 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fallback = generateStructuredSummary(dossier);
+  const [localItems, setLocalItems] = useState<MaterialItem[]>([]);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
+  const [showAddInput, setShowAddInput] = useState(false);
+  const [newItemLabel, setNewItemLabel] = useState("");
+  const addInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: aiSummary,
@@ -64,13 +68,27 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
     retry: 1,
   });
 
+  // Sync local items when AI data arrives
+  useEffect(() => {
+    if (aiSummary?.material_list) {
+      setLocalItems(aiSummary.material_list);
+      setCheckedItems(new Set());
+    }
+  }, [aiSummary?.material_list]);
+
+  // Focus input when add mode is toggled
+  useEffect(() => {
+    if (showAddInput && addInputRef.current) {
+      addInputRef.current.focus();
+    }
+  }, [showAddInput]);
+
   const summary = aiSummary || fallback;
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
   const mediaInfo = aiSummary?.media_analyzed;
   const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.audio > 0 || (mediaInfo.notes ?? 0) > 0 || (mediaInfo.quotes ?? 0) > 0 || (mediaInfo.invoices ?? 0) > 0);
-  const materialList = aiSummary?.material_list || [];
-  const hasMaterial = materialList.length > 0;
+  const hasMaterial = localItems.length > 0 || showAddInput;
 
   const toggleItem = (idx: number) => {
     setCheckedItems(prev => {
@@ -79,6 +97,26 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
       else next.add(idx);
       return next;
     });
+  };
+
+  const removeItem = (idx: number) => {
+    setLocalItems(prev => prev.filter((_, i) => i !== idx));
+    setCheckedItems(prev => {
+      const next = new Set<number>();
+      for (const v of prev) {
+        if (v < idx) next.add(v);
+        else if (v > idx) next.add(v - 1);
+      }
+      return next;
+    });
+  };
+
+  const addItem = () => {
+    const label = newItemLabel.trim();
+    if (!label) return;
+    setLocalItems(prev => [...prev, { label, qty: 1 }]);
+    setNewItemLabel("");
+    setShowAddInput(false);
   };
 
   return (
