@@ -395,6 +395,56 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
+  // Confirm a proposed slot (artisan picks from list)
+  const confirmProposedSlot = useMutation({
+    mutationFn: async () => {
+      if (!selectedSlotId) throw new Error("Sélectionnez un créneau");
+      const slot = slots.find((s) => s.id === selectedSlotId);
+      if (!slot) throw new Error("Créneau introuvable");
+
+      const conflicts = findConflicts(slot.slot_date, slot.time_start, slot.time_end, confirmedRdvs, dossier.id);
+      if (conflicts.length > 0) {
+        const clientName = [conflicts[0].client_first_name, conflicts[0].client_last_name].filter(Boolean).join(" ") || "un client";
+        throw new Error(`Conflit : vous avez déjà un RDV avec ${clientName} le ${slot.slot_date} de ${conflicts[0].appointment_time_start.slice(0, 5)} à ${conflicts[0].appointment_time_end.slice(0, 5)}`);
+      }
+
+      const { error } = await supabase
+        .from("dossiers")
+        .update({
+          status: "rdv_pris", status_changed_at: new Date().toISOString(),
+          appointment_status: "rdv_confirmed", appointment_date: slot.slot_date,
+          appointment_time_start: slot.time_start, appointment_time_end: slot.time_end,
+          appointment_source: "manual", appointment_confirmed_at: new Date().toISOString(),
+        } as any)
+        .eq("id", dossier.id);
+      if (error) throw error;
+
+      const dateStr = format(new Date(slot.slot_date), "EEEE d MMMM yyyy", { locale: fr });
+      await addHistorique("rdv_confirmed", `Créneau confirmé par l'artisan : ${dateStr} ${slot.time_start.slice(0, 5)}–${slot.time_end.slice(0, 5)}`);
+
+      try {
+        const fullAddress = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
+        await sendNotification("APPOINTMENT_CONFIRMED", {
+          appointment_date: dateStr,
+          appointment_time: slot.time_start.slice(0, 5),
+          appointment_time_end: slot.time_end.slice(0, 5),
+          address: fullAddress,
+          raw_date: slot.slot_date,
+        });
+      } catch (e) {
+        console.error("Notification error after confirm proposed slot:", e);
+      }
+
+      syncToGoogleCalendar(slot.slot_date, slot.time_start, slot.time_end);
+    },
+    onSuccess: () => {
+      toast({ title: "Rendez-vous confirmé ✅" });
+      setSelectedSlotId(null);
+      invalidate();
+    },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
   // Cancel RDV
   const cancelRdv = useMutation({
     mutationFn: async () => {
