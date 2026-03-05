@@ -43,11 +43,12 @@ export function GmailConnectionCard() {
     if (code && state === "gmail" && !callbackCalledRef.current) {
       callbackCalledRef.current = true;
       handleCallback(code);
-    } else {
-      // Always check Gmail status (even during Calendar OAuth flow)
-      checkStatus();
     }
-  }, []);
+  }, [searchParams]);
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
 
   const handleCallback = async (code: string) => {
     setActionLoading(true);
