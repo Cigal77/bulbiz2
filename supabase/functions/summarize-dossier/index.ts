@@ -148,10 +148,66 @@ serve(async (req) => {
       }
     }
 
+    // Process quotes: items JSONB + PDF downloads
+    const quotes = quotesRes.data || [];
+    let quotesTextContext = "";
+    let quotePdfCount = 0;
+
+    // Format quote_lines items as readable text
+    for (const q of quotes) {
+      const items = q.items as any[] | null;
+      if (items && Array.isArray(items) && items.length > 0) {
+        quotesTextContext += `\nDÉTAIL DEVIS ${q.quote_number} :\n`;
+        for (const item of items) {
+          const label = item.label || item.designation || "?";
+          const qty = item.qty ?? item.quantity ?? 1;
+          const unit = item.unit || "u";
+          const price = item.unit_price ?? item.unitPrice ?? 0;
+          quotesTextContext += `  - ${label} × ${qty} ${unit} à ${price}€ HT\n`;
+        }
+        if (q.notes) quotesTextContext += `  Notes: ${q.notes}\n`;
+      }
+    }
+
+    // Download imported quote PDFs (max 2, 5MB each)
+    const importedWithPdf = quotes.filter(q => q.pdf_url).slice(0, 2);
+    const pdfResults = await Promise.all(
+      importedWithPdf.map(async (q) => {
+        try {
+          const url = q.pdf_url!.startsWith("http")
+            ? q.pdf_url!
+            : `${supabaseUrl}/storage/v1/object/public/dossier-medias/${q.pdf_url}`;
+          const resp = await fetch(url);
+          if (!resp.ok) return null;
+          const blob = await resp.arrayBuffer();
+          if (blob.byteLength > 5 * 1024 * 1024) return null;
+          const b64 = base64Encode(new Uint8Array(blob));
+          return { base64: b64, quoteNumber: q.quote_number };
+        } catch (e) {
+          console.error(`Error downloading PDF for ${q.quote_number}:`, e);
+          return null;
+        }
+      })
+    );
+
+    const validPdfs = pdfResults.filter(Boolean);
+    quotePdfCount = validPdfs.length;
+
+    // Add PDF parts to multimodal content
+    if (validPdfs.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n📄 DEVIS PDF IMPORTÉS (${validPdfs.length}) — Analyse le contenu pour extraire matériel, prestations et infos techniques :` });
+      for (const pdf of validPdfs) {
+        if (!pdf) continue;
+        mediaParts.push({ type: "text", text: `[Devis "${pdf.quoteNumber}"] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${pdf.base64}` } });
+      }
+    }
+
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
     const hasVideos = validVideos.length > 0;
+    const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
     // Build empty fields list
     const emptyFields: string[] = [];
@@ -188,7 +244,7 @@ Relances: ${d.relance_count} envoyée(s)
 
 DEVIS (${quotesRes.data?.length || 0}):
 ${(quotesRes.data || []).map(q => `- ${q.quote_number}: ${q.status}, ${q.total_ttc ?? 0}€ TTC${q.sent_at ? ", envoyé" : ""}${q.signed_at ? ", signé" : ""}`).join("\n") || "Aucun devis"}
-
+${quotesTextContext}
 FACTURES (${invoicesRes.data?.length || 0}):
 ${(invoicesRes.data || []).map(f => `- ${f.invoice_number}: ${f.status}, ${f.total_ttc ?? 0}€ TTC${f.paid_at ? ", payée" : ""}`).join("\n") || "Aucune facture"}
 
