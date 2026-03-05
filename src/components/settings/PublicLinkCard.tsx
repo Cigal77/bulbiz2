@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Share2, Link2, Loader2, MessageSquare } from "lucide-react";
+import { Copy, Check, Share2, Link2, Loader2, MessageSquare, Mail, Phone } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
