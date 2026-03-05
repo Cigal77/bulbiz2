@@ -206,7 +206,7 @@ export default function DossierDetail() {
             />
 
             {/* Résumé de la demande — always visible */}
-            <SummaryBlock dossier={dossier} />
+            <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
 
             {/* Actions — open by default on mobile, placed before devis */}
             <CollapsibleSection title="⚙️ Actions" defaultOpen={true}>
@@ -278,7 +278,7 @@ export default function DossierDetail() {
                 dossier={dossier}
                 onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
-              <SummaryBlock dossier={dossier} />
+              <SummaryBlock dossier={dossier} mediaCount={medias?.length ?? 0} historiqueCount={historique?.length ?? 0} />
               <QuoteBlock dossier={dossier} />
               <InvoiceBlock dossier={dossier} />
               <ClientBlock dossier={dossier} />
