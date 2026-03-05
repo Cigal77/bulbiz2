@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Info,
+  Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Info, Calendar, Clock, Plus,
 } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { TRADE_TYPES } from "@/lib/trade-types";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
+const TOTAL_STEPS = 5;
 
 interface ArtisanProfile {
   first_name: string | null;
@@ -27,6 +28,11 @@ interface ArtisanProfile {
   company_name: string | null;
   phone: string | null;
   email: string | null;
+}
+
+interface ProposedSlot {
+  date: string;
+  time: string;
 }
 
 export default function PublicClientForm() {
@@ -54,6 +60,15 @@ export default function PublicClientForm() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
   const [emailError, setEmailError] = useState("");
+
+  // Slot proposal state
+  const [proposedSlots, setProposedSlots] = useState<ProposedSlot[]>([
+    { date: "", time: "09:00" },
+    { date: "", time: "14:00" },
+    { date: "", time: "10:00" },
+  ]);
+  const [slotErrors, setSlotErrors] = useState<(string | null)[]>([null, null, null]);
+  const [checkingSlots, setCheckingSlots] = useState(false);
 
   const galleryRef = React.useRef<HTMLInputElement>(null);
 
@@ -91,6 +106,81 @@ export default function PublicClientForm() {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  // Slot helpers
+  function updateSlot(index: number, field: keyof ProposedSlot, value: string) {
+    setProposedSlots(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    setSlotErrors(prev => prev.map((e, i) => i === index ? null : e));
+  }
+
+  function addSlot() {
+    if (proposedSlots.length >= 5) return;
+    setProposedSlots(prev => [...prev, { date: "", time: "09:00" }]);
+    setSlotErrors(prev => [...prev, null]);
+  }
+
+  function removeSlot(index: number) {
+    if (proposedSlots.length <= 3) return;
+    setProposedSlots(prev => prev.filter((_, i) => i !== index));
+    setSlotErrors(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function getValidSlots(): ProposedSlot[] {
+    return proposedSlots.filter(s => s.date && s.time);
+  }
+
+  function hasDuplicateSlots(): boolean {
+    const valid = getValidSlots();
+    const keys = valid.map(s => `${s.date}_${s.time}`);
+    return new Set(keys).size !== keys.length;
+  }
+
+  function hasMinimumSlots(): boolean {
+    return getValidSlots().length >= 3;
+  }
+
+  function hasFutureSlots(): boolean {
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+    return getValidSlots().every(s => s.date >= today);
+  }
+
+  async function checkSlotAvailability(): Promise<boolean> {
+    const valid = getValidSlots();
+    if (valid.length < 3) return false;
+
+    setCheckingSlots(true);
+    try {
+      const slotsToCheck = valid.map(s => ({
+        date: s.date,
+        time_start: s.time,
+        time_end: `${String(Math.min(23, parseInt(s.time.split(":")[0]) + 2)).padStart(2, "0")}:${s.time.split(":")[1]}`,
+      }));
+
+      const { data, error } = await supabase.functions.invoke("check-slot-availability", {
+        body: { slug, slots: slotsToCheck },
+      });
+
+      if (error || !data?.results) return true; // Allow if check fails
+
+      const newErrors: (string | null)[] = proposedSlots.map(() => null);
+      let hasConflict = false;
+
+      data.results.forEach((result: any, idx: number) => {
+        if (!result.available) {
+          newErrors[idx] = result.reason || "Ce créneau est déjà réservé.";
+          hasConflict = true;
+        }
+      });
+
+      setSlotErrors(newErrors);
+      return !hasConflict;
+    } catch {
+      return true; // Allow if check fails
+    } finally {
+      setCheckingSlots(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!form.client_first_name.trim() || !form.client_last_name.trim()) return;
     if (form.client_email && !validateEmail(form.client_email)) {
@@ -120,11 +210,18 @@ export default function PublicClientForm() {
           });
           const result = await resp.json();
           if (result.url) mediaUrls.push(result.url);
-          setUploadProgress(10 + ((i + 1) / files.length) * 60);
+          setUploadProgress(10 + ((i + 1) / files.length) * 50);
         }
       }
 
-      setUploadProgress(80);
+      setUploadProgress(70);
+
+      // Prepare proposed slots
+      const validSlots = getValidSlots().map(s => ({
+        date: s.date,
+        time_start: s.time,
+        time_end: `${String(Math.min(23, parseInt(s.time.split(":")[0]) + 2)).padStart(2, "0")}:${s.time.split(":")[1]}`,
+      }));
 
       const submitData = {
         ...form,
@@ -141,7 +238,13 @@ export default function PublicClientForm() {
       };
 
       const { data: result, error } = await supabase.functions.invoke("submit-public-form", {
-        body: { slug, data: submitData, media_urls: mediaUrls, rgpd_consent: true },
+        body: {
+          slug,
+          data: submitData,
+          media_urls: mediaUrls,
+          rgpd_consent: true,
+          proposed_slots: validSlots,
+        },
       });
 
       setUploadProgress(100);
@@ -194,7 +297,7 @@ export default function PublicClientForm() {
               {form.client_email && " Vous recevrez un email de confirmation."}
             </p>
             <p className="text-sm text-muted-foreground text-center">
-              {artisanName} reviendra vers vous rapidement.
+              {artisanName} reviendra vers vous rapidement pour confirmer un créneau.
             </p>
             {existingDossier && (
               <div className="bg-accent/50 border border-accent rounded-lg p-3 text-sm text-center w-full">
@@ -212,6 +315,8 @@ export default function PublicClientForm() {
                 setAddressInput("");
                 setSelectedTrades([]);
                 setRgpdConsent(false);
+                setProposedSlots([{ date: "", time: "09:00" }, { date: "", time: "14:00" }, { date: "", time: "10:00" }]);
+                setSlotErrors([null, null, null]);
                 setStep(1);
                 setExistingDossier(null);
               }}
@@ -228,8 +333,28 @@ export default function PublicClientForm() {
     if (step === 1) return selectedTrades.length > 0;
     if (step === 2) return form.client_first_name.trim() && form.client_last_name.trim() && (form.client_email ? validateEmail(form.client_email) : true);
     if (step === 3) return true;
-    if (step === 4) return rgpdConsent;
+    if (step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
+    if (step === 5) return rgpdConsent;
     return false;
+  };
+
+  const handleNextFromSlots = async () => {
+    if (!canGoNext()) return;
+    const available = await checkSlotAvailability();
+    if (available) {
+      setStep(5);
+    }
+  };
+
+  // Format date for display
+  const formatSlotDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
@@ -246,10 +371,10 @@ export default function PublicClientForm() {
         {/* Progress */}
         <div className="mb-6">
           <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>Étape {step}/4</span>
-            <span>{Math.round((step / 4) * 100)}%</span>
+            <span>Étape {step}/{TOTAL_STEPS}</span>
+            <span>{Math.round((step / TOTAL_STEPS) * 100)}%</span>
           </div>
-          <Progress value={(step / 4) * 100} className="h-2" />
+          <Progress value={(step / TOTAL_STEPS) * 100} className="h-2" />
         </div>
 
         {/* Step 1: Trade selection */}
@@ -435,8 +560,89 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 4: RGPD + Submit */}
+        {/* Step 4: Slot proposals */}
         {step === 4 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Proposer des créneaux
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Afin d'organiser l'intervention, merci de proposer <strong>3 créneaux de disponibilité minimum</strong>.
+                L'artisan confirmera ensuite le rendez-vous.
+              </p>
+
+              <div className="space-y-3">
+                {proposedSlots.map((slot, idx) => (
+                  <div key={idx} className="space-y-1.5">
+                    <div className="flex items-center gap-1 mb-1">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Créneau {idx + 1} {idx < 3 ? "*" : "(optionnel)"}
+                      </span>
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 space-y-1">
+                        <Input
+                          type="date"
+                          value={slot.date}
+                          min={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => updateSlot(idx, "date", e.target.value)}
+                          className={cn("h-10 text-sm", slotErrors[idx] && "border-destructive")}
+                        />
+                      </div>
+                      <div className="w-24 space-y-1">
+                        <Input
+                          type="time"
+                          value={slot.time}
+                          onChange={(e) => updateSlot(idx, "time", e.target.value)}
+                          className={cn("h-10 text-sm", slotErrors[idx] && "border-destructive")}
+                        />
+                      </div>
+                      {proposedSlots.length > 3 && (
+                        <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => removeSlot(idx)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {slotErrors[idx] && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        {slotErrors[idx]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {proposedSlots.length < 5 && (
+                <Button variant="ghost" size="sm" onClick={addSlot} className="gap-1 text-xs">
+                  <Plus className="h-3 w-3" /> Ajouter un créneau
+                </Button>
+              )}
+
+              {hasDuplicateSlots() && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Certains créneaux sont identiques. Merci de proposer des créneaux différents.
+                </p>
+              )}
+
+              {!hasFutureSlots() && getValidSlots().length > 0 && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Les créneaux doivent être à une date future.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 5: RGPD + Submit */}
+        {step === 5 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Confirmation</CardTitle>
@@ -451,6 +657,21 @@ export default function PublicClientForm() {
                 {(addressData.address || addressInput) && <p><strong>Adresse :</strong> {addressData.address || addressInput}</p>}
                 {form.description && <p><strong>Description :</strong> {form.description}</p>}
                 {files.length > 0 && <p><strong>Médias :</strong> {files.length} fichier(s)</p>}
+
+                {/* Proposed slots summary */}
+                {getValidSlots().length > 0 && (
+                  <div>
+                    <strong>Créneaux proposés :</strong>
+                    <ul className="mt-1 space-y-1">
+                      {getValidSlots().map((s, i) => (
+                        <li key={i} className="flex items-center gap-1.5 text-sm">
+                          <Calendar className="h-3.5 w-3.5 text-primary" />
+                          {formatSlotDate(s.date)} à {s.time}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-start gap-3 p-3 border rounded-lg">
@@ -482,10 +703,21 @@ export default function PublicClientForm() {
               Retour
             </Button>
           )}
-          {step < 4 ? (
-            <Button onClick={() => setStep(step + 1)} disabled={!canGoNext()} className="flex-1">
-              Suivant
-            </Button>
+          {step < TOTAL_STEPS ? (
+            step === 4 ? (
+              <Button
+                onClick={handleNextFromSlots}
+                disabled={!canGoNext() || checkingSlots}
+                className="flex-1 gap-2"
+              >
+                {checkingSlots && <Loader2 className="h-4 w-4 animate-spin" />}
+                {checkingSlots ? "Vérification..." : "Suivant"}
+              </Button>
+            ) : (
+              <Button onClick={() => setStep(step + 1)} disabled={!canGoNext()} className="flex-1">
+                Suivant
+              </Button>
+            )
           ) : (
             <Button onClick={handleSubmit} disabled={submitting || !rgpdConsent} className="flex-1 gap-2">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
