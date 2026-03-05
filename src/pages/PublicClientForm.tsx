@@ -331,12 +331,15 @@ export default function PublicClientForm() {
     );
   }
 
+  const validationStep = TOTAL_STEPS;
+  const slotStep = slotsEnabled ? 4 : -1;
+
   const canGoNext = () => {
     if (step === 1) return selectedTrades.length > 0;
     if (step === 2) return form.client_first_name.trim() && form.client_last_name.trim() && (form.client_email ? validateEmail(form.client_email) : true);
     if (step === 3) return true;
-    if (step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
-    if (step === 5) return rgpdConsent;
+    if (slotsEnabled && step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
+    if (step === validationStep) return rgpdConsent;
     return false;
   };
 
@@ -344,7 +347,7 @@ export default function PublicClientForm() {
     if (!canGoNext()) return;
     const available = await checkSlotAvailability();
     if (available) {
-      setStep(5);
+      setStep(validationStep);
     }
   };
 
