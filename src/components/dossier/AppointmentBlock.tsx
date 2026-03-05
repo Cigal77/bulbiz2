@@ -748,8 +748,37 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
         </div>
       )}
 
-      {/* Proposed slots list */}
-      {(status === "slots_proposed" || status === "client_selected") && slots.length > 0 && (
+      {/* Proposed slots list — interactive for slots_proposed */}
+      {status === "slots_proposed" && slots.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground font-medium">Choisissez un créneau à confirmer :</p>
+          {slots.map((slot) => (
+            <button
+              key={slot.id}
+              type="button"
+              onClick={() => setSelectedSlotId(slot.id === selectedSlotId ? null : slot.id)}
+              className={cn(
+                "w-full text-xs rounded px-2.5 py-2 flex items-center gap-2 text-left transition-colors border",
+                slot.id === selectedSlotId
+                  ? "bg-primary/10 border-primary text-primary font-medium"
+                  : "bg-muted border-transparent text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <div className={cn(
+                "h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center",
+                slot.id === selectedSlotId ? "border-primary" : "border-muted-foreground/40"
+              )}>
+                {slot.id === selectedSlotId && <div className="h-2 w-2 rounded-full bg-primary" />}
+              </div>
+              {format(new Date(slot.slot_date), "EEE d MMM", { locale: fr })} {slot.time_start.slice(0, 5)}–{slot.time_end.slice(0, 5)}
+              {slot.selected_at && <Badge variant="outline" className="ml-auto text-[9px] px-1.5 py-0">Choix client</Badge>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Static slot list for client_selected */}
+      {status === "client_selected" && slots.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground font-medium">Créneaux proposés :</p>
           {slots.map((slot) => (
