@@ -28,6 +28,7 @@ function useDesktopBadges() {
       }
       if (["rdv_pending", "slots_proposed", "client_selected"].includes(d.appointment_status as string)) {
         rdv++;
+        todo++;
       }
     }
     return { todo, rdv };
