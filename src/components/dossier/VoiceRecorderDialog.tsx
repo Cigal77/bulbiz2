@@ -1,8 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mic, Square, Trash2, Save, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface VoiceRecorderDialogProps {
   open: boolean;
@@ -16,19 +15,59 @@ export function VoiceRecorderDialog({ open, onClose, onSave }: VoiceRecorderDial
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
 
   const MAX_DURATION = 300; // 5 minutes
 
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    clearTimer();
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+    } catch (e) {
+      console.warn("stopRecording error:", e);
+    }
+    setRecording(false);
+  }, [clearTimer]);
+
   const startRecording = useCallback(async () => {
+    setError(null);
+    setAudioBlob(null);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
-        : "audio/webm";
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
+
       const recorder = new MediaRecorder(stream, { mimeType });
       chunksRef.current = [];
 
@@ -37,10 +76,20 @@ export function VoiceRecorderDialog({ open, onClose, onSave }: VoiceRecorderDial
       };
 
       recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        setAudioBlob(blob);
-        setAudioUrl(URL.createObjectURL(blob));
+        // Stop the stream tracks when recording stops
+        stopStream();
+        if (chunksRef.current.length > 0) {
+          const blob = new Blob(chunksRef.current, { type: mimeType });
+          setAudioBlob(blob);
+          setAudioUrl(URL.createObjectURL(blob));
+        }
+      };
+
+      recorder.onerror = () => {
+        clearTimer();
+        stopStream();
+        setRecording(false);
+        setError("Erreur d'enregistrement. Réessayez.");
       };
 
       mediaRecorderRef.current = recorder;
@@ -48,38 +97,40 @@ export function VoiceRecorderDialog({ open, onClose, onSave }: VoiceRecorderDial
       startTimeRef.current = Date.now();
       setRecording(true);
       setDuration(0);
-      setAudioBlob(null);
-      setAudioUrl(null);
 
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         setDuration(elapsed);
         if (elapsed >= MAX_DURATION) {
-          stopRecording();
+          // Stop via ref to avoid stale closure
+          clearTimer();
+          try {
+            if (mediaRecorderRef.current?.state === "recording") {
+              mediaRecorderRef.current.stop();
+            }
+          } catch { /* ignore */ }
+          setRecording(false);
         }
       }, 500);
-    } catch {
-      // Permission denied or no mic
+    } catch (e: any) {
+      stopStream();
+      if (e.name === "NotAllowedError" || e.name === "PermissionDeniedError") {
+        setError("Accès au micro refusé. Autorisez l'accès dans les paramètres du navigateur.");
+      } else if (e.name === "NotFoundError") {
+        setError("Aucun micro détecté.");
+      } else {
+        setError("Impossible de démarrer l'enregistrement.");
+      }
     }
-  }, []);
+  }, [audioUrl, clearTimer, stopStream]);
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setRecording(false);
-  }, []);
-
-  const reset = () => {
+  const reset = useCallback(() => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioBlob(null);
     setAudioUrl(null);
     setDuration(0);
-  };
+    setError(null);
+  }, [audioUrl]);
 
   const handleSave = async () => {
     if (!audioBlob) return;
@@ -88,16 +139,27 @@ export function VoiceRecorderDialog({ open, onClose, onSave }: VoiceRecorderDial
       await onSave(audioBlob, duration);
       reset();
       onClose();
+    } catch {
+      setError("Erreur lors de la sauvegarde. Réessayez.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (recording) stopRecording();
+    stopStream();
     reset();
     onClose();
-  };
+  }, [recording, stopRecording, stopStream, reset, onClose]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearTimer();
+      stopStream();
+    };
+  }, [clearTimer, stopStream]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
@@ -128,6 +190,11 @@ export function VoiceRecorderDialog({ open, onClose, onSave }: VoiceRecorderDial
                 />
               ))}
             </div>
+          )}
+
+          {/* Error */}
+          {error && (
+            <p className="text-sm text-destructive text-center">{error}</p>
           )}
 
           {/* Audio player */}
