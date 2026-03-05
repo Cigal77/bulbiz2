@@ -58,6 +58,8 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const summary = aiSummary || fallback;
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
+  const mediaInfo = aiSummary?.media_analyzed;
+  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.videos > 0 || mediaInfo.audio > 0);
 
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
