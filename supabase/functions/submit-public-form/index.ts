@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
     if (profile.email) {
       const gmailConn = await getGmailConnection(supabase, userId);
       if (gmailConn) {
-        await sendViaGmail(gmailConn.access_token, gmailConn.gmail_address, profile.email, `Nouvelle demande : ${clientName}`, artisanEmailHtml);
+        await sendViaGmail(gmailConn.access_token, gmailConn.gmail_address, profile.email, artisanSubject, artisanEmailHtml);
       } else {
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (resendKey) {
@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
           await resend.emails.send({
             from: "Bulbiz <notifications@bulbiz.io>",
             to: profile.email,
-            subject: `Nouvelle demande : ${clientName}`,
+            subject: artisanSubject,
             html: artisanEmailHtml,
           });
         }
