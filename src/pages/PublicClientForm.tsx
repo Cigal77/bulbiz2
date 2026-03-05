@@ -195,19 +195,11 @@ export default function PublicClientForm() {
     setUploadProgress(10);
 
     try {
-      // Compress large videos before upload
-      const { compressVideoIfNeeded } = await import("@/lib/video-compression");
-      const processedFiles: File[] = [];
-      for (const f of files) {
-        const result = await compressVideoIfNeeded(f);
-        processedFiles.push(result instanceof File ? result : new File([result], f.name, { type: result.type }));
-      }
-
       // Upload files
       const mediaUrls: string[] = [];
-      if (processedFiles.length > 0) {
-        for (let i = 0; i < processedFiles.length; i++) {
-          const file = processedFiles[i];
+      if (files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
           const formData = new FormData();
           formData.append("file", file);
           formData.append("slug", slug!);
