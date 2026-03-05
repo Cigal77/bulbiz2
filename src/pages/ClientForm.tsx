@@ -36,7 +36,7 @@ import { AddressAutocomplete, type AddressData } from "@/components/AddressAutoc
 import { cn } from "@/lib/utils";
 
 const MAX_FILES = 5;
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_FILE_SIZE = 200 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"];
 
 interface SlotData {

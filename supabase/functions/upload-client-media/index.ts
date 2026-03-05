@@ -24,10 +24,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate file size (max 50MB to match client limit)
-    if (file.size > 50 * 1024 * 1024) {
+    // Validate file size (max 200MB to match client limit)
+    if (file.size > 200 * 1024 * 1024) {
       return new Response(
-        JSON.stringify({ error: "Fichier trop volumineux (max 50 MB)" }),
+        JSON.stringify({ error: "Fichier trop volumineux (max 200 MB)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
