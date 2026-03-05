@@ -49,7 +49,7 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5" />
-          Résumé {aiSummary ? "IA" : ""}
+          Résumé de la demande
         </h3>
         <Button
           variant="ghost"

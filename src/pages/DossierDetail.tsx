@@ -204,6 +204,9 @@ export default function DossierDetail() {
               onScrollToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
             />
 
+            {/* Résumé de la demande — always visible */}
+            <SummaryBlock dossier={dossier} />
+
             {/* Actions — open by default on mobile, placed before devis */}
             <CollapsibleSection title="⚙️ Actions" defaultOpen={true}>
               <div className="space-y-3">
@@ -230,9 +233,8 @@ export default function DossierDetail() {
               <InvoiceBlock dossier={dossier} />
             </CollapsibleSection>
 
-            <CollapsibleSection title="📋 Résumé & Client">
+            <CollapsibleSection title="📋 Client & Intervention">
               <div className="space-y-3">
-                <SummaryBlock dossier={dossier} />
                 <ClientBlock dossier={dossier} />
                 <InterventionBlock dossier={dossier} />
                 <AccessBlock dossier={dossier} />
@@ -275,9 +277,9 @@ export default function DossierDetail() {
                 dossier={dossier}
                 onNavigateToAppointment={() => appointmentRef.current?.scrollIntoView({ behavior: "smooth" })}
               />
+              <SummaryBlock dossier={dossier} />
               <QuoteBlock dossier={dossier} />
               <InvoiceBlock dossier={dossier} />
-              <SummaryBlock dossier={dossier} />
               <ClientBlock dossier={dossier} />
               <InterventionBlock dossier={dossier} />
               <AccessBlock dossier={dossier} />
