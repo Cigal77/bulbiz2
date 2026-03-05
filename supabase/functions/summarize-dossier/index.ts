@@ -493,7 +493,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
-          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
+          const sourceLabel = [hasImages && "photos", hasVideoFiles && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
             details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
