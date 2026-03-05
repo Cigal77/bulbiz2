@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/quicktime"];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
 
 interface ArtisanProfile {
   first_name: string | null;
@@ -426,7 +426,7 @@ export default function PublicClientForm() {
                     >
                       <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                       <span className="text-sm text-muted-foreground">Ajouter des photos ou vidéos</span>
-                      <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, MP4 · Max 50 Mo</span>
+                      <span className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP, HEIC, MP4 · Max 50 Mo</span>
                     </button>
                   </>
                 )}

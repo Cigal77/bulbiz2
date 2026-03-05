@@ -1,33 +1,79 @@
 
+# Audit et corrections des automatisations email/notifications
 
-## Plan: Fix public client link file uploads + test readiness
+## Problemes identifies
 
-### Problem identified
-The public form (`PublicClientForm.tsx`) sends `slug` to the `upload-client-media` edge function, but that function only accepts `token` (a `client_token` from the `dossiers` table). Since no dossier exists yet when uploading, **all file uploads from the public link fail silently**.
+### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
+**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
+- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
+- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
 
-### Changes
+### 2. Bug `send-invoice` : authentification inconsistante
+**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
+- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
 
-#### 1. Update `supabase/functions/upload-client-media/index.ts`
-- Accept both `token` (existing flow) and `slug` (public link flow) from form data
-- When `slug` is provided: look up `profiles.public_client_slug` to get `user_id`, then upload to a temporary path like `{user_id}/public-uploads/client_{timestamp}.{ext}`
-- When `token` is provided: keep existing behavior unchanged
-- Return the storage file path as `url` (same as current)
+### 3. Bug `send-appointment-notification` : authentification inconsistante
+**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
+- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
 
-#### 2. Update `src/pages/PublicClientForm.tsx`
-- Fix the upload call: currently sends `formData.append("slug", slug!)` but the edge function reads `formData.get("token")` — these don't match
-- The response field is `url` but the code checks `result.url` — verify this matches (it does, OK)
-- Add `HEIC` and `HEIF` to `ALLOWED_TYPES` for iPhone compatibility
+### 4. Notification artisan manquante sur confirmation RDV
+**Fichier** : `supabase/functions/submit-client-form/index.ts`
+- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
+- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
 
-#### 3. No other files affected
-The `submit-public-form` edge function already receives `media_urls` (storage paths) and inserts them correctly. No database changes needed.
+### 5. Notification artisan manquante sur selection de creneau (multi-slots)
+- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
 
-### Technical detail
+### 6. Lien dossier hardcode dans `submit-client-form`
+**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
+- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
+
+### 7. Email facture sans signature personnalisee
+**Fichier** : `supabase/functions/send-invoice/index.ts`
+- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
+
+### 8. Email facture sans numero de facture dans le sujet
+- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+
+---
+
+## Plan de corrections
+
+### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
+- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+- Ajouter la signature personnalisee
+- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+
+### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+
+### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
+- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
+- Remplacer le lien hardcode par `app.bulbiz.io`
+- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
+
+---
+
+## Details techniques
+
+### `send-invoice/index.ts` - Changements
 ```text
-Current broken flow:
-  PublicClientForm → upload-client-media(slug=X) → function reads "token" → null → 400 error
-
-Fixed flow:
-  PublicClientForm → upload-client-media(slug=X) → lookup profiles by slug → get user_id → upload to storage → return path
-  PublicClientForm → submit-public-form(slug, data, media_urls) → create dossier + link medias
+Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
+Ligne 170-218 : Remonter artisanName + signature au bon scope
+Ligne 181      : Ajouter signature personnalisee dans l'email
+Ligne 218      : Fixer la reference artisanName dans le SMS
+Sujet email    : Ajouter numero facture
 ```
 
+### `send-appointment-notification/index.ts` - Changements
+```text
+Lignes 210-217 : Remplacer auth getUser() par decodage JWT
+```
+
+### `submit-client-form/index.ts` - Changements
+```text
+Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
+Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
+Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
+```
