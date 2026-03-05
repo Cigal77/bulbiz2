@@ -87,7 +87,7 @@ serve(async (req) => {
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("id, quote_number, status, total_ht, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
-      supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes").eq("dossier_id", dossier_id),
+      supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes, client_first_name, client_last_name, client_email, client_phone, client_address").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
