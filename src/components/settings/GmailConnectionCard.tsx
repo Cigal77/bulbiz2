@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,11 +44,7 @@ export function GmailConnectionCard() {
       callbackCalledRef.current = true;
       handleCallback(code);
     }
-  }, [searchParams]);
-
-  useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
+  }, []);
 
   const handleCallback = async (code: string) => {
     setActionLoading(true);
