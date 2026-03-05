@@ -74,7 +74,7 @@ serve(async (req) => {
             return null;
           }
 
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(blob)));
+          const base64 = base64Encode(new Uint8Array(blob));
           const mimeType = toMimeType(media.file_type);
 
           return {
