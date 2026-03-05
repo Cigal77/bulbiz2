@@ -143,75 +143,36 @@ ${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES NOTES VOCALES: ${emptyFie
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Build tools for structured extraction
-    const tools = hasEmptyFields ? [
-      {
-        type: "function",
-        function: {
-          name: "update_dossier_fields",
-          description: "Met à jour les champs manquants du dossier avec les informations extraites des notes vocales. N'appelle cette fonction QUE si tu as trouvé des informations concrètes dans les notes vocales. Ne devine pas, n'invente pas.",
-          parameters: {
-            type: "object",
-            properties: {
-              address: { type: "string", description: "Adresse complète (ex: 11 rue Brigadier Voituret, 69007 Lyon)" },
-              address_line: { type: "string", description: "Numéro et rue uniquement (ex: 11 rue Brigadier Voituret)" },
-              postal_code: { type: "string", description: "Code postal (ex: 69007)" },
-              city: { type: "string", description: "Ville (ex: Lyon)" },
-              client_phone: { type: "string", description: "Numéro de téléphone du client (format français)" },
-              client_email: { type: "string", description: "Email du client" },
-              client_first_name: { type: "string", description: "Prénom du client" },
-              client_last_name: { type: "string", description: "Nom de famille du client" },
-              description: { type: "string", description: "Description du problème / intervention (résumé structuré de ce qui a été dit dans les notes vocales)" },
-              housing_type: { type: "string", description: "Type de logement (appartement, maison, commerce, etc.)" },
-              floor_number: { type: "integer", description: "Numéro d'étage" },
-              access_code: { type: "string", description: "Code d'accès / digicode" },
-              availability: { type: "string", description: "Disponibilités du client" },
-            },
-            required: [],
-            additionalProperties: false,
-          },
-        },
-      },
-    ] : undefined;
+    // Build JSON format instruction — include extracted_fields only when needed
+    const extractionSchema = hasEmptyFields ? `
+  "extracted_fields": {
+    // Uniquement les champs trouvés dans les notes vocales parmi: ${emptyFields.join(", ")}
+    // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
+    // Clés possibles: address, address_line, postal_code, city, client_phone, client_email, client_first_name, client_last_name, description, housing_type, floor_number (integer), access_code, availability
+  }` : "";
 
     const systemPrompt = `Tu es l'assistant IA d'un plombier artisan. Tu dois générer un résumé intelligent et actionnable d'un dossier client.
 
-Règles pour le résumé:
-- Réponds en JSON avec exactement ce format: {"headline": "...", "bullets": ["...", "...", ...], "next_action": "..."}
-- headline: phrase courte (max 15 mots) résumant la situation actuelle du dossier
-- bullets: 3 à 5 points clés sur le problème, le client, et l'avancement (max 20 mots chacun)
-- next_action: la prochaine action recommandée pour l'artisan (max 20 mots)
+Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) avec ce format:
+{
+  "headline": "phrase courte max 15 mots résumant la situation",
+  "bullets": ["point 1", "point 2", "point 3"],
+  "next_action": "prochaine action recommandée max 20 mots"${hasEmptyFields ? ',' + extractionSchema : ''}
+}
+
+Règles:
+- headline: max 15 mots, situation actuelle
+- bullets: 3 à 5 points clés (max 20 mots chacun)
+- next_action: action concrète pour l'artisan (jamais "écouter la note vocale")
 - Sois concis, utile, orienté action
-- Utilise un ton professionnel mais accessible
-- Mentionne les infos manquantes si pertinent (tel, adresse, etc.)
-- Adapte ton résumé au statut du dossier (nouveau → qualifier, devis envoyé → relancer, etc.)
-- IGNORE les erreurs techniques dans l'historique (ex: "Impossible d'envoyer SMS", "erreur notification", etc.) — ne les mentionne jamais dans le résumé
+- IGNORE les erreurs techniques dans l'historique
 - Ne répète pas les labels bruts, reformule intelligemment
-- Ne suggère JAMAIS "écouter la note vocale" ou "réécouter les notes" comme action — tu les as déjà écoutées et intégrées dans le résumé
-- Les next_action doivent être des actions concrètes de l'artisan envers le client ou le chantier (ex: "Appeler le client", "Planifier l'intervention", "Envoyer le devis")
-${hasAudio ? `- Des notes vocales de l'artisan sont jointes. ÉCOUTE-LES ATTENTIVEMENT et intègre les informations clés dans les bullets du résumé
-- Si une note vocale contient des infos sur le problème, le diagnostic ou les travaux à faire, ajoute-les en priorité dans les bullets` : ""}
-${hasEmptyFields ? `
-Règles pour l'extraction des champs:
-- Si tu trouves dans les notes vocales des informations correspondant aux CHAMPS MANQUANTS listés, appelle la fonction update_dossier_fields avec UNIQUEMENT les champs que tu as trouvés
-- Ne remplis QUE les champs pour lesquels tu as une information CLAIRE et EXPLICITE dans les notes vocales
-- N'invente RIEN, ne devine RIEN
-- Pour description: fais un résumé structuré et professionnel de ce que l'artisan a dit (problème, diagnostic, travaux à faire)
-- Pour l'adresse: décompose-la en address (complète), address_line (rue), postal_code, city
-- Pour le téléphone: format français avec indicatif si possible` : ""}`;
-
-    const aiRequestBody: any = {
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.3,
-    };
-
-    if (tools) {
-      aiRequestBody.tools = tools;
-    }
+- Les next_action doivent être des actions concrètes (ex: "Appeler le client", "Planifier l'intervention")
+${hasAudio ? `- Des notes vocales sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets` : ""}
+${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uniquement ce qui est EXPLICITEMENT dit dans les notes vocales
+- Pour description: résumé structuré du problème/diagnostic/travaux
+- Pour l'adresse: décompose en address (complète), address_line (rue), postal_code, city
+- Pour le téléphone: format français` : ""}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -219,7 +180,14 @@ Règles pour l'extraction des champs:
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(aiRequestBody),
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.3,
+      }),
     });
 
     if (!aiResponse.ok) {
@@ -239,77 +207,53 @@ Règles pour l'extraction des champs:
     }
 
     const aiData = await aiResponse.json();
-    const choice = aiData.choices?.[0];
-    const rawContent = choice?.message?.content || "";
-    const toolCalls = choice?.message?.tool_calls || [];
+    const rawContent = aiData.choices?.[0]?.message?.content || "";
 
-    // Parse summary JSON
+    // Parse JSON response
     let parsed;
     try {
       const jsonStr = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
-      parsed = { headline: "Résumé indisponible", bullets: [rawContent.slice(0, 100)], next_action: "" };
+      parsed = { headline: rawContent.slice(0, 80) || "Résumé en cours de traitement", bullets: [], next_action: "" };
     }
 
-    // Process tool calls — update dossier with extracted fields
+    // Process extracted fields if present
     let updatedFields: string[] = [];
-    for (const tc of toolCalls) {
-      if (tc.function?.name === "update_dossier_fields") {
-        try {
-          const args = JSON.parse(tc.function.arguments);
-          
-          // Only update fields that are actually empty in the dossier
-          const updatePayload: Record<string, any> = {};
-          const fieldLabels: Record<string, string> = {
-            address: "Adresse",
-            address_line: "Rue",
-            postal_code: "Code postal",
-            city: "Ville",
-            client_phone: "Téléphone",
-            client_email: "Email",
-            client_first_name: "Prénom",
-            client_last_name: "Nom",
-            description: "Description",
-            housing_type: "Type logement",
-            floor_number: "Étage",
-            access_code: "Code accès",
-            availability: "Disponibilités",
-          };
+    if (parsed.extracted_fields && typeof parsed.extracted_fields === "object") {
+      const args = parsed.extracted_fields;
+      const updatePayload: Record<string, any> = {};
+      const fieldLabels: Record<string, string> = {
+        address: "Adresse", address_line: "Rue", postal_code: "Code postal", city: "Ville",
+        client_phone: "Téléphone", client_email: "Email", client_first_name: "Prénom",
+        client_last_name: "Nom", description: "Description", housing_type: "Type logement",
+        floor_number: "Étage", access_code: "Code accès", availability: "Disponibilités",
+      };
 
-          for (const [key, value] of Object.entries(args)) {
-            if (value !== null && value !== undefined && value !== "" && emptyFields.includes(key)) {
-              updatePayload[key] = value;
-              updatedFields.push(fieldLabels[key] || key);
-            }
-          }
-
-          if (Object.keys(updatePayload).length > 0) {
-            console.log("Auto-updating dossier fields:", Object.keys(updatePayload));
-            const { error: updateError } = await supabase
-              .from("dossiers")
-              .update(updatePayload)
-              .eq("id", dossier_id);
-
-            if (updateError) {
-              console.error("Error updating dossier:", updateError);
-            } else {
-              // Log in historique
-              await supabase.from("historique").insert({
-                dossier_id,
-                user_id: d.user_id,
-                action: "ai_auto_fill",
-                details: `IA : champs remplis automatiquement depuis notes vocales — ${updatedFields.join(", ")}`,
-              });
-            }
-          }
-        } catch (e) {
-          console.error("Error processing tool call:", e);
+      for (const [key, value] of Object.entries(args)) {
+        if (value !== null && value !== undefined && value !== "" && emptyFields.includes(key)) {
+          updatePayload[key] = value;
+          updatedFields.push(fieldLabels[key] || key);
         }
       }
+
+      if (Object.keys(updatePayload).length > 0) {
+        console.log("Auto-updating dossier fields:", Object.keys(updatePayload));
+        const { error: updateError } = await supabase
+          .from("dossiers").update(updatePayload).eq("id", dossier_id);
+
+        if (updateError) {
+          console.error("Error updating dossier:", updateError);
+        } else {
+          await supabase.from("historique").insert({
+            dossier_id, user_id: d.user_id, action: "ai_auto_fill",
+            details: `IA : champs remplis automatiquement depuis notes vocales — ${updatedFields.join(", ")}`,
+          });
+        }
+      }
+      delete parsed.extracted_fields;
     }
 
-    // Add updated fields info to response
     parsed.auto_filled = updatedFields;
 
     return new Response(JSON.stringify(parsed), {
