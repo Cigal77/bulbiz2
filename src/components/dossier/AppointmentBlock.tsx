@@ -102,6 +102,7 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
   const [manualStart, setManualStart] = useState("09:00");
   const [manualEnd, setManualEnd] = useState("11:00");
   const [resending, setResending] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const hasValidContact = !!(dossier.client_email || dossier.client_phone);
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.none;
