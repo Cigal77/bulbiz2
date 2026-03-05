@@ -52,7 +52,9 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
           dossier.client_last_name ? normalize(dossier.client_last_name) : null,
           dossier.client_first_name ? normalize(dossier.client_first_name) : null,
         ].filter(Boolean);
-        setInvoiceNumber(parts.join("-"));
+        if (parts.length > 1) {
+          setInvoiceNumber(parts.join("-"));
+        }
       }
     })();
   }, [open, dossierId]);
