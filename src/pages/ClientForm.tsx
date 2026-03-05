@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,8 @@ export default function ClientForm() {
   const alreadySelected = dossier?.appointment_slots?.find((s) => s.selected_at);
 
   const [prefilled, setPrefilled] = useState<Set<string>>(new Set());
+  const galleryRef = React.useRef<HTMLInputElement>(null);
+  const camcorderRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!token) {
@@ -1014,9 +1016,9 @@ export default function ClientForm() {
                     ref={camcorderRef}
                     type="file"
                     accept="video/*"
-                    capture="camcorder"
-                    className="hidden"
-                    onChange={handleFileAdd}
+                capture="environment"
+                className="hidden"
+                onChange={handleFileAdd}
                   />
 
                   <div className="flex flex-col gap-2">

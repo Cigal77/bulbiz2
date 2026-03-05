@@ -20,6 +20,7 @@ import QuoteValidation from "./pages/QuoteValidation";
 import InvoiceEditor from "./pages/InvoiceEditor";
 import InvoiceView from "./pages/InvoiceView";
 import NotFound from "./pages/NotFound";
+import PublicClientForm from "./pages/PublicClientForm";
 import ResetPassword from "./pages/ResetPassword";
 import CGU from "./pages/CGU";
 import MentionsLegales from "./pages/MentionsLegales";
@@ -130,6 +131,7 @@ const App = () => (
               <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />
               <Route path="/dpa" element={<DPA />} />
               <Route path="/cookies" element={<Cookies />} />
+              <Route path="/:slug" element={<PublicClientForm />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             <MobileBottomNav />
