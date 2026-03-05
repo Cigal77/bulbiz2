@@ -8,13 +8,61 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function toMimeType(fileType: string): string {
+function toAudioMime(fileType: string): string {
   if (fileType.includes("webm")) return "audio/webm";
   if (fileType.includes("mp4") || fileType.includes("m4a")) return "audio/mp4";
   if (fileType.includes("ogg")) return "audio/ogg";
   if (fileType.includes("wav")) return "audio/wav";
   if (fileType.includes("mp3") || fileType.includes("mpeg")) return "audio/mpeg";
   return fileType.startsWith("audio/") ? fileType : "audio/webm";
+}
+
+function toImageMime(fileType: string): string {
+  if (fileType.includes("jpeg") || fileType.includes("jpg")) return "image/jpeg";
+  if (fileType.includes("png")) return "image/png";
+  if (fileType.includes("webp")) return "image/webp";
+  if (fileType.includes("gif")) return "image/gif";
+  if (fileType.includes("heic")) return "image/heic";
+  return fileType.startsWith("image/") ? fileType : "image/jpeg";
+}
+
+function toVideoMime(fileType: string): string {
+  if (fileType.includes("mp4")) return "video/mp4";
+  if (fileType.includes("webm")) return "video/webm";
+  if (fileType.includes("3gp")) return "video/3gpp";
+  return fileType.startsWith("video/") ? fileType : "video/mp4";
+}
+
+interface MediaRecord {
+  file_url: string;
+  file_type: string;
+  file_name: string;
+  created_at: string;
+  media_category: string;
+}
+
+async function downloadMediaAsBase64(
+  media: MediaRecord,
+  supabaseUrl: string,
+  maxSizeMB: number
+): Promise<{ base64: string; mimeType: string; name: string; date: string } | null> {
+  try {
+    const url = media.file_url.startsWith("http")
+      ? media.file_url
+      : `${supabaseUrl}/storage/v1/object/public/dossier-medias/${media.file_url}`;
+
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+
+    const blob = await resp.arrayBuffer();
+    if (blob.byteLength > maxSizeMB * 1024 * 1024) return null;
+
+    const base64 = base64Encode(new Uint8Array(blob));
+    return { base64, mimeType: media.file_type, name: media.file_name, date: media.created_at };
+  } catch (e) {
+    console.error(`Error downloading ${media.file_name}:`, e);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -32,58 +80,80 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader ?? "" } } }
     );
 
-    // Fetch all data in parallel
-    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, mediasRes] = await Promise.all([
+    // Fetch all data in parallel — now also fetch images and videos
+    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, videoMediasRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at").eq("dossier_id", dossier_id),
       supabase.from("invoices").select("invoice_number, status, total_ttc, sent_at, paid_at").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
-        .eq("dossier_id", dossier_id)
-        .like("file_type", "audio/%")
-        .order("created_at", { ascending: false })
-        .limit(5),
+        .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
+      supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
+        .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(5),
+      supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
+        .eq("dossier_id", dossier_id).like("file_type", "video/%").order("created_at", { ascending: false }).limit(2),
     ]);
 
     if (dossierRes.error) throw dossierRes.error;
     const d = dossierRes.data;
 
-    // Download audio files as base64
-    const audioMedias = mediasRes.data || [];
-    const audioContentParts: Array<{ type: string; image_url?: { url: string }; text?: string }> = [];
+    // Download all media types in parallel
+    const audioMedias = audioMediasRes.data || [];
+    const imageMedias = imageMediasRes.data || [];
+    const videoMedias = videoMediasRes.data || [];
 
-    if (audioMedias.length > 0) {
-      const downloads = audioMedias.slice(0, 3).map(async (media) => {
-        try {
-          const audioUrl = media.file_url.startsWith("http")
-            ? media.file_url
-            : `${supabaseUrl}/storage/v1/object/public/dossier-medias/${media.file_url}`;
+    const [audioResults, imageResults, videoResults] = await Promise.all([
+      Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
+      Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
+      Promise.all(videoMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 10))),
+    ]);
 
-          const resp = await fetch(audioUrl);
-          if (!resp.ok) return null;
+    // Build multimodal content parts
+    const mediaParts: Array<{ type: string; image_url?: { url: string }; text?: string }> = [];
 
-          const blob = await resp.arrayBuffer();
-          if (blob.byteLength > 5 * 1024 * 1024) return null;
-
-          const base64 = base64Encode(new Uint8Array(blob));
-          return { name: media.file_name, date: media.created_at, base64, mimeType: toMimeType(media.file_type) };
-        } catch (e) {
-          console.error(`Error downloading audio ${media.file_name}:`, e);
-          return null;
-        }
-      });
-
-      const results = await Promise.all(downloads);
-      for (const result of results) {
-        if (result) {
-          audioContentParts.push({ type: "text", text: `[Note vocale "${result.name}" du ${result.date.slice(0, 16)}] :` });
-          audioContentParts.push({ type: "image_url", image_url: { url: `data:${result.mimeType};base64,${result.base64}` } });
-        }
+    // Images
+    const validImages = imageResults.filter(Boolean);
+    if (validImages.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n📷 PHOTOS DU DOSSIER (${validImages.length}) — Analyse visuellement chaque photo pour identifier le problème, l'état des installations, les dégâts visibles, le type d'équipement :` });
+      for (const img of validImages) {
+        if (!img) continue;
+        const mime = toImageMime(img.mimeType);
+        mediaParts.push({ type: "text", text: `[Photo "${img.name}" du ${img.date.slice(0, 16)}] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${img.base64}` } });
       }
     }
 
-    // Build empty fields list — only extract what's missing
+    // Videos
+    const validVideos = videoResults.filter(Boolean);
+    if (validVideos.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DU DOSSIER (${validVideos.length}) — Analyse le contenu visuel et audio de chaque vidéo pour comprendre le problème :` });
+      for (const vid of validVideos) {
+        if (!vid) continue;
+        const mime = toVideoMime(vid.mimeType);
+        mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
+      }
+    }
+
+    // Audio
+    const validAudios = audioResults.filter(Boolean);
+    if (validAudios.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n🎙️ NOTES VOCALES (${validAudios.length}) — Écoute et intègre le contenu dans le résumé :` });
+      for (const audio of validAudios) {
+        if (!audio) continue;
+        const mime = toAudioMime(audio.mimeType);
+        mediaParts.push({ type: "text", text: `[Note vocale "${audio.name}" du ${audio.date.slice(0, 16)}] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${audio.base64}` } });
+      }
+    }
+
+    const hasMedia = mediaParts.length > 0;
+    const hasAudio = validAudios.length > 0;
+    const hasImages = validImages.length > 0;
+    const hasVideos = validVideos.length > 0;
+
+    // Build empty fields list
     const emptyFields: string[] = [];
     if (!d.address) emptyFields.push("address");
     if (!d.address_line) emptyFields.push("address_line");
@@ -99,8 +169,7 @@ serve(async (req) => {
     if (!d.access_code) emptyFields.push("access_code");
     if (!d.availability) emptyFields.push("availability");
 
-    const hasAudio = audioContentParts.length > 0;
-    const hasEmptyFields = emptyFields.length > 0 && hasAudio;
+    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasVideos);
 
     // Build text context
     const context = `
@@ -129,27 +198,43 @@ ${(slotsRes.data || []).map(s => `- ${s.slot_date} ${s.time_start.slice(0, 5)}-$
 HISTORIQUE RÉCENT:
 ${(histRes.data || []).map(h => `- ${h.action}: ${h.details || ""} (${h.created_at.slice(0, 16)})`).join("\n") || "Aucun"}
 
-${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES NOTES VOCALES: ${emptyFields.join(", ")}` : ""}
+${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.join(", ")}` : ""}
 `.trim();
 
-    const userContent: any = hasAudio
-      ? [
-          { type: "text", text: context },
-          { type: "text", text: "\n\nNOTES VOCALES DE L'ARTISAN (écoute et intègre le contenu dans le résumé + extrais les informations manquantes) :" },
-          ...audioContentParts,
-        ]
+    const userContent: any = hasMedia
+      ? [{ type: "text", text: context }, ...mediaParts]
       : context;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Build JSON format instruction — include extracted_fields only when needed
+    // Build extraction schema
     const extractionSchema = hasEmptyFields ? `
   "extracted_fields": {
-    // Uniquement les champs trouvés dans les notes vocales parmi: ${emptyFields.join(", ")}
+    // Uniquement les champs trouvés dans les médias parmi: ${emptyFields.join(", ")}
     // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
     // Clés possibles: address, address_line, postal_code, city, client_phone, client_email, client_first_name, client_last_name, description, housing_type, floor_number (integer), access_code, availability
   }` : "";
+
+    // Build media analysis instructions
+    const mediaInstructions: string[] = [];
+    if (hasImages) {
+      mediaInstructions.push(`- Des PHOTOS sont jointes. ANALYSE-LES visuellement pour identifier :
+  * Le type de problème visible (fuite, casse, usure, corrosion, moisissure...)
+  * Le type et la marque d'équipement si visible (robinet, chauffe-eau, WC, tuyauterie...)
+  * L'état général de l'installation
+  * Les dégâts visibles et leur gravité estimée
+  * Tout détail utile pour préparer l'intervention (accès, espace de travail...)`);
+    }
+    if (hasVideos) {
+      mediaInstructions.push(`- Des VIDÉOS sont jointes. ANALYSE l'image ET le son pour comprendre :
+  * Le problème montré (bruit de fuite, écoulement, dysfonctionnement...)
+  * Les explications verbales du client ou de l'artisan dans la vidéo
+  * Les détails visuels du problème en mouvement`);
+    }
+    if (hasAudio) {
+      mediaInstructions.push(`- Des NOTES VOCALES sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets`);
+    }
 
     const systemPrompt = `Tu es l'assistant IA d'un plombier artisan. Tu dois générer un résumé intelligent et actionnable d'un dossier client.
 
@@ -162,17 +247,19 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) avec ce f
 
 Règles:
 - headline: max 15 mots, situation actuelle
-- bullets: 3 à 5 points clés (max 20 mots chacun)
-- next_action: action concrète pour l'artisan (jamais "écouter la note vocale")
+- bullets: 3 à 6 points clés (max 20 mots chacun)
+- next_action: action concrète pour l'artisan (jamais "écouter la note vocale" ou "regarder la photo")
 - Sois concis, utile, orienté action
 - IGNORE les erreurs techniques dans l'historique
 - Ne répète pas les labels bruts, reformule intelligemment
 - Les next_action doivent être des actions concrètes (ex: "Appeler le client", "Planifier l'intervention")
-${hasAudio ? `- Des notes vocales sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets` : ""}
-${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uniquement ce qui est EXPLICITEMENT dit dans les notes vocales
-- Pour description: résumé structuré du problème/diagnostic/travaux
+${mediaInstructions.join("\n")}
+${hasMedia ? `- Intègre les observations des médias dans les bullets (ex: "Fuite visible sous l'évier — corrosion avancée du siphon")` : ""}
+${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uniquement ce qui est EXPLICITEMENT visible ou dit dans les médias
+- Pour description: résumé structuré du problème/diagnostic/travaux basé sur TOUS les médias
 - Pour l'adresse: décompose en address (complète), address_line (rue), postal_code, city
-- Pour le téléphone: format français` : ""}`;
+- Pour le téléphone: format français
+- Pour housing_type: déduis du contexte visuel si possible (appartement, maison, etc.)` : ""}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -181,7 +268,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
@@ -245,9 +332,10 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
+          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
-            details: `IA : champs remplis automatiquement depuis notes vocales — ${updatedFields.join(", ")}`,
+            details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
           });
         }
       }
@@ -255,6 +343,11 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
     }
 
     parsed.auto_filled = updatedFields;
+    parsed.media_analyzed = {
+      images: validImages.length,
+      videos: validVideos.length,
+      audio: validAudios.length,
+    };
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
