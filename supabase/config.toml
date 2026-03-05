@@ -56,3 +56,9 @@ verify_jwt = false
 
 [functions.upload-client-media]
 verify_jwt = false
+
+[functions.submit-public-form]
+verify_jwt = false
+
+[functions.check-slot-availability]
+verify_jwt = false
