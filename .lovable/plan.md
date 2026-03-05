@@ -1,79 +1,35 @@
 
-# Audit et corrections des automatisations email/notifications
 
-## Problemes identifies
+## Supprimer toute l'intégration SMS/Twilio
 
-### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
-**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
-- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
-- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
+### Fichiers edge functions à modifier (supprimer les blocs SMS)
 
-### 2. Bug `send-invoice` : authentification inconsistante
-**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
-- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
+**6 edge functions** contiennent du code SMS Twilio à retirer :
 
-### 3. Bug `send-appointment-notification` : authentification inconsistante
-**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
-- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
+1. **`supabase/functions/validate-quote/index.ts`** — Supprimer la fonction `sendSms()`, supprimer le bloc "SMS notification to artisan" (~lignes 206-222)
 
-### 4. Notification artisan manquante sur confirmation RDV
-**Fichier** : `supabase/functions/submit-client-form/index.ts`
-- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
-- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
+2. **`supabase/functions/send-client-link/index.ts`** — Supprimer `sendSms()`, `normalizePhone()`, `isValidPhone()`, et le bloc d'envoi SMS
 
-### 5. Notification artisan manquante sur selection de creneau (multi-slots)
-- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
+3. **`supabase/functions/send-relance/index.ts`** — Supprimer `sendSms()`, la variable `smsBody`, le bloc "Send SMS" (~lignes 230-248)
 
-### 6. Lien dossier hardcode dans `submit-client-form`
-**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
-- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
+4. **`supabase/functions/send-quote/index.ts`** — Supprimer `sendSms()` et le bloc SMS
 
-### 7. Email facture sans signature personnalisee
-**Fichier** : `supabase/functions/send-invoice/index.ts`
-- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
+5. **`supabase/functions/send-invoice/index.ts`** — Supprimer `sendSms()` et le bloc SMS
 
-### 8. Email facture sans numero de facture dans le sujet
-- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+6. **`supabase/functions/send-appointment-notification/index.ts`** — Supprimer `sendSms()`, `getSmsTemplate()`, le bloc SMS, simplifier `NotifResult` (retirer `sms_status`)
 
----
+7. **`supabase/functions/check-relances/index.ts`** — Supprimer `sendSms()` et les blocs SMS
 
-## Plan de corrections
+8. **`supabase/functions/submit-client-form/index.ts`** — Supprimer `sendSms()`, `normalizePhone()` et les appels SMS
 
-### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
-- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-- Ajouter la signature personnalisee
-- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+### Edge function à supprimer
 
-### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+9. **`supabase/functions/test-sms/index.ts`** — Supprimer entièrement + retirer `[functions.test-sms]` de `supabase/config.toml`
 
-### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
-- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
-- Remplacer le lien hardcode par `app.bulbiz.io`
-- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
+### Frontend
 
----
+10. **`src/pages/Settings.tsx`** — Supprimer la carte SMS (lignes 255-273), retirer `sms_enabled` du formulaire et du submit
 
-## Details techniques
+### Pas de migration DB nécessaire
+La colonne `sms_enabled` sur `profiles` peut rester sans impact — elle sera simplement ignorée.
 
-### `send-invoice/index.ts` - Changements
-```text
-Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
-Ligne 170-218 : Remonter artisanName + signature au bon scope
-Ligne 181      : Ajouter signature personnalisee dans l'email
-Ligne 218      : Fixer la reference artisanName dans le SMS
-Sujet email    : Ajouter numero facture
-```
-
-### `send-appointment-notification/index.ts` - Changements
-```text
-Lignes 210-217 : Remplacer auth getUser() par decodage JWT
-```
-
-### `submit-client-form/index.ts` - Changements
-```text
-Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
-Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
-Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
-```
