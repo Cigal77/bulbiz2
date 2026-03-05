@@ -195,19 +195,34 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount }: SummaryBl
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
-              <ul className="space-y-1.5">
+              <ul className="space-y-1">
                 {localItems.map((item, i) => (
                   <li
                     key={i}
-                    className={`flex items-center gap-2 text-sm group transition-opacity ${checkedItems.has(i) ? "opacity-50" : ""}`}
+                    className={`flex items-center group transition-opacity duration-150 ${checkedItems.has(i) ? "opacity-50" : ""}`}
                   >
-                    <Checkbox
-                      checked={checkedItems.has(i)}
-                      className="mt-0 h-3.5 w-3.5 shrink-0"
-                      onCheckedChange={() => toggleItem(i)}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleItem(i)}
+                      className="flex items-center justify-center shrink-0 w-10 h-10 -ml-2 mr-1 cursor-pointer"
+                      aria-label={checkedItems.has(i) ? "Décocher" : "Cocher"}
+                    >
+                      <span
+                        className={`flex items-center justify-center w-[22px] h-[22px] rounded-full border-2 transition-all duration-150 ease-in-out ${
+                          checkedItems.has(i)
+                            ? "border-primary bg-primary"
+                            : "border-primary/60 bg-transparent"
+                        }`}
+                      >
+                        {checkedItems.has(i) && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-primary-foreground">
+                            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                    </button>
                     <div
-                      className={`flex-1 min-w-0 cursor-pointer ${checkedItems.has(i) ? "line-through" : ""}`}
+                      className={`flex-1 min-w-0 cursor-pointer text-sm leading-snug py-1 ${checkedItems.has(i) ? "line-through" : ""}`}
                       onClick={() => toggleItem(i)}
                     >
                       <span className="text-foreground/90">
@@ -220,7 +235,7 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount }: SummaryBl
                     </div>
                     <button
                       onClick={() => removeItem(i)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0 p-1"
                       title="Supprimer"
                     >
                       <X className="h-3.5 w-3.5" />
