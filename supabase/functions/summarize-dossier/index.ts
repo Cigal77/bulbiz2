@@ -86,7 +86,6 @@ serve(async (req) => {
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
       supabase.from("invoices").select("invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes").eq("dossier_id", dossier_id),
-      supabase.from("invoice_lines").select("label, qty, unit, unit_price, tva_rate, invoice_id").in("invoice_id", []),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
