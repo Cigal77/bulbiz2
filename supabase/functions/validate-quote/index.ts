@@ -6,37 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) {
-    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
-    return { success: false, error: "SMS provider not configured" };
-  }
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("Twilio error:", err);
-      return { success: false, error: `Twilio ${resp.status}` };
-    }
-    await resp.json();
-    return { success: true };
-  } catch (e) {
-    console.error("SMS error:", e);
-    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -106,8 +75,6 @@ Deno.serve(async (req) => {
         })
         .eq("id", quote.id);
 
-      // New flow: RDV → Intervention → Devis → Facture
-      // When quote is validated, transition to devis_signe (RDV is already done)
       await supabase
         .from("dossiers")
         .update({
@@ -158,11 +125,10 @@ Deno.serve(async (req) => {
       if (resendKey) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("email, first_name, last_name, company_name, phone, sms_enabled")
+          .select("email, first_name, last_name, company_name, phone")
           .eq("user_id", dossier.user_id)
           .maybeSingle();
 
-        // Fallback: use auth user email if profile email is not set
         let artisanEmail = profile?.email;
         if (!artisanEmail) {
           const { data: authUser } = await supabase.auth.admin.getUserById(dossier.user_id);
@@ -202,31 +168,10 @@ Deno.serve(async (req) => {
             html: body,
           });
         }
-
-        // SMS notification to artisan
-        if (profile?.phone && profile?.sms_enabled !== false) {
-          const cleaned = profile.phone.replace(/[\s\-().]/g, "");
-          if (/^\+?\d{10,15}$/.test(cleaned)) {
-            let phone = cleaned;
-            if (phone.startsWith("0") && phone.length === 10) phone = "+33" + phone.slice(1);
-            if (!phone.startsWith("+")) phone = "+" + phone;
-
-            const clientName =
-              [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Le client";
-            const isAccepted = action === "accept";
-            const smsBody = isAccepted
-              ? `${clientName} a validé le devis ${quote.quote_number}. RDV à fixer. — Bulbiz`
-              : `${clientName} a refusé le devis ${quote.quote_number}.${reason ? ` Motif : ${reason}` : ""} — Bulbiz`;
-            await sendSms(phone, smsBody);
-          }
-        }
       }
     } catch (emailErr) {
       console.error("Failed to send artisan notification email:", emailErr);
     }
-
-    // NOTE: Client confirmation SMS ("Pour fixer le RDV") removed —
-    // the artisan will propose slots or fix the RDV, triggering notifications at that point.
 
     return new Response(JSON.stringify({ success: true, action }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
