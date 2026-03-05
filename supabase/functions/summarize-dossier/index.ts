@@ -301,20 +301,41 @@ serve(async (req) => {
     const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
     // Build empty fields list for auto-fill
+    // IMPORTANT: If the dossier was created by the client (lien_client, public_link),
+    // protect ALL client-provided fields — never let AI overwrite what the client typed
+    const isClientSource = d.source === "lien_client" || d.source === "public_link";
+    const clientProtectedFields = [
+      "client_first_name", "client_last_name", "client_phone", "client_email",
+      "address", "address_line", "postal_code", "city", "description",
+      "housing_type", "floor_number", "access_code", "availability",
+    ];
+
     const emptyFields: string[] = [];
-    if (!d.address) emptyFields.push("address");
-    if (!d.address_line) emptyFields.push("address_line");
-    if (!d.postal_code) emptyFields.push("postal_code");
-    if (!d.city) emptyFields.push("city");
-    if (!d.client_phone || d.client_phone === "00000") emptyFields.push("client_phone");
-    if (!d.client_email) emptyFields.push("client_email");
-    if (!d.client_first_name) emptyFields.push("client_first_name");
-    if (!d.client_last_name) emptyFields.push("client_last_name");
-    if (!d.description) emptyFields.push("description");
-    if (!d.housing_type) emptyFields.push("housing_type");
-    if (!d.floor_number && d.floor_number !== 0) emptyFields.push("floor_number");
-    if (!d.access_code) emptyFields.push("access_code");
-    if (!d.availability) emptyFields.push("availability");
+    const fieldChecks: Record<string, boolean> = {
+      address: !d.address,
+      address_line: !d.address_line,
+      postal_code: !d.postal_code,
+      city: !d.city,
+      client_phone: !d.client_phone || d.client_phone === "00000",
+      client_email: !d.client_email,
+      client_first_name: !d.client_first_name,
+      client_last_name: !d.client_last_name,
+      description: !d.description,
+      housing_type: !d.housing_type,
+      floor_number: !d.floor_number && d.floor_number !== 0,
+      access_code: !d.access_code,
+      availability: !d.availability,
+    };
+
+    for (const [field, isEmpty] of Object.entries(fieldChecks)) {
+      if (!isEmpty) continue; // field already has a value, skip
+      // If source is client form, only allow AI to fill fields the client clearly left blank
+      // AND that are not "contact identity" fields (name, phone, email) — client chose not to provide them
+      if (isClientSource && ["client_phone", "client_email", "client_first_name", "client_last_name"].includes(field)) {
+        continue; // Don't let AI guess contact info the client didn't provide
+      }
+      emptyFields.push(field);
+    }
 
     const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes || hasQuoteContent || hasInvoiceContent);
 
