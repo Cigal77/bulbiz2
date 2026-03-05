@@ -32,7 +32,7 @@ export function FloatingVoiceButton({ dossierId }: FloatingVoiceButtonProps) {
           "h-12 w-12 rounded-full",
           "bg-primary text-primary-foreground shadow-lg",
           "hover:bg-primary/90 active:scale-95 transition-all",
-          "bottom-20 right-4 md:bottom-6 md:right-6"
+          "bottom-20 left-4 md:bottom-6 md:right-6 md:left-auto"
         )}
         aria-label="Note vocale"
       >
