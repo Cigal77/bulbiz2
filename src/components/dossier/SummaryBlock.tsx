@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
 import { generateStructuredSummary } from "@/lib/summary";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, Video } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, Video, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,7 +15,7 @@ interface AiSummary {
   bullets: string[];
   next_action: string;
   auto_filled?: string[];
-  media_analyzed?: { images: number; videos: number; audio: number };
+  media_analyzed?: { images: number; videos: number; audio: number; quotes?: number };
 }
 
 export function SummaryBlock({ dossier }: SummaryBlockProps) {
@@ -59,7 +59,7 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
   const mediaInfo = aiSummary?.media_analyzed;
-  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.videos > 0 || mediaInfo.audio > 0);
+  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.videos > 0 || mediaInfo.audio > 0 || (mediaInfo.quotes ?? 0) > 0);
 
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
@@ -141,6 +141,11 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
               {mediaInfo!.audio > 0 && (
                 <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
                   <Mic className="h-3 w-3" /> {mediaInfo!.audio} vocal{mediaInfo!.audio > 1 ? "es" : "e"}
+                </span>
+              )}
+              {(mediaInfo!.quotes ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <FileText className="h-3 w-3" /> {mediaInfo!.quotes} devis
                 </span>
               )}
             </div>
