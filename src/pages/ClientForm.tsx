@@ -307,7 +307,7 @@ export default function ClientForm() {
           }
           const data = await res.json();
           mediaUrls.push({ url: data.url, name: data.name, type: data.type, size: data.size });
-          setUploadProgress(Math.round(((i + 1) / processedFiles.length) * 100));
+          setUploadProgress(Math.round(((i + 1) / files.length) * 100));
         }
       }
 

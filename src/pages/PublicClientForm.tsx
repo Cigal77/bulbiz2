@@ -212,7 +212,7 @@ export default function PublicClientForm() {
           });
           const result = await resp.json();
           if (result.url) mediaUrls.push(result.url);
-          setUploadProgress(10 + ((i + 1) / processedFiles.length) * 50);
+          setUploadProgress(10 + ((i + 1) / files.length) * 50);
         }
       }
 
