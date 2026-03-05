@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { slug, data, media_urls, rgpd_consent } = await req.json();
+    const { slug, data, media_urls, rgpd_consent, proposed_slots } = await req.json();
 
     if (!slug || !data) {
       return new Response(JSON.stringify({ error: "Missing slug or data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -161,6 +161,37 @@ Deno.serve(async (req) => {
       await supabase.from("medias").insert(mediaInserts);
     }
 
+    // Insert proposed appointment slots
+    let slotsHtml = "";
+    if (proposed_slots?.length) {
+      const slotInserts = proposed_slots.map((s: { date: string; time_start: string; time_end: string }) => ({
+        dossier_id: dossierId,
+        slot_date: s.date,
+        time_start: s.time_start,
+        time_end: s.time_end,
+      }));
+      await supabase.from("appointment_slots").insert(slotInserts);
+
+      // Set appointment_status to slots_proposed
+      await supabase.from("dossiers").update({
+        appointment_status: "slots_proposed",
+      }).eq("id", dossierId);
+
+      // Build HTML for email
+      const dateFormatter = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+      slotsHtml = proposed_slots.map((s: any) => {
+        const d = new Date(s.date + "T00:00:00");
+        const dateStr = dateFormatter.format(d);
+        return `<li style="padding:4px 0;">${dateStr} à ${s.time_start.slice(0, 5)}</li>`;
+      }).join("");
+
+      await supabase.from("historique").insert({
+        dossier_id: dossierId,
+        action: "Créneaux proposés par le client",
+        details: `${proposed_slots.length} créneau(x) proposé(s) via lien public`,
+      });
+    }
+
     // Log historique
     await supabase.from("historique").insert({
       dossier_id: dossierId,
@@ -171,8 +202,10 @@ Deno.serve(async (req) => {
     // Auto-advance status if we have enough info
     const hasContact = data.client_email || data.client_phone;
     const hasDescription = data.description?.trim();
-    if (hasContact && hasDescription) {
+    if (hasContact && hasDescription && !proposed_slots?.length) {
       await supabase.from("dossiers").update({ status: "devis_a_faire", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
+    } else if (proposed_slots?.length) {
+      await supabase.from("dossiers").update({ status: "en_attente_rdv", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
     }
 
     // ── Send emails ──
@@ -183,7 +216,7 @@ Deno.serve(async (req) => {
     // Email to artisan
     const artisanEmailHtml = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
-        <h2 style="color:#1a1a1a;">🔔 Nouvelle demande client</h2>
+        <h2 style="color:#1a1a1a;">🔔 Nouvelle demande client${slotsHtml ? " avec créneaux proposés" : ""}</h2>
         <p>Un nouveau dossier a été créé via votre lien public.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
           <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Client</td><td style="padding:8px;border-bottom:1px solid #eee;">${clientName}</td></tr>
@@ -193,15 +226,25 @@ Deno.serve(async (req) => {
           ${data.description ? `<tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Description</td><td style="padding:8px;border-bottom:1px solid #eee;">${data.description}</td></tr>` : ""}
           ${media_urls?.length ? `<tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Médias</td><td style="padding:8px;border-bottom:1px solid #eee;">${media_urls.length} fichier(s)</td></tr>` : ""}
         </table>
+        ${slotsHtml ? `
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin:16px 0;">
+          <h3 style="color:#0369a1;margin:0 0 8px;">📅 Créneaux proposés par le client</h3>
+          <ul style="list-style:none;padding:0;margin:0;">${slotsHtml}</ul>
+        </div>
+        ` : ""}
         <a href="${origin}/dossier/${dossierId}" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir le dossier</a>
       </div>
     `;
+
+    const artisanSubject = slotsHtml
+      ? `Nouvelle demande avec créneaux : ${clientName}`
+      : `Nouvelle demande : ${clientName}`;
 
     // Send to artisan via Gmail or Resend
     if (profile.email) {
       const gmailConn = await getGmailConnection(supabase, userId);
       if (gmailConn) {
-        await sendViaGmail(gmailConn.access_token, gmailConn.gmail_address, profile.email, `Nouvelle demande : ${clientName}`, artisanEmailHtml);
+        await sendViaGmail(gmailConn.access_token, gmailConn.gmail_address, profile.email, artisanSubject, artisanEmailHtml);
       } else {
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (resendKey) {
@@ -209,7 +252,7 @@ Deno.serve(async (req) => {
           await resend.emails.send({
             from: "Bulbiz <notifications@bulbiz.io>",
             to: profile.email,
-            subject: `Nouvelle demande : ${clientName}`,
+            subject: artisanSubject,
             html: artisanEmailHtml,
           });
         }
