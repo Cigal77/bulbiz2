@@ -22,7 +22,7 @@ const LABEL_MAP = {
 };
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
 const MAX_PLAN_SIZE = 20 * 1024 * 1024; // 20 MB
 
 function getMaxSize(file: File, mode: string) {
