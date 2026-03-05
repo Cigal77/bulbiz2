@@ -6,6 +6,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+async function refreshAccessToken(refreshToken: string, clientId: string, clientSecret: string) {
+  const resp = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: "refresh_token",
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error_description || "Token refresh failed");
+  return data;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,7 +39,6 @@ Deno.serve(async (req: Request) => {
 
     const { action, code, redirect_uri, state } = await req.json();
 
-    // For authorize and status/disconnect, we need the user
     const authHeader = req.headers.get("Authorization");
 
     if (action === "authorize") {
@@ -87,13 +102,30 @@ Deno.serve(async (req: Request) => {
         throw new Error(tokenData.error_description || "Token exchange failed");
       }
 
+      // FIX: If Google didn't return a new refresh_token (already authorized before),
+      // keep the existing one from the database
+      if (!tokenData.refresh_token) {
+        const { data: existing } = await supabase
+          .from("gmail_connections")
+          .select("refresh_token")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (existing?.refresh_token) {
+          tokenData.refresh_token = existing.refresh_token;
+          console.log("Reusing existing refresh_token for user", user.id);
+        } else {
+          // No refresh_token at all — force re-consent next time
+          console.warn("No refresh_token available for user", user.id);
+        }
+      }
+
       // Get user email from Google
       const userinfoResp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const userinfo = await userinfoResp.json();
 
-      // Basic validation
       if (!userinfo.email) {
         throw new Error("Impossible de récupérer l'email du compte Google.");
       }
@@ -132,14 +164,51 @@ Deno.serve(async (req: Request) => {
     if (action === "status") {
       const { data: connection } = await supabase
         .from("gmail_connections")
-        .select("gmail_address, token_expires_at")
+        .select("gmail_address, token_expires_at, refresh_token")
         .eq("user_id", user.id)
         .maybeSingle();
 
+      if (!connection) {
+        return new Response(JSON.stringify({ connected: false, gmail_address: null }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // FIX: Auto-refresh token if expired (like google-calendar does)
+      if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
+        if (connection.refresh_token) {
+          try {
+            const newTokens = await refreshAccessToken(connection.refresh_token, googleClientId, googleClientSecret);
+            const newExpiry = new Date(Date.now() + (newTokens.expires_in || 3600) * 1000).toISOString();
+            await supabase
+              .from("gmail_connections")
+              .update({ access_token: newTokens.access_token, token_expires_at: newExpiry })
+              .eq("user_id", user.id);
+            console.log("Gmail token auto-refreshed for user", user.id);
+          } catch (refreshErr) {
+            console.error("Gmail token refresh failed:", refreshErr);
+            // Token refresh failed → treat as disconnected so user re-authenticates
+            return new Response(
+              JSON.stringify({
+                connected: false,
+                gmail_address: null,
+                error: "Token expired and refresh failed. Please reconnect.",
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+        } else {
+          // Expired and no refresh token → force reconnect
+          return new Response(JSON.stringify({ connected: false, gmail_address: null, needs_reconnect: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       return new Response(
         JSON.stringify({
-          connected: !!connection,
-          gmail_address: connection?.gmail_address || null,
+          connected: true,
+          gmail_address: connection.gmail_address,
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
