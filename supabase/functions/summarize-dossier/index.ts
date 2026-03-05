@@ -429,7 +429,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: hasVideos ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
