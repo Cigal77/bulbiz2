@@ -190,7 +190,16 @@ export function ImportFactureDialog({ open, onClose, dossierId, clientEmail }: I
       resetForm();
       onClose();
     } catch (err: any) {
-      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+      const msg = err.message || "";
+      if (msg.includes("invoices_invoice_number_user_id_key") || msg.includes("duplicate key")) {
+        toast({
+          title: "Numéro de facture déjà utilisé",
+          description: `Le numéro "${invoiceNumber.trim() || "auto-généré"}" existe déjà. Modifiez-le ou laissez le champ vide pour en générer un automatiquement.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Erreur", description: msg, variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }
