@@ -83,15 +83,20 @@ ${publicUrl}`;
     setTimeout(() => setCopiedMessage(false), 2000);
   }
 
-  function handleShare() {
-    if (navigator.share) {
-      navigator.share({
-        title: "Envoyez-moi vos photos et infos",
-        text: clientMessage,
-      }).catch(() => {});
-    } else {
-      handleCopyMessage();
-    }
+  function handleShareEmail() {
+    const subject = encodeURIComponent("Envoyez-moi vos photos et infos");
+    const body = encodeURIComponent(clientMessage);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  }
+
+  function handleShareSMS() {
+    const body = encodeURIComponent(clientMessage);
+    window.open(`sms:?body=${body}`, "_blank");
+  }
+
+  function handleShareWhatsApp() {
+    const text = encodeURIComponent(clientMessage);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   }
 
   return (
