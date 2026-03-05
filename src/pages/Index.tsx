@@ -120,19 +120,9 @@ export default function Dashboard() {
           .filter(d => d.status === "invoice_pending")
           .sort((a, b) => new Date(a.status_changed_at).getTime() - new Date(b.status_changed_at).getTime())
           .concat(list.filter(d => d.status !== "invoice_pending"));
-      case "chronological":
-        return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       case "recent":
       default:
-        return list.sort((a, b) => {
-          const isNewA = a.status === "nouveau" || a.status === "a_qualifier";
-          const isNewB = b.status === "nouveau" || b.status === "a_qualifier";
-          if (isNewA && !isNewB) return -1;
-          if (isNewB && !isNewA) return 1;
-          const urgDiff = URGENCY_ORDER[b.urgency] - URGENCY_ORDER[a.urgency];
-          if (urgDiff !== 0) return urgDiff;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
   };
 
