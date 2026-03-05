@@ -67,6 +67,7 @@ export const SOURCE_LABELS: Record<DossierSource, string> = {
   lien_client: "Lien client",
   manuel: "Manuel",
   email: "Email",
+  public_link: "Lien public",
 };
 
 export const CATEGORY_LABELS: Record<ProblemCategory, string> = {
