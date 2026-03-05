@@ -3,10 +3,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Share2, Link2, Loader2, MessageSquare, Mail, Phone } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Copy, Check, Share2, Link2, Loader2, MessageSquare, Mail, Phone, Pencil, RotateCcw } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
+
+const DEFAULT_MESSAGE_TEMPLATE = `Bonjour,
+
+Afin d'intervenir rapidement, merci de cliquer sur ce lien et de remplir les informations nécessaires.
+
+Si possible, vous pouvez également ajouter des photos ou une vidéo du problème (facultatif).
+
+Je regarderai votre demande et je vous recontacterai rapidement.`;
 
 function generateSlug(firstName: string, lastName: string): string {
   const raw = `${firstName} ${lastName}`
@@ -23,6 +32,9 @@ export function PublicLinkCard() {
   const [copied, setCopied] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState(DEFAULT_MESSAGE_TEMPLATE);
+  const [editingMessage, setEditingMessage] = useState(false);
+  const [savingMessage, setSavingMessage] = useState(false);
 
   useEffect(() => {
     if (profile?.public_client_slug) {
@@ -30,19 +42,13 @@ export function PublicLinkCard() {
     } else if (profile) {
       setSlug(generateSlug(profile.first_name || "", profile.last_name || ""));
     }
+    if (profile) {
+      setMessageTemplate((profile as any).client_message_template || DEFAULT_MESSAGE_TEMPLATE);
+    }
   }, [profile]);
 
   const publicUrl = `https://app.bulbiz.io/${slug}`;
-
-  const clientMessage = `Bonjour,
-
-Afin d'intervenir rapidement, merci de cliquer sur ce lien et de remplir les informations nécessaires.
-
-Si possible, vous pouvez également ajouter des photos ou une vidéo du problème (facultatif).
-
-Je regarderai votre demande et je vous recontacterai rapidement.
-
-${publicUrl}`;
+  const clientMessage = `${messageTemplate}\n\n${publicUrl}`;
 
   async function handleSave() {
     if (!slug.trim()) return;
@@ -67,6 +73,23 @@ ${publicUrl}`;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSaveMessage() {
+    setSavingMessage(true);
+    try {
+      await update.mutateAsync({ client_message_template: messageTemplate } as any);
+      setEditingMessage(false);
+      toast.success("Message sauvegardé");
+    } catch {
+      toast.error("Erreur lors de la sauvegarde du message");
+    } finally {
+      setSavingMessage(false);
+    }
+  }
+
+  function handleResetMessage() {
+    setMessageTemplate(DEFAULT_MESSAGE_TEMPLATE);
   }
 
   function handleCopy() {
@@ -98,6 +121,8 @@ ${publicUrl}`;
     const text = encodeURIComponent(clientMessage);
     window.open(`https://wa.me/?text=${text}`, "_blank");
   }
+
+  const hasMessageChanged = messageTemplate !== ((profile as any)?.client_message_template || DEFAULT_MESSAGE_TEMPLATE);
 
   return (
     <Card>
@@ -148,10 +173,53 @@ ${publicUrl}`;
 
             {/* Message prêt à envoyer */}
             <div className="space-y-2">
-              <Label>Message prêt à envoyer</Label>
-              <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-line text-foreground">
-                {clientMessage}
+              <div className="flex items-center justify-between">
+                <Label>Message prêt à envoyer</Label>
+                <div className="flex gap-1">
+                  {!editingMessage ? (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingMessage(true)} className="gap-1 h-7 text-xs">
+                      <Pencil className="h-3 w-3" />
+                      Modifier
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" size="sm" onClick={handleResetMessage} className="gap-1 h-7 text-xs text-muted-foreground">
+                      <RotateCcw className="h-3 w-3" />
+                      Par défaut
+                    </Button>
+                  )}
+                </div>
               </div>
+
+              {editingMessage ? (
+                <div className="space-y-2">
+                  <Textarea
+                    value={messageTemplate}
+                    onChange={(e) => setMessageTemplate(e.target.value)}
+                    rows={6}
+                    className="text-sm"
+                    placeholder="Votre message personnalisé…"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Votre lien Bulbiz sera automatiquement ajouté à la fin du message.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSaveMessage} disabled={savingMessage || !messageTemplate.trim()} className="gap-2">
+                      {savingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      {savingMessage ? "Sauvegarde..." : "Sauvegarder le message"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      setMessageTemplate((profile as any)?.client_message_template || DEFAULT_MESSAGE_TEMPLATE);
+                      setEditingMessage(false);
+                    }}>
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-line text-foreground">
+                  {clientMessage}
+                </div>
+              )}
             </div>
 
             {/* Boutons d'action */}

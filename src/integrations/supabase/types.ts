@@ -947,6 +947,7 @@ export type Database = {
           auto_relance_enabled: boolean
           auto_send_client_link: boolean
           client_link_validity_days: number
+          client_message_template: string | null
           company_name: string | null
           created_at: string
           default_validity_days: number | null
@@ -975,6 +976,7 @@ export type Database = {
           auto_relance_enabled?: boolean
           auto_send_client_link?: boolean
           client_link_validity_days?: number
+          client_message_template?: string | null
           company_name?: string | null
           created_at?: string
           default_validity_days?: number | null
@@ -1003,6 +1005,7 @@ export type Database = {
           auto_relance_enabled?: boolean
           auto_send_client_link?: boolean
           client_link_validity_days?: number
+          client_message_template?: string | null
           company_name?: string | null
           created_at?: string
           default_validity_days?: number | null
