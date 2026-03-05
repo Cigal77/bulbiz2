@@ -111,7 +111,7 @@ serve(async (req) => {
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(5),
-      supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
+      supabase.from("medias").select("file_url, file_type, file_name, file_size, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "video/%").order("created_at", { ascending: false }).limit(2),
     ]);
 
@@ -123,10 +123,15 @@ serve(async (req) => {
     const imageMedias = imageMediasRes.data || [];
     const videoMedias = videoMediasRes.data || [];
 
+    // Filter videos: only attempt download for videos <= 20MB to avoid OOM
+    const MAX_VIDEO_DOWNLOAD_MB = 20;
+    const downloadableVideos = videoMedias.filter((m: any) => !m.file_size || m.file_size <= MAX_VIDEO_DOWNLOAD_MB * 1024 * 1024);
+    const skippedVideos = videoMedias.filter((m: any) => m.file_size && m.file_size > MAX_VIDEO_DOWNLOAD_MB * 1024 * 1024);
+
     const [audioResults, imageResults, videoResults] = await Promise.all([
       Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 5))),
       Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 4))),
-      Promise.all(videoMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 100))),
+      Promise.all(downloadableVideos.map(m => downloadMediaAsBase64(m, supabaseUrl, MAX_VIDEO_DOWNLOAD_MB))),
     ]);
 
     // Build multimodal content parts
@@ -154,6 +159,12 @@ serve(async (req) => {
         mediaParts.push({ type: "text", text: `[Vidéo "${vid.name}" du ${vid.date.slice(0, 16)}] :` });
         mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${vid.base64}` } });
       }
+    }
+
+    // Mention skipped videos in text context so the AI knows they exist
+    if (skippedVideos.length > 0) {
+      const skippedInfo = skippedVideos.map((v: any) => `"${v.file_name}" (${Math.round(v.file_size / 1024 / 1024)} MB)`).join(", ");
+      mediaParts.push({ type: "text", text: `\n\n⚠️ VIDÉOS NON ANALYSÉES (trop volumineuses pour l'analyse IA) : ${skippedInfo}. Mentionne dans le résumé que des vidéos sont disponibles mais n'ont pas pu être analysées automatiquement.` });
     }
 
     // Audio
