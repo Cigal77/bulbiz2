@@ -959,6 +959,7 @@ export type Database = {
           logo_url: string | null
           payment_terms_default: string | null
           phone: string | null
+          public_client_slug: string | null
           relance_delay_devis_1: number
           relance_delay_devis_2: number
           relance_delay_info: number
@@ -986,6 +987,7 @@ export type Database = {
           logo_url?: string | null
           payment_terms_default?: string | null
           phone?: string | null
+          public_client_slug?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
@@ -1013,6 +1015,7 @@ export type Database = {
           logo_url?: string | null
           payment_terms_default?: string | null
           phone?: string | null
+          public_client_slug?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_info?: number
@@ -1341,7 +1344,7 @@ export type Database = {
         | "cancelled"
         | "done"
       client_type: "individual" | "business"
-      dossier_source: "lien_client" | "manuel" | "email"
+      dossier_source: "lien_client" | "manuel" | "email" | "public_link"
       dossier_status:
         | "nouveau"
         | "a_qualifier"
@@ -1505,7 +1508,7 @@ export const Constants = {
         "done",
       ],
       client_type: ["individual", "business"],
-      dossier_source: ["lien_client", "manuel", "email"],
+      dossier_source: ["lien_client", "manuel", "email", "public_link"],
       dossier_status: [
         "nouveau",
         "a_qualifier",
