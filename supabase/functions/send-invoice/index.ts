@@ -44,48 +44,6 @@ async function getGmailConnection(supabase: any, userId: string) {
   return conn;
 }
 
-async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) {
-    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
-    return { success: false, error: "SMS provider not configured" };
-  }
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("Twilio error:", err);
-      return { success: false, error: `Twilio ${resp.status}` };
-    }
-    await resp.json();
-    return { success: true };
-  } catch (e) {
-    console.error("SMS error:", e);
-    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
-  }
-}
-
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-().]/g, "");
-  if (cleaned.startsWith("0") && cleaned.length === 10) cleaned = "+33" + cleaned.slice(1);
-  if (!cleaned.startsWith("+")) cleaned = "+" + cleaned;
-  return cleaned;
-}
-
-function isValidPhone(phone: string): boolean {
-  return /^\+?\d{10,15}$/.test(phone.replace(/[\s\-().]/g, ""));
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -95,7 +53,6 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // ── JWT auth (consistent with other edge functions) ──
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
@@ -111,7 +68,6 @@ Deno.serve(async (req: Request) => {
     const { invoice_id } = await req.json();
     if (!invoice_id) throw new Error("Missing invoice_id");
 
-    // Get invoice
     const { data: invoice, error: invErr } = await supabase
       .from("invoices")
       .select("*")
@@ -180,7 +136,6 @@ Deno.serve(async (req: Request) => {
 
     // Send email
     if (invoice.client_email) {
-      // Try Gmail first
       const gmailConn = await getGmailConnection(supabase, userId);
 
       if (gmailConn) {
@@ -207,23 +162,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Send SMS
-    let smsSent = false;
-    if (invoice.client_phone && isValidPhone(invoice.client_phone)) {
-      const phone = normalizePhone(invoice.client_phone);
-      const smsBody = `Votre facture ${invoice.invoice_number} est disponible. N'hésitez pas à nous contacter. — ${artisanName}${invoice.artisan_phone ? ` (${invoice.artisan_phone})` : ""}`;
-      const smsResult = await sendSms(phone, smsBody);
-      if (smsResult.success) {
-        smsSent = true;
-        await supabase.from("historique").insert({
-          dossier_id: invoice.dossier_id,
-          user_id: userId,
-          action: "invoice_sent_sms",
-          details: `Facture ${invoice.invoice_number} envoyée par SMS au ${invoice.client_phone}`,
-        });
-      }
-    }
-
     // Historique
     await supabase.from("historique").insert({
       dossier_id: invoice.dossier_id,
@@ -239,7 +177,6 @@ Deno.serve(async (req: Request) => {
         success: true,
         email_sent: emailSent,
         email_error: emailError,
-        sms_sent: smsSent,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

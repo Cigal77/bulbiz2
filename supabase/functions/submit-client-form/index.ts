@@ -8,34 +8,6 @@ function formatDateFr(dateStr: string): string {
   return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-function normalizePhone(phone: string): string | null {
-  const cleaned = phone.replace(/[\s\-().]/g, "");
-  if (!/^\+?\d{10,15}$/.test(cleaned)) return null;
-  let p = cleaned;
-  if (p.startsWith("0") && p.length === 10) p = "+33" + p.slice(1);
-  if (!p.startsWith("+")) p = "+" + p;
-  return p;
-}
-
-async function sendSms(to: string, body: string): Promise<boolean> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) return false;
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    return resp.ok;
-  } catch { return false; }
-}
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
@@ -112,7 +84,6 @@ Deno.serve(async (req) => {
         appointment_slots: slots || [],
         artisan_name,
         artisan_logo_url: profile?.logo_url || null,
-        // New fields
         trade_types: dossier.trade_types || [],
         problem_types: dossier.problem_types || [],
         housing_type: dossier.housing_type,
@@ -166,7 +137,6 @@ Deno.serve(async (req) => {
         changedFields.push("Urgence modifiée");
       }
 
-      // Address structured data
       if (clientData?.google_place_id) {
         updates.google_place_id = clientData.google_place_id;
         if (clientData.lat) updates.lat = parseFloat(clientData.lat);
@@ -176,7 +146,6 @@ Deno.serve(async (req) => {
         if (clientData.address_line) updates.address_line = clientData.address_line;
       }
 
-      // ── New multi-trade fields ──
       if (clientData?.trade_types && Array.isArray(clientData.trade_types)) {
         const current = dossier.trade_types || [];
         const incoming = clientData.trade_types as string[];
@@ -195,7 +164,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Append other_trade / other_problem to description if provided
       const extras: string[] = [];
       if (clientData?.other_trade) extras.push(`Autre métier : ${clientData.other_trade}`);
       if (clientData?.other_problem) extras.push(`Autre problème : ${clientData.other_problem}`);
@@ -208,7 +176,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Practical info fields
       const practicalFields = [
         { key: "housing_type", label: "Type de logement" },
         { key: "occupant_type", label: "Statut occupant" },
@@ -247,10 +214,8 @@ Deno.serve(async (req) => {
         changedFields.push("Informations pratiques complétées");
       }
 
-      // Update source
       updates.source = "lien_client";
 
-      // Auto-transition status
       const mergedFirstName = updates.client_first_name || dossier.client_first_name;
       const mergedPhone = updates.client_phone || dossier.client_phone;
       const mergedAddress = updates.address || dossier.address;
@@ -270,7 +235,6 @@ Deno.serve(async (req) => {
         if (updateError) throw updateError;
       }
 
-      // Insert media records
       if (media_urls && Array.isArray(media_urls)) {
         for (const media of media_urls) {
           await supabase.from("medias").insert({
@@ -284,7 +248,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Log in historique
       const details = changedFields.length > 0
         ? `Le client a mis à jour : ${changedFields.join(", ")}${media_urls?.length ? ` + ${media_urls.length} média(s)` : ""}`
         : `Le client a soumis le formulaire${media_urls?.length ? ` avec ${media_urls.length} média(s)` : ""}`;
@@ -407,7 +370,7 @@ Deno.serve(async (req) => {
           details: `Rendez-vous auto-confirmé : ${slotDateFr} ${timeRange}`,
         });
 
-        // Send confirmation email + SMS
+        // Send confirmation email
         const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", dossier.user_id).maybeSingle();
         const artisanName = profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
         const clientName = dossier.client_first_name || "Bonjour";
@@ -463,22 +426,6 @@ Deno.serve(async (req) => {
             });
           }
         } catch (e) { console.error("Error notifying artisan about confirmed RDV:", e); }
-
-        const clientPhone = dossier.client_phone;
-        if (clientPhone) {
-          const normalized = normalizePhone(clientPhone);
-          if (normalized) {
-            const sent = await sendSms(normalized,
-              `✅ RDV confirmé avec ${artisanName} : ${slotDateFr} à ${timeRange}.${profile?.phone ? ` Contact : ${profile.phone}` : ""}`
-            );
-            if (sent) {
-              await supabase.from("notification_logs").insert({
-                dossier_id: dossier.id, event_type: "APPOINTMENT_CONFIRMED",
-                channel: "sms", recipient: normalized, status: "SENT",
-              });
-            }
-          }
-        }
 
         return new Response(JSON.stringify({ success: true, auto_confirmed: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

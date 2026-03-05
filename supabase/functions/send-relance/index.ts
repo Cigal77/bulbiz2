@@ -44,48 +44,6 @@ async function getGmailConnection(supabase: any, userId: string) {
   return conn;
 }
 
-async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) {
-    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
-    return { success: false, error: "SMS provider not configured" };
-  }
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("Twilio error:", err);
-      return { success: false, error: `Twilio ${resp.status}` };
-    }
-    await resp.json();
-    return { success: true };
-  } catch (e) {
-    console.error("SMS error:", e);
-    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
-  }
-}
-
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-().]/g, "");
-  if (cleaned.startsWith("0") && cleaned.length === 10) cleaned = "+33" + cleaned.slice(1);
-  if (!cleaned.startsWith("+")) cleaned = "+" + cleaned;
-  return cleaned;
-}
-
-function isValidPhone(phone: string): boolean {
-  return /^\+?\d{10,15}$/.test(phone.replace(/[\s\-().]/g, ""));
-}
-
 interface SendRelanceRequest {
   dossier_id: string;
   type: "info_manquante" | "devis_non_signe";
@@ -133,7 +91,6 @@ Deno.serve(async (req: Request) => {
     const artisanName =
       profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
-    const smsEnabled = profile?.sms_enabled !== false;
 
     // Generate or reuse client token
     let clientToken = dossier.client_token;
@@ -156,7 +113,6 @@ Deno.serve(async (req: Request) => {
 
     let subject: string;
     let htmlBody: string;
-    let smsBody: string;
 
     const relanceLabel = type === "info_manquante" ? "Info manquante" : "Devis non signé";
 
@@ -177,7 +133,6 @@ Deno.serve(async (req: Request) => {
           <br/><p style="white-space: pre-line;">${signature}</p>
         </div>
       `;
-      smsBody = `Bonjour ${dossier.client_first_name || ""}, pour traiter votre demande, complétez ces infos (2 min) : ${clientLink} — ${artisanName}${profile?.phone ? ` (${profile.phone})` : ""}`;
     } else {
       subject = `${artisanName} – Suivi de votre devis`;
       htmlBody = `
@@ -191,7 +146,6 @@ Deno.serve(async (req: Request) => {
           <br/><p style="white-space: pre-line;">${signature}</p>
         </div>
       `;
-      smsBody = `Rappel : votre devis est en attente de validation. N'hésitez pas à nous contacter. — ${artisanName}${profile?.phone ? ` (${profile.phone})` : ""}`;
     }
 
     // Send email - try Gmail first, fallback to Resend
@@ -227,33 +181,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Send SMS
-    if (dossier.client_phone && isValidPhone(dossier.client_phone) && smsEnabled) {
-      const phone = normalizePhone(dossier.client_phone);
-      const smsResult = await sendSms(phone, smsBody);
-      if (smsResult.success) {
-        await supabase.from("historique").insert({
-          dossier_id,
-          user_id: user.id,
-          action: "relance_sent_sms",
-          details: `Relance "${relanceLabel}" envoyée par SMS au ${dossier.client_phone}`,
-        });
-      } else if (smsResult.error !== "SMS provider not configured") {
-        await supabase.from("historique").insert({
-          dossier_id,
-          user_id: user.id,
-          action: "sms_error",
-          details: `SMS non envoyé (erreur) – vérifier le numéro ${dossier.client_phone}`,
-        });
-      }
-    }
-
     // Record relance
     await supabase.from("relances").insert({
       dossier_id,
       user_id: user.id,
       type,
-      email_to: dossier.client_email || dossier.client_phone || "",
+      email_to: dossier.client_email || "",
       status: "sent",
     });
 

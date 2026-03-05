@@ -12,7 +12,6 @@ async function refreshGmailToken(supabase: any, userId: string, connection: any)
   const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
   const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
   if (!clientId || !clientSecret || !connection.refresh_token) return null;
-
   try {
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -26,13 +25,11 @@ async function refreshGmailToken(supabase: any, userId: string, connection: any)
     });
     const data = await resp.json();
     if (!resp.ok) return null;
-
     const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
     await supabase.from("gmail_connections").update({
       access_token: data.access_token,
       token_expires_at: expiresAt,
     }).eq("user_id", userId);
-
     return data.access_token;
   } catch { return null; }
 }
@@ -47,19 +44,13 @@ async function sendViaGmail(accessToken: string, from: string, to: string, subje
     ``,
     html,
   ].join("\r\n");
-
   const raw = btoa(unescape(encodeURIComponent(message)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
   const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({ raw }),
   });
-
   if (!resp.ok) {
     const err = await resp.text();
     console.error("Gmail API error:", err);
@@ -76,59 +67,11 @@ async function getGmailConnection(supabase: any, userId: string) {
     .eq("user_id", userId)
     .maybeSingle();
   if (!conn) return null;
-
-  // Check if token is expired
   if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
     const newToken = await refreshGmailToken(supabase, userId, conn);
-    if (newToken) {
-      conn.access_token = newToken;
-    } else {
-      return null;
-    }
+    if (newToken) { conn.access_token = newToken; } else { return null; }
   }
   return conn;
-}
-
-async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) {
-    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
-    return { success: false, error: "SMS provider not configured" };
-  }
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("Twilio error:", err);
-      return { success: false, error: `Twilio ${resp.status}` };
-    }
-    await resp.json();
-    return { success: true };
-  } catch (e) {
-    console.error("SMS send error:", e);
-    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
-  }
-}
-
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-().]/g, "");
-  if (cleaned.startsWith("0") && cleaned.length === 10) cleaned = "+33" + cleaned.slice(1);
-  if (!cleaned.startsWith("+")) cleaned = "+" + cleaned;
-  return cleaned;
-}
-
-function isValidPhone(phone: string): boolean {
-  return /^\+?\d{10,15}$/.test(phone.replace(/[\s\-().]/g, ""));
 }
 
 Deno.serve(async (req: Request) => {
@@ -150,11 +93,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ✅ Vérifie l'utilisateur via GoTrue avec le token (pas besoin d'anon key)
     const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
         "Content-Type": "application/json",
-        "apikey": supabaseServiceKey,               // service role ok pour appeler /auth
+        "apikey": supabaseServiceKey,
         "Authorization": authHeader,
       },
     });
@@ -168,8 +110,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const user = await userResp.json(); // contient id, email, etc.
-
+    const user = await userResp.json();
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { quote_id } = await req.json();
@@ -196,7 +137,6 @@ Deno.serve(async (req: Request) => {
     const artisanName =
       profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
     const signature = profile?.email_signature || `Cordialement,\n${artisanName}`;
-    const smsEnabled = profile?.sms_enabled !== false;
 
     // Generate signature token
     const tokenBytes = new Uint8Array(32);
@@ -240,14 +180,12 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!emailSent) {
-        const resendKey = Deno.env.get("RESEND_API_KEY");
-        if (resendKey) {
-          const resend = new Resend(resendKey);
-          await resend.emails.send({
-            from: `${artisanName} <noreply@bulbiz.fr>`,
-            to: [dossier.client_email],
-            subject: `${artisanName} – Votre devis`,
-            html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        const resend = new Resend(resendKey);
+        await resend.emails.send({
+          from: `${artisanName} <noreply@bulbiz.fr>`,
+          to: [dossier.client_email],
+          subject: `${artisanName} – Votre devis`,
+          html: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
               <p>Bonjour ${dossier.client_first_name || ""},</p>
               <p>Veuillez trouver ci-joint votre devis.</p>
               <p style="margin: 24px 0;">
@@ -262,8 +200,7 @@ Deno.serve(async (req: Request) => {
               <br/>
               <p style="white-space: pre-line;">${signature}</p>
             </div>`,
-          });
-        }
+        });
       }
 
       await supabase.from("historique").insert({
@@ -272,28 +209,6 @@ Deno.serve(async (req: Request) => {
         action: "quote_sent",
         details: `Devis ${quote.quote_number} envoyé par email à ${dossier.client_email}`,
       });
-    }
-
-    // Send SMS
-    if (dossier.client_phone && isValidPhone(dossier.client_phone) && smsEnabled) {
-      const phone = normalizePhone(dossier.client_phone);
-      const smsBody = `Votre devis est disponible. Pour le consulter : ${validationUrl} — ${artisanName}`;
-      const smsResult = await sendSms(phone, smsBody);
-      if (smsResult.success) {
-        await supabase.from("historique").insert({
-          dossier_id: dossier.id,
-          user_id: user.id,
-          action: "quote_sent_sms",
-          details: `Devis ${quote.quote_number} envoyé par SMS au ${dossier.client_phone}`,
-        });
-      } else if (smsResult.error !== "SMS provider not configured") {
-        await supabase.from("historique").insert({
-          dossier_id: dossier.id,
-          user_id: user.id,
-          action: "sms_error",
-          details: `SMS non envoyé (erreur) – vérifier le numéro ${dossier.client_phone}`,
-        });
-      }
     }
 
     // Update quote status

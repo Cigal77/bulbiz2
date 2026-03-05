@@ -44,48 +44,6 @@ async function getGmailConnection(supabase: any, userId: string) {
   return conn;
 }
 
-async function sendSms(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  const fromPhone = Deno.env.get("TWILIO_PHONE_NUMBER");
-  if (!accountSid || !authToken || !fromPhone) {
-    console.log(`[SMS placeholder] To: ${to} | Body: ${body}`);
-    return { success: false, error: "SMS provider not configured" };
-  }
-  try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic " + btoa(`${accountSid}:${authToken}`),
-      },
-      body: new URLSearchParams({ To: to, From: fromPhone, Body: body }),
-    });
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error("Twilio error:", err);
-      return { success: false, error: `Twilio ${resp.status}` };
-    }
-    await resp.json();
-    return { success: true };
-  } catch (e) {
-    console.error("SMS error:", e);
-    return { success: false, error: e instanceof Error ? e.message : "Unknown" };
-  }
-}
-
-function normalizePhone(phone: string): string {
-  let cleaned = phone.replace(/[\s\-().]/g, "");
-  if (cleaned.startsWith("0") && cleaned.length === 10) cleaned = "+33" + cleaned.slice(1);
-  if (!cleaned.startsWith("+")) cleaned = "+" + cleaned;
-  return cleaned;
-}
-
-function isValidPhone(phone: string): boolean {
-  return /^\+?\d{10,15}$/.test(phone.replace(/[\s\-().]/g, ""));
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -98,7 +56,6 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization header");
 
-    // Extract user_id from JWT (already verified by infrastructure)
     const jwtToken = authHeader.replace("Bearer ", "");
     const payload = JSON.parse(atob(jwtToken.split(".")[1]));
     const userId = payload.sub;
@@ -109,7 +66,6 @@ Deno.serve(async (req: Request) => {
     const { dossier_id, force_regenerate } = await req.json();
     if (!dossier_id) throw new Error("Missing dossier_id");
 
-    // Get dossier
     const { data: dossier, error: dErr } = await supabase
       .from("dossiers")
       .select("*")
@@ -118,12 +74,10 @@ Deno.serve(async (req: Request) => {
       .single();
     if (dErr || !dossier) throw new Error("Dossier introuvable");
 
-    // Get profile
     const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
 
     const validityDays = profile?.client_link_validity_days || 7;
 
-    // Check for existing active token (anti-duplicate)
     let token = dossier.client_token;
     let expiresAt = dossier.client_token_expires_at;
     let tokenGenerated = false;
@@ -131,7 +85,6 @@ Deno.serve(async (req: Request) => {
     const isExpired = !expiresAt || new Date(expiresAt) < new Date();
 
     if (!token || isExpired || force_regenerate) {
-      // Generate new token
       const tokenBytes = new Uint8Array(32);
       crypto.getRandomValues(tokenBytes);
       token = Array.from(tokenBytes)
@@ -146,7 +99,6 @@ Deno.serve(async (req: Request) => {
 
       tokenGenerated = true;
 
-      // Historique
       await supabase.from("historique").insert({
         dossier_id,
         user_id: userId,
@@ -155,7 +107,6 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Build client link
     const origin =
       req.headers.get("origin") ||
       req.headers.get("referer")?.replace(/\/+$/, "") ||
@@ -163,7 +114,6 @@ Deno.serve(async (req: Request) => {
       "https://bulbiz.fr";
     const clientLink = `${origin}/client?token=${token}`;
 
-    // Try to send email
     let emailSent = false;
     let emailError: string | null = null;
 
@@ -217,37 +167,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Send SMS
-    let smsSent = false;
-    if (dossier.client_phone && isValidPhone(dossier.client_phone)) {
-      const artisanName =
-        profile?.company_name ||
-        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
-        "Votre artisan";
-      const smsEnabled = profile?.sms_enabled !== false;
-      if (smsEnabled) {
-        const phone = normalizePhone(dossier.client_phone);
-        const smsBody = `Bonjour, complétez votre demande d'intervention ici : ${clientLink} — ${artisanName}`;
-        const smsResult = await sendSms(phone, smsBody);
-        if (smsResult.success) {
-          smsSent = true;
-          await supabase.from("historique").insert({
-            dossier_id,
-            user_id: userId,
-            action: "client_link_sent_sms",
-            details: `Lien client envoyé par SMS au ${dossier.client_phone}`,
-          });
-        }
-      }
-    }
-
     // Log if no contact info
-    if (!dossier.client_email && !dossier.client_phone) {
+    if (!dossier.client_email) {
       await supabase.from("historique").insert({
         dossier_id,
         user_id: userId,
         action: "client_link_not_sent",
-        details: "Coordonnées manquantes : lien non envoyé",
+        details: "Email manquant : lien non envoyé",
       });
     }
 
@@ -260,8 +186,7 @@ Deno.serve(async (req: Request) => {
         token_generated: tokenGenerated,
         email_sent: emailSent,
         email_error: emailError,
-        sms_sent: smsSent,
-        no_contact: !dossier.client_email && !dossier.client_phone,
+        no_contact: !dossier.client_email,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
