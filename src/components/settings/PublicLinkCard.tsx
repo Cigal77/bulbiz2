@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Copy, Check, Share2, Link2, Loader2, MessageSquare } from "lucide-react";
+import { Copy, Check, Share2, Link2, Loader2, MessageSquare, Mail, Phone } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
@@ -82,15 +83,20 @@ ${publicUrl}`;
     setTimeout(() => setCopiedMessage(false), 2000);
   }
 
-  function handleShare() {
-    if (navigator.share) {
-      navigator.share({
-        title: "Envoyez-moi vos photos et infos",
-        text: clientMessage,
-      }).catch(() => {});
-    } else {
-      handleCopyMessage();
-    }
+  function handleShareEmail() {
+    const subject = encodeURIComponent("Envoyez-moi vos photos et infos");
+    const body = encodeURIComponent(clientMessage);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  }
+
+  function handleShareSMS() {
+    const body = encodeURIComponent(clientMessage);
+    window.open(`sms:?body=${body}`, "_blank");
+  }
+
+  function handleShareWhatsApp() {
+    const text = encodeURIComponent(clientMessage);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
   }
 
   return (
@@ -158,10 +164,28 @@ ${publicUrl}`;
                 {copiedMessage ? <Check className="h-4 w-4 text-primary" /> : <MessageSquare className="h-4 w-4" />}
                 {copiedMessage ? "Message copié" : "Copier le message"}
               </Button>
-              <Button variant="outline" onClick={handleShare} className="flex-1 gap-2">
-                <Share2 className="h-4 w-4" />
-                Partager
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex-1 gap-2">
+                    <Share2 className="h-4 w-4" />
+                    Partager
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleShareWhatsApp} className="gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    WhatsApp
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareSMS} className="gap-2">
+                    <Phone className="h-4 w-4" />
+                    SMS
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareEmail} className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <p className="text-xs text-muted-foreground">
