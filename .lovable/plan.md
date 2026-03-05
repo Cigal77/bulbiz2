@@ -1,79 +1,36 @@
 
-# Audit et corrections des automatisations email/notifications
 
-## Problemes identifies
+## Diagnostic
 
-### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
-**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
-- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
-- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
+Le problème est un **cache React Query non invalidé** après l'import d'un devis PDF.
 
-### 2. Bug `send-invoice` : authentification inconsistante
-**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
-- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
-
-### 3. Bug `send-appointment-notification` : authentification inconsistante
-**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
-- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
-
-### 4. Notification artisan manquante sur confirmation RDV
-**Fichier** : `supabase/functions/submit-client-form/index.ts`
-- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
-- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
-
-### 5. Notification artisan manquante sur selection de creneau (multi-slots)
-- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
-
-### 6. Lien dossier hardcode dans `submit-client-form`
-**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
-- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
-
-### 7. Email facture sans signature personnalisee
-**Fichier** : `supabase/functions/send-invoice/index.ts`
-- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
-
-### 8. Email facture sans numero de facture dans le sujet
-- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
-
----
-
-## Plan de corrections
-
-### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
-- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-- Ajouter la signature personnalisee
-- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
-
-### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
-- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
-
-### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
-- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
-- Remplacer le lien hardcode par `app.bulbiz.io`
-- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
-
----
-
-## Details techniques
-
-### `send-invoice/index.ts` - Changements
-```text
-Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
-Ligne 170-218 : Remonter artisanName + signature au bon scope
-Ligne 181      : Ajouter signature personnalisee dans l'email
-Ligne 218      : Fixer la reference artisanName dans le SMS
-Sujet email    : Ajouter numero facture
+La clé de cache du résumé IA est :
+```
+["ai-summary", dossier.id, dossier.status, dossier.appointment_status, mediaCount, historiqueCount]
 ```
 
-### `send-appointment-notification/index.ts` - Changements
-```text
-Lignes 210-217 : Remplacer auth getUser() par decodage JWT
-```
+Quand un devis PDF est importé via `ImportDevisDialog`, le nombre de **quotes** ne fait pas partie de cette clé. De plus, `ImportDevisDialog` n'invalide pas le cache `ai-summary`. Résultat : l'IA n'est pas re-sollicitée et le matériel du PDF n'apparait pas.
 
-### `submit-client-form/index.ts` - Changements
-```text
-Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
-Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
-Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
-```
+Sur ton compte, tu as probablement rafraîchi manuellement ou le cache a expiré (staleTime = 5min). Chez Alexandre, le cache est resté en place.
+
+## Plan de correction
+
+### 1. Invalider le cache `ai-summary` après import de devis
+
+**`src/components/dossier/ImportDevisDialog.tsx`** : Ajouter `queryClient.invalidateQueries({ queryKey: ["ai-summary"] })` dans le bloc de succès du `handleSubmit`, à côté des autres invalidations existantes.
+
+### 2. Invalider le cache `ai-summary` dans QuoteBlock
+
+**`src/components/dossier/QuoteBlock.tsx`** : Ajouter la même invalidation après chaque action sur un devis (import, suppression, changement de statut).
+
+### 3. Ajouter le nombre de devis au query key du SummaryBlock
+
+**`src/components/dossier/SummaryBlock.tsx`** :
+- Ajouter une prop `quotesCount?: number`
+- L'inclure dans le `queryKey` : `["ai-summary", dossier.id, ..., quotesCount]`
+
+**`src/pages/DossierDetail.tsx`** :
+- Importer `useQuotes` et passer `quotes?.length ?? 0` comme `quotesCount` au `SummaryBlock`.
+
+Ces 4 fichiers couvrent la totalité du fix. Le résumé IA se régénèrera automatiquement dès qu'un devis est ajouté ou modifié.
+
