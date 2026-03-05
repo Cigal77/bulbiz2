@@ -19,7 +19,6 @@ interface DossierFiltersProps {
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "recent", label: "Plus récents" },
-  { value: "chronological", label: "Chronologique" },
   { value: "activity", label: "Dernière activité" },
   { value: "rdv_next", label: "Prochain RDV" },
   { value: "devis_oldest", label: "Devis envoyé (+ ancien)" },
