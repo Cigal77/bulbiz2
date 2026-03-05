@@ -155,17 +155,6 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
-        {/* Intervention terminée - always visible if not already done */}
-        {canMarkDone && (
-          <Button
-            className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-            onClick={() => markDone.mutate()}
-            disabled={markDone.isPending}
-          >
-            {markDone.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            Intervention terminée
-          </Button>
-        )}
 
         {/* 1. Phone */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
@@ -234,8 +223,18 @@ export function DossierActions({ dossier }: DossierActionsProps) {
             )}
             Relancer maintenant
           </Button>
+        {/* Intervention terminée */}
+        {canMarkDone && (
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={() => markDone.mutate()}
+            disabled={markDone.isPending}
+          >
+            {markDone.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 text-primary" />}
+            Intervention terminée
+          </Button>
         )}
-
         {/* 6. Importer devis (always available) */}
         <Button variant="outline" className="w-full justify-start gap-2" onClick={() => setImportDevisOpen(true)}>
           <FileText className="h-4 w-4 text-primary" />
