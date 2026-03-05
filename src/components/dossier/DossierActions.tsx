@@ -252,6 +252,19 @@ export function DossierActions({ dossier }: DossierActionsProps) {
             {dossier.relance_active ? "Stop relances" : "Activer relances"}
           </Button>
         )}
+
+        {/* Intervention terminée */}
+        {canMarkDone && (
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2"
+            onClick={() => markDone.mutate()}
+            disabled={markDone.isPending}
+          >
+            {markDone.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 text-primary" />}
+            Intervention terminée
+          </Button>
+        )}
       </div>
 
       {/* Dialogs */}
