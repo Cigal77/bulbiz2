@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { slug, data, media_urls, rgpd_consent } = await req.json();
+    const { slug, data, media_urls, rgpd_consent, proposed_slots } = await req.json();
 
     if (!slug || !data) {
       return new Response(JSON.stringify({ error: "Missing slug or data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
