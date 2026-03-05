@@ -43,8 +43,13 @@ export function GmailConnectionCard() {
     if (code && state === "gmail" && !callbackCalledRef.current) {
       callbackCalledRef.current = true;
       handleCallback(code);
-    } else {
+    } else if (!code) {
+      // Only check status when there's no OAuth code in URL
+      // (avoid calling gmail-oauth during a Calendar OAuth callback)
       checkStatus();
+    } else {
+      // Another OAuth flow (e.g. calendar) — just stop loading
+      setLoading(false);
     }
   }, []);
 
