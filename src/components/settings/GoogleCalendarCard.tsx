@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,44 +29,57 @@ export function GoogleCalendarCard() {
     }
   }, []);
 
-  const handleCallback = useCallback(async (code: string) => {
-    setActionLoading(true);
-    try {
-      const redirectUri = `${window.location.origin}/parametres`;
-      const { data, error } = await supabase.functions.invoke("google-calendar", {
-        body: { action: "callback", code, redirect_uri: redirectUri },
-      });
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-      setConnected(true);
-      setGoogleEmail(data.google_email);
-      toast.success(`Google Calendar connecté : ${data.google_email}`);
-    } catch (e: any) {
-      const msg = e.message || "Erreur inconnue";
-      const isConfig = msg.includes("URI") || msg.includes("redirect") || msg.includes("invalid_grant") || msg.includes("Google Cloud");
-      toast.error(isConfig
-        ? "Configuration Google Cloud incomplète. Vérifiez les URIs de redirection autorisées."
-        : `Erreur : ${msg}`,
-        { duration: 8000 }
-      );
-    } finally {
-      setActionLoading(false);
-      searchParams.delete("code");
-      searchParams.delete("scope");
-      searchParams.delete("state");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
+  const handleCallback = useCallback(
+    async (code: string) => {
+      setActionLoading(true);
+      try {
+        const redirectUri = `${window.location.origin}/parametres`;
+        const { data, error } = await supabase.functions.invoke("google-calendar", {
+          body: { action: "callback", code, redirect_uri: redirectUri },
+        });
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+        setConnected(true);
+        setGoogleEmail(data.google_email);
+        toast.success(`Google Calendar connecté : ${data.google_email}`);
+      } catch (e: any) {
+        const msg = e.message || "Erreur inconnue";
+        const isConfig =
+          msg.includes("URI") ||
+          msg.includes("redirect") ||
+          msg.includes("invalid_grant") ||
+          msg.includes("Google Cloud");
+        toast.error(
+          isConfig
+            ? "Configuration Google Cloud incomplète. Vérifiez les URIs de redirection autorisées."
+            : `Erreur : ${msg}`,
+          { duration: 8000 },
+        );
+      } finally {
+        setActionLoading(false);
+        searchParams.delete("code");
+        searchParams.delete("scope");
+        searchParams.delete("state");
+        setSearchParams(searchParams, { replace: true });
+      }
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const callbackCalledRef = useRef(false);
 
   useEffect(() => {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
+
     if (code && state === "google_calendar") {
+      if (callbackCalledRef.current) return; // ← guard
+      callbackCalledRef.current = true;
       handleCallback(code);
     } else {
       checkStatus();
     }
-  }, []);
+  }, []); // eslint-disable-line
 
   const handleConnect = async () => {
     setActionLoading(true);
@@ -136,8 +149,8 @@ export function GoogleCalendarCard() {
         {connected ? (
           <>
             <p className="text-sm text-muted-foreground">
-              Connecté à <span className="font-medium text-foreground">{googleEmail}</span>.
-              Les nouveaux RDV confirmés seront ajoutés automatiquement à votre agenda.
+              Connecté à <span className="font-medium text-foreground">{googleEmail}</span>. Les nouveaux RDV confirmés
+              seront ajoutés automatiquement à votre agenda.
             </p>
             <Button
               variant="outline"
@@ -156,11 +169,7 @@ export function GoogleCalendarCard() {
               Connectez votre Google Calendar pour que chaque RDV confirmé soit automatiquement ajouté à votre agenda.
               Vous pouvez aussi télécharger un fichier .ics depuis chaque dossier.
             </p>
-            <Button
-              onClick={handleConnect}
-              disabled={actionLoading}
-              className="gap-2"
-            >
+            <Button onClick={handleConnect} disabled={actionLoading} className="gap-2">
               {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link className="h-4 w-4" />}
               Connecter Google Calendar
             </Button>
