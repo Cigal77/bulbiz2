@@ -2,12 +2,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
 import { generateStructuredSummary } from "@/lib/summary";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, Video, FileText, Receipt } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, FileText, Receipt, Package, CheckSquare, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface SummaryBlockProps {
   dossier: Dossier;
+}
+
+interface MaterialItem {
+  label: string;
+  qty: number;
+  ref?: string;
 }
 
 interface AiSummary {
@@ -15,13 +23,15 @@ interface AiSummary {
   bullets: string[];
   next_action: string;
   auto_filled?: string[];
-  media_analyzed?: { images: number; videos: number; audio: number; quotes?: number; invoices?: number };
+  material_list?: MaterialItem[];
+  media_analyzed?: { images: number; videos: number; audio: number; notes?: number; quotes?: number; invoices?: number };
 }
 
 export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fallback = generateStructuredSummary(dossier);
+  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
 
   const {
     data: aiSummary,
@@ -38,13 +48,11 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // If AI auto-filled fields, show toast and refresh dossier data
       if (data?.auto_filled?.length > 0) {
         toast({
           title: "🤖 Dossier mis à jour automatiquement",
           description: `Champs remplis depuis les notes vocales : ${data.auto_filled.join(", ")}`,
         });
-        // Refresh dossier data to show updated fields
         queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
         queryClient.invalidateQueries({ queryKey: ["historique", dossier.id] });
       }
@@ -59,7 +67,18 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
   const mediaInfo = aiSummary?.media_analyzed;
-  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.videos > 0 || mediaInfo.audio > 0 || (mediaInfo.quotes ?? 0) > 0 || (mediaInfo.invoices ?? 0) > 0);
+  const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.audio > 0 || (mediaInfo.notes ?? 0) > 0 || (mediaInfo.quotes ?? 0) > 0 || (mediaInfo.invoices ?? 0) > 0);
+  const materialList = aiSummary?.material_list || [];
+  const hasMaterial = materialList.length > 0;
+
+  const toggleItem = (idx: number) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 space-y-3">
@@ -113,6 +132,46 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
             </div>
           )}
 
+          {hasMaterial && (
+            <div className="rounded-lg bg-accent/30 border border-accent/50 p-3 mt-2 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Package className="h-3.5 w-3.5 text-primary" />
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70">
+                  Matériel à emporter ({materialList.length})
+                </p>
+                {checkedItems.size > 0 && (
+                  <span className="text-[10px] text-muted-foreground ml-auto">
+                    {checkedItems.size}/{materialList.length} ✓
+                  </span>
+                )}
+              </div>
+              <ul className="space-y-1.5">
+                {materialList.map((item, i) => (
+                  <li
+                    key={i}
+                    className={`flex items-start gap-2 text-sm cursor-pointer transition-opacity ${checkedItems.has(i) ? "opacity-50 line-through" : ""}`}
+                    onClick={() => toggleItem(i)}
+                  >
+                    <Checkbox
+                      checked={checkedItems.has(i)}
+                      className="mt-0.5 h-3.5 w-3.5"
+                      onCheckedChange={() => toggleItem(i)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-foreground/90">
+                        {item.qty > 1 && <span className="font-medium text-primary">{item.qty}× </span>}
+                        {item.label}
+                      </span>
+                      {item.ref && item.ref !== "n/a" && (
+                        <span className="text-[10px] text-muted-foreground ml-1">({item.ref})</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {hasAutoFilled && (
             <div className="flex items-start gap-2 rounded-lg bg-green-500/10 border border-green-500/20 p-3 mt-2">
               <Mic className="h-4 w-4 text-green-600 shrink-0 mt-0.5" />
@@ -127,20 +186,20 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
 
           {hasMediaAnalyzed && (
             <div className="flex items-center gap-2 flex-wrap mt-1">
-              <span className="text-[10px] text-muted-foreground">Médias analysés :</span>
+              <span className="text-[10px] text-muted-foreground">Analysé :</span>
               {mediaInfo!.images > 0 && (
                 <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
                   <Camera className="h-3 w-3" /> {mediaInfo!.images} photo{mediaInfo!.images > 1 ? "s" : ""}
                 </span>
               )}
-              {mediaInfo!.videos > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
-                  <Video className="h-3 w-3" /> {mediaInfo!.videos} vidéo{mediaInfo!.videos > 1 ? "s" : ""}
-                </span>
-              )}
               {mediaInfo!.audio > 0 && (
                 <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
                   <Mic className="h-3 w-3" /> {mediaInfo!.audio} vocal{mediaInfo!.audio > 1 ? "es" : "e"}
+                </span>
+              )}
+              {(mediaInfo!.notes ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground">
+                  <StickyNote className="h-3 w-3" /> {mediaInfo!.notes} note{mediaInfo!.notes! > 1 ? "s" : ""}
                 </span>
               )}
               {(mediaInfo!.quotes ?? 0) > 0 && (

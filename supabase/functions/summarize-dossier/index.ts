@@ -26,7 +26,6 @@ function toImageMime(fileType: string): string {
   return fileType.startsWith("image/") ? fileType : "image/jpeg";
 }
 
-
 interface MediaRecord {
   file_url: string;
   file_type: string;
@@ -59,8 +58,6 @@ async function downloadMediaAsBase64(
   }
 }
 
-// For large files (videos), generate a signed URL instead of downloading
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -82,20 +79,25 @@ serve(async (req) => {
       });
     }
 
-    // Use service role to bypass RLS (user is verified above)
+    // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Fetch all data in parallel
-    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes] = await Promise.all([
+    // Fetch all data in parallel (including text notes and quote_lines)
+    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, noteMediasRes, quoteLinesRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
-      supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
-      supabase.from("invoices").select("invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes").eq("dossier_id", dossier_id),
+      supabase.from("quotes").select("id, quote_number, status, total_ht, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
+      supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
-        .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(3),
+        .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(5),
+      supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
+        .eq("dossier_id", dossier_id).eq("media_category", "note").order("created_at", { ascending: false }).limit(10),
+      // Fetch quote_lines for structured data
+      supabase.from("quote_lines").select("label, description, qty, unit, unit_price, tva_rate, line_type, quote_id, sort_order")
+        .in("quote_id", []) // placeholder, will be re-fetched below if needed
     ]);
 
     if (dossierRes.error) throw dossierRes.error;
@@ -103,6 +105,7 @@ serve(async (req) => {
 
     const audioMedias = audioMediasRes.data || [];
     const imageMedias = imageMediasRes.data || [];
+    const noteMedias = noteMediasRes.data || [];
 
     // Download images (max 2MB each) and audio (max 3MB each)
     const [audioResults, imageResults] = await Promise.all([
@@ -116,7 +119,7 @@ serve(async (req) => {
     // Images
     const validImages = imageResults.filter(Boolean);
     if (validImages.length > 0) {
-      mediaParts.push({ type: "text", text: `\n\n📷 PHOTOS DU DOSSIER (${validImages.length}) — Analyse visuellement chaque photo pour identifier le problème, l'état des installations, les dégâts visibles, le type d'équipement :` });
+      mediaParts.push({ type: "text", text: `\n\n📷 PHOTOS DU CHANTIER (${validImages.length}) :` });
       for (const img of validImages) {
         if (!img) continue;
         const mime = toImageMime(img.mimeType);
@@ -128,7 +131,7 @@ serve(async (req) => {
     // Audio
     const validAudios = audioResults.filter(Boolean);
     if (validAudios.length > 0) {
-      mediaParts.push({ type: "text", text: `\n\n🎙️ NOTES VOCALES (${validAudios.length}) — Écoute et intègre le contenu dans le résumé :` });
+      mediaParts.push({ type: "text", text: `\n\n🎙️ NOTES VOCALES (${validAudios.length}) :` });
       for (const audio of validAudios) {
         if (!audio) continue;
         const mime = toAudioMime(audio.mimeType);
@@ -137,24 +140,54 @@ serve(async (req) => {
       }
     }
 
-    // Process quotes: items JSONB + PDF downloads
+    // Process quotes: structured lines + items JSONB + PDF downloads
     const quotes = quotesRes.data || [];
     let quotesTextContext = "";
     let quotePdfCount = 0;
 
-    // Format quote_lines items as readable text
+    // Fetch quote_lines if we have quotes
+    if (quotes.length > 0) {
+      const quoteIds = quotes.map(q => q.id);
+      const { data: quoteLines } = await supabase
+        .from("quote_lines").select("label, description, qty, unit, unit_price, tva_rate, line_type, quote_id, sort_order")
+        .in("quote_id", quoteIds).order("sort_order");
+
+      if (quoteLines && quoteLines.length > 0) {
+        const linesByQuote = new Map<string, typeof quoteLines>();
+        for (const line of quoteLines) {
+          const arr = linesByQuote.get(line.quote_id) || [];
+          arr.push(line);
+          linesByQuote.set(line.quote_id, arr);
+        }
+
+        for (const q of quotes) {
+          const lines = linesByQuote.get(q.id);
+          if (lines && lines.length > 0) {
+            quotesTextContext += `\n📋 DÉTAIL DEVIS ${q.quote_number} (${q.status}) :\n`;
+            for (const l of lines) {
+              const desc = l.description ? ` — ${l.description}` : "";
+              quotesTextContext += `  • ${l.label}${desc} | ${l.qty} ${l.unit} × ${l.unit_price}€ HT (TVA ${l.tva_rate}%) [${l.line_type}]\n`;
+            }
+            if (q.notes) quotesTextContext += `  📝 Notes devis: ${q.notes}\n`;
+          }
+        }
+      }
+    }
+
+    // Fallback: items JSONB for quotes without quote_lines
     for (const q of quotes) {
+      if (quotesTextContext.includes(q.quote_number)) continue;
       const items = q.items as any[] | null;
       if (items && Array.isArray(items) && items.length > 0) {
-        quotesTextContext += `\nDÉTAIL DEVIS ${q.quote_number} :\n`;
+        quotesTextContext += `\n📋 DÉTAIL DEVIS ${q.quote_number} (${q.status}) :\n`;
         for (const item of items) {
           const label = item.label || item.designation || "?";
           const qty = item.qty ?? item.quantity ?? 1;
           const unit = item.unit || "u";
           const price = item.unit_price ?? item.unitPrice ?? 0;
-          quotesTextContext += `  - ${label} × ${qty} ${unit} à ${price}€ HT\n`;
+          quotesTextContext += `  • ${label} | ${qty} ${unit} × ${price}€ HT\n`;
         }
-        if (q.notes) quotesTextContext += `  Notes: ${q.notes}\n`;
+        if (q.notes) quotesTextContext += `  📝 Notes devis: ${q.notes}\n`;
       }
     }
 
@@ -182,9 +215,8 @@ serve(async (req) => {
     const validPdfs = pdfResults.filter(Boolean);
     quotePdfCount = validPdfs.length;
 
-    // Add PDF parts to multimodal content
     if (validPdfs.length > 0) {
-      mediaParts.push({ type: "text", text: `\n\n📄 DEVIS PDF IMPORTÉS (${validPdfs.length}) — Analyse le contenu pour extraire matériel, prestations et infos techniques :` });
+      mediaParts.push({ type: "text", text: `\n\n📄 DEVIS PDF IMPORTÉS (${validPdfs.length}) — Extrais le matériel, références, marques et quantités :` });
       for (const pdf of validPdfs) {
         if (!pdf) continue;
         mediaParts.push({ type: "text", text: `[Devis "${pdf.quoteNumber}"] :` });
@@ -192,54 +224,43 @@ serve(async (req) => {
       }
     }
 
-    // Process invoices: fetch lines + PDF downloads
+    // Process invoices
     const invoices = invoicesRes.data || [];
     let invoicesTextContext = "";
     let invoicePdfCount = 0;
 
-    // Fetch invoice lines for all invoices
-    const invoiceIds = invoices.map(i => i.invoice_number).length > 0 ? invoices.map(i => (i as any).id || "").filter(Boolean) : [];
-    // We don't have invoice IDs directly, so fetch lines via a separate query if invoices exist
     if (invoices.length > 0) {
-      // Get invoice IDs by querying again
-      const { data: invoicesFull } = await supabase
-        .from("invoices").select("id, invoice_number").eq("dossier_id", dossier_id);
-      
-      if (invoicesFull && invoicesFull.length > 0) {
-        const ids = invoicesFull.map(i => i.id);
-        const { data: lines } = await supabase
-          .from("invoice_lines").select("label, qty, unit, unit_price, tva_rate, invoice_id")
-          .in("invoice_id", ids).order("sort_order");
-        
-        if (lines && lines.length > 0) {
-          const linesByInvoice = new Map<string, typeof lines>();
-          for (const line of lines) {
-            const arr = linesByInvoice.get(line.invoice_id) || [];
-            arr.push(line);
-            linesByInvoice.set(line.invoice_id, arr);
-          }
-          
-          for (const inv of invoicesFull) {
-            const invLines = linesByInvoice.get(inv.id);
-            if (invLines && invLines.length > 0) {
-              invoicesTextContext += `\nDÉTAIL FACTURE ${inv.invoice_number} :\n`;
-              for (const l of invLines) {
-                invoicesTextContext += `  - ${l.label} × ${l.qty} ${l.unit} à ${l.unit_price}€ HT (TVA ${l.tva_rate}%)\n`;
-              }
+      const invoiceIds = invoices.map(i => i.id);
+      const { data: lines } = await supabase
+        .from("invoice_lines").select("label, description, qty, unit, unit_price, tva_rate, invoice_id")
+        .in("invoice_id", invoiceIds).order("sort_order");
+
+      if (lines && lines.length > 0) {
+        const linesByInvoice = new Map<string, typeof lines>();
+        for (const line of lines) {
+          const arr = linesByInvoice.get(line.invoice_id) || [];
+          arr.push(line);
+          linesByInvoice.set(line.invoice_id, arr);
+        }
+
+        for (const inv of invoices) {
+          const invLines = linesByInvoice.get(inv.id);
+          if (invLines && invLines.length > 0) {
+            invoicesTextContext += `\n🧾 DÉTAIL FACTURE ${inv.invoice_number} (${inv.status}) :\n`;
+            for (const l of invLines) {
+              const desc = l.description ? ` — ${l.description}` : "";
+              invoicesTextContext += `  • ${l.label}${desc} | ${l.qty} ${l.unit} × ${l.unit_price}€ HT (TVA ${l.tva_rate}%)\n`;
             }
           }
         }
       }
     }
 
-    // Add invoice notes
     for (const inv of invoices) {
-      if (inv.notes) {
-        invoicesTextContext += `  Notes ${inv.invoice_number}: ${inv.notes}\n`;
-      }
+      if (inv.notes) invoicesTextContext += `  📝 Notes ${inv.invoice_number}: ${inv.notes}\n`;
     }
 
-    // Download invoice PDFs (max 2, 5MB each)
+    // Download invoice PDFs
     const invoicesWithPdf = invoices.filter(i => i.pdf_url).slice(0, 2);
     const invoicePdfResults = await Promise.all(
       invoicesWithPdf.map(async (inv) => {
@@ -264,7 +285,7 @@ serve(async (req) => {
     invoicePdfCount = validInvoicePdfs.length;
 
     if (validInvoicePdfs.length > 0) {
-      mediaParts.push({ type: "text", text: `\n\n🧾 FACTURES PDF (${validInvoicePdfs.length}) — Analyse le contenu pour extraire les détails de facturation :` });
+      mediaParts.push({ type: "text", text: `\n\n🧾 FACTURES PDF (${validInvoicePdfs.length}) :` });
       for (const pdf of validInvoicePdfs) {
         if (!pdf) continue;
         mediaParts.push({ type: "text", text: `[Facture "${pdf.invoiceNumber}"] :` });
@@ -273,14 +294,13 @@ serve(async (req) => {
     }
 
     const hasInvoiceContent = invoicesTextContext.length > 0 || invoicePdfCount > 0;
-
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
-    const hasVideoFiles = videoMedias.length > 0; // metadata only, no content
+    const hasNotes = noteMedias.length > 0;
     const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
-    // Build empty fields list
+    // Build empty fields list for auto-fill
     const emptyFields: string[] = [];
     if (!d.address) emptyFields.push("address");
     if (!d.address_line) emptyFields.push("address_line");
@@ -296,38 +316,66 @@ serve(async (req) => {
     if (!d.access_code) emptyFields.push("access_code");
     if (!d.availability) emptyFields.push("availability");
 
-    // Only allow extraction from media that is actually analyzed (images/audio)
-    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages);
+    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes);
 
-    // Build text context
+    // Build text notes context
+    let notesTextContext = "";
+    if (hasNotes) {
+      notesTextContext = `\n✏️ NOTES ÉCRITES DE L'ARTISAN (${noteMedias.length}) :\n`;
+      for (const note of noteMedias) {
+        // Notes are stored with file_url containing the text content or as file references
+        // For note media_category, file_name typically contains the note text
+        notesTextContext += `  • [${note.created_at.slice(0, 16)}] ${note.file_name}\n`;
+      }
+    }
+
+    // Build full context
     const context = `
 DOSSIER #${d.id.slice(0, 8)}
-Client: ${[d.client_first_name, d.client_last_name].filter(Boolean).join(" ") || "Non renseigné"}
-Email: ${d.client_email || "Non renseigné"} | Tél: ${d.client_phone || "Non renseigné"}
-Adresse: ${d.address || "Non renseignée"}
-Adresse ligne: ${d.address_line || "Non renseignée"} | CP: ${d.postal_code || "?"} | Ville: ${d.city || "?"}
-Catégorie problème: ${d.category} | Urgence: ${d.urgency}
-Description client: ${d.description || "Aucune description"}
-Type logement: ${d.housing_type || "Non renseigné"} | Étage: ${d.floor_number ?? "?"} | Code accès: ${d.access_code || "?"}
-Source: ${d.source} | Statut: ${d.status}
-Statut RDV: ${d.appointment_status}${d.appointment_date ? ` | Date RDV: ${d.appointment_date} ${(d.appointment_time_start || "").slice(0, 5)}-${(d.appointment_time_end || "").slice(0, 5)}` : ""}
-Créé le: ${d.created_at} | Dernière mise à jour: ${d.updated_at}
-Relances: ${d.relance_count} envoyée(s)
+═══════════════════════════════════════
 
-DEVIS (${quotesRes.data?.length || 0}):
-${(quotesRes.data || []).map(q => `- ${q.quote_number}: ${q.status}, ${q.total_ttc ?? 0}€ TTC${q.sent_at ? ", envoyé" : ""}${q.signed_at ? ", signé" : ""}`).join("\n") || "Aucun devis"}
+👤 CLIENT
+Nom: ${[d.client_first_name, d.client_last_name].filter(Boolean).join(" ") || "Non renseigné"}
+Email: ${d.client_email || "Non renseigné"} | Tél: ${d.client_phone || "Non renseigné"}
+Disponibilités: ${d.availability || "Non renseignées"}
+
+📍 CHANTIER
+Adresse: ${d.address || "Non renseignée"}
+Rue: ${d.address_line || "?"} | CP: ${d.postal_code || "?"} | Ville: ${d.city || "?"}
+Logement: ${d.housing_type || "Non renseigné"} | Étage: ${d.floor_number ?? "?"} | Ascenseur: ${d.has_elevator === true ? "Oui" : d.has_elevator === false ? "Non" : "?"}
+Code accès: ${d.access_code || "Non renseigné"}
+Occupant: ${d.occupant_type || "?"}
+
+🔧 PROBLÈME
+Catégorie: ${d.category} | Urgence: ${d.urgency}
+Types de problème: ${d.problem_types?.join(", ") || "Non précisé"}
+Corps de métier: ${d.trade_types?.join(", ") || "Non précisé"}
+Description: ${d.description || "Aucune description"}
+
+📋 STATUT ADMINISTRATIF
+Statut dossier: ${d.status} | Source: ${d.source}
+Relances: ${d.relance_count} envoyée(s)${d.last_relance_at ? ` (dernière: ${d.last_relance_at.slice(0, 10)})` : ""}
+
+📅 RENDEZ-VOUS
+Statut RDV: ${d.appointment_status}${d.appointment_date ? `\nDate: ${d.appointment_date} de ${(d.appointment_time_start || "").slice(0, 5)} à ${(d.appointment_time_end || "").slice(0, 5)}` : ""}
+${d.appointment_notes ? `Notes RDV: ${d.appointment_notes}` : ""}
+
+💰 DEVIS (${quotes.length}):
+${quotes.map(q => `  • ${q.quote_number}: ${q.status} — ${q.total_ttc ?? 0}€ TTC${q.sent_at ? " ✉️ envoyé" : ""}${q.signed_at ? " ✅ signé" : ""}`).join("\n") || "  Aucun devis"}
 ${quotesTextContext}
-FACTURES (${invoicesRes.data?.length || 0}):
-${(invoicesRes.data || []).map(f => `- ${f.invoice_number}: ${f.status}, ${f.total_ht ?? 0}€ HT, TVA ${f.total_tva ?? 0}€, ${f.total_ttc ?? 0}€ TTC${f.paid_at ? ", payée" : ""}`).join("\n") || "Aucune facture"}
+
+🧾 FACTURES (${invoices.length}):
+${invoices.map(f => `  • ${f.invoice_number}: ${f.status} — ${f.total_ttc ?? 0}€ TTC${f.paid_at ? " ✅ payée" : f.sent_at ? " ✉️ envoyée" : ""}`).join("\n") || "  Aucune facture"}
 ${invoicesTextContext}
 
-CRÉNEAUX PROPOSÉS (${slotsRes.data?.length || 0}):
-${(slotsRes.data || []).map(s => `- ${s.slot_date} ${s.time_start.slice(0, 5)}-${s.time_end.slice(0, 5)}${s.selected_at ? " ✅ sélectionné" : ""}`).join("\n") || "Aucun"}
+📅 CRÉNEAUX PROPOSÉS (${slotsRes.data?.length || 0}):
+${(slotsRes.data || []).map(s => `  • ${s.slot_date} ${s.time_start.slice(0, 5)}-${s.time_end.slice(0, 5)}${s.selected_at ? " ✅ choisi par le client" : ""}`).join("\n") || "  Aucun"}
+${notesTextContext}
 
-HISTORIQUE RÉCENT:
-${(histRes.data || []).map(h => `- ${h.action}: ${h.details || ""} (${h.created_at.slice(0, 16)})`).join("\n") || "Aucun"}
+📜 HISTORIQUE RÉCENT:
+${(histRes.data || []).map(h => `  • ${h.action}: ${h.details || ""} (${h.created_at.slice(0, 16)})`).join("\n") || "  Aucun"}
 
-${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.join(", ")}` : ""}
+${hasEmptyFields ? `\n⚠️ CHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.join(", ")}` : ""}
 `.trim();
 
     const userContent: any = hasMedia
@@ -338,64 +386,52 @@ ${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.jo
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     // Build extraction schema
-    const extractionSchema = hasEmptyFields ? `
+    const extractionSchema = hasEmptyFields ? `,
   "extracted_fields": {
     // Uniquement les champs trouvés dans les médias parmi: ${emptyFields.join(", ")}
     // Ne remplis QUE les champs pour lesquels tu as une info CLAIRE et EXPLICITE
-    // Clés possibles: address, address_line, postal_code, city, client_phone, client_email, client_first_name, client_last_name, description, housing_type, floor_number (integer), access_code, availability
   }` : "";
 
-    // Build media analysis instructions
-    const mediaInstructions: string[] = [];
-    if (hasImages) {
-      mediaInstructions.push(`- Des PHOTOS sont jointes. ANALYSE-LES visuellement pour identifier :
-  * Le type de problème visible (fuite, casse, usure, corrosion, moisissure...)
-  * Le type et la marque d'équipement si visible (robinet, chauffe-eau, WC, tuyauterie...)
-  * L'état général de l'installation
-  * Les dégâts visibles et leur gravité estimée
-  * Tout détail utile pour préparer l'intervention (accès, espace de travail...)`);
-    }
-    if (hasVideoFiles) {
-      mediaInstructions.push(`- Des VIDÉOS existent dans le dossier mais ne sont PAS analysées automatiquement.
-  * N'invente AUCUN détail visuel/sonore issu des vidéos
-  * Mentionne simplement que des vidéos sont disponibles dans le dossier`);
-    }
-    if (hasAudio) {
-      mediaInstructions.push(`- Des NOTES VOCALES sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets`);
-    }
-    if (hasQuoteContent) {
-      mediaInstructions.push(`- Des DEVIS sont joints (PDF et/ou lignes détaillées). ANALYSE-LES pour identifier :
-  * La liste complète du matériel avec marques, références et quantités
-  * Les prestations prévues et leur durée estimée
-  * Les informations techniques importantes (dimensions, puissance, normes...)
-  * Le budget matériel vs main d'œuvre
-  * Intègre ces infos dans les bullets pour aider l'artisan à préparer l'intervention`);
-    }
+    const systemPrompt = `Tu es l'assistant IA de terrain d'un artisan (plombier/chauffagiste/multi-services). Ton rôle est de générer un résumé OPÉRATIONNEL qui aide l'artisan à :
+1. Comprendre le problème en 3 secondes
+2. Savoir exactement quel matériel emporter
+3. Connaître les conditions d'accès au chantier
+4. Avoir le statut administratif clair
 
-    const systemPrompt = `Tu es l'assistant IA d'un plombier artisan. Tu dois générer un résumé intelligent et actionnable d'un dossier client.
+Tu analyses TOUS les médias fournis : photos (détecte visuellement le problème, marque et modèle d'équipement), notes vocales (transcris et intègre les infos clés), devis/factures (extrais la liste de matériel DÉTAILLÉE avec marques, références, quantités).
 
-Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) avec ce format:
+Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) :
 {
-  "headline": "phrase courte max 15 mots résumant la situation",
-  "bullets": ["point 1", "point 2", "point 3"],
-  "next_action": "prochaine action recommandée max 20 mots"${hasEmptyFields ? ',' + extractionSchema : ''}
+  "headline": "phrase courte résumant la situation et le problème principal (max 15 mots)",
+  "bullets": [
+    "🔧 Problème : description technique précise du problème identifié",
+    "📍 Accès : étage, code, parking, conditions d'accès chantier",
+    "📋 Admin : statut devis/facture/RDV en 1 ligne",
+    "📞 Client : disponibilités et moyen de contact",
+    "... autres points importants identifiés dans les médias"
+  ],
+  "next_action": "action concrète prioritaire pour l'artisan (max 20 mots)",
+  "material_list": [
+    { "label": "Nom exact du matériel/fourniture", "qty": 1, "ref": "référence ou marque si connue" }
+  ]${extractionSchema}
 }
 
-Règles:
-- headline: max 15 mots, situation actuelle
-- bullets: 3 à 6 points clés (max 20 mots chacun)
-- next_action: action concrète pour l'artisan (jamais "écouter la note vocale" ou "regarder la photo")
-- Sois concis, utile, orienté action
-- IGNORE les erreurs techniques dans l'historique
-- Ne répète pas les labels bruts, reformule intelligemment
-- Les next_action doivent être des actions concrètes (ex: "Appeler le client", "Planifier l'intervention")
-${mediaInstructions.join("\n")}
-${hasMedia ? `- Intègre les observations des médias dans les bullets (ex: "Fuite visible sous l'évier — corrosion avancée du siphon")` : ""}
-${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uniquement ce qui est EXPLICITEMENT visible ou dit dans les médias
-- Pour description: résumé structuré du problème/diagnostic/travaux basé sur TOUS les médias
-- Pour l'adresse: décompose en address (complète), address_line (rue), postal_code, city
-- Pour le téléphone: format français
-- Pour housing_type: déduis du contexte visuel si possible (appartement, maison, etc.)` : ""}`;
+RÈGLES STRICTES :
+- headline : max 15 mots, situation actuelle + problème
+- bullets : 3 à 7 points, préfixe emoji, max 25 mots chacun. Priorise : problème technique → matériel → accès → admin → client
+- next_action : action CONCRÈTE (ex: "Commander le ballon Thermor 200L avant intervention", "Appeler le client pour confirmer le créneau")
+- material_list : OBLIGATOIRE si un devis ou une facture existe. Extrais CHAQUE ligne de matériel/fourniture avec :
+  * label : nom exact tel qu'écrit dans le devis (garde les marques, modèles, dimensions)
+  * qty : quantité
+  * ref : référence fabricant, marque ou "n/a"
+  * N'inclus PAS la main d'œuvre, déplacement, ou frais administratifs dans la material_list
+  * Si aucun devis/facture : material_list = []
+- Ne JAMAIS inventer de détails non présents dans les données
+- Les photos : décris ce que tu VOIS réellement (type de tuyau, marque visible, état, dégâts)
+- Les notes vocales : transcris les infos UTILES pour le chantier
+- Les notes écrites : intègre dans le résumé
+- Ignore les erreurs techniques dans l'historique
+${hasEmptyFields ? `- extracted_fields : n'invente RIEN, extrais UNIQUEMENT ce qui est EXPLICITEMENT visible/dit dans les médias` : ""}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -409,7 +445,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
         ],
-        temperature: 0.3,
+        temperature: 0.2,
       }),
     });
 
@@ -438,7 +474,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
       const jsonStr = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
-      parsed = { headline: rawContent.slice(0, 80) || "Résumé en cours de traitement", bullets: [], next_action: "" };
+      parsed = { headline: rawContent.slice(0, 80) || "Résumé en cours de traitement", bullets: [], next_action: "", material_list: [] };
     }
 
     // Process extracted fields if present
@@ -468,7 +504,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
-          const sourceLabel = [hasImages && "photos", hasVideoFiles && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
+          const sourceLabel = [hasImages && "photos", hasAudio && "notes vocales", hasNotes && "notes écrites", hasQuoteContent && "devis", hasInvoiceContent && "factures"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
             details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
@@ -481,9 +517,13 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
     parsed.auto_filled = updatedFields;
     parsed.media_analyzed = {
       images: validImages.length,
-      videos: videoMedias.length, // metadata only, not analyzed
+      videos: 0,
       audio: validAudios.length,
-      quotes: quotePdfCount + (quotesTextContext.length > 0 ? quotes.filter(q => q.items && Array.isArray(q.items) && (q.items as any[]).length > 0).length : 0),
+      notes: noteMedias.length,
+      quotes: quotePdfCount + (quotesTextContext.length > 0 ? quotes.filter(q => {
+        const items = q.items as any[] | null;
+        return items && Array.isArray(items) && items.length > 0;
+      }).length : 0),
       invoices: invoicePdfCount + (invoicesTextContext.length > 0 ? 1 : 0),
     };
 
