@@ -2,11 +2,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
 import { generateStructuredSummary } from "@/lib/summary";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, FileText, Receipt, Package, CheckSquare, StickyNote } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, FileText, Receipt, Package, StickyNote, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface SummaryBlockProps {
   dossier: Dossier;
@@ -31,7 +32,11 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fallback = generateStructuredSummary(dossier);
+  const [localItems, setLocalItems] = useState<MaterialItem[]>([]);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
+  const [showAddInput, setShowAddInput] = useState(false);
+  const [newItemLabel, setNewItemLabel] = useState("");
+  const addInputRef = useRef<HTMLInputElement>(null);
 
   const {
     data: aiSummary,
@@ -63,13 +68,27 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
     retry: 1,
   });
 
+  // Sync local items when AI data arrives
+  useEffect(() => {
+    if (aiSummary?.material_list) {
+      setLocalItems(aiSummary.material_list);
+      setCheckedItems(new Set());
+    }
+  }, [aiSummary?.material_list]);
+
+  // Focus input when add mode is toggled
+  useEffect(() => {
+    if (showAddInput && addInputRef.current) {
+      addInputRef.current.focus();
+    }
+  }, [showAddInput]);
+
   const summary = aiSummary || fallback;
   const showNextAction = aiSummary?.next_action;
   const hasAutoFilled = aiSummary?.auto_filled && aiSummary.auto_filled.length > 0;
   const mediaInfo = aiSummary?.media_analyzed;
   const hasMediaAnalyzed = mediaInfo && (mediaInfo.images > 0 || mediaInfo.audio > 0 || (mediaInfo.notes ?? 0) > 0 || (mediaInfo.quotes ?? 0) > 0 || (mediaInfo.invoices ?? 0) > 0);
-  const materialList = aiSummary?.material_list || [];
-  const hasMaterial = materialList.length > 0;
+  const hasMaterial = localItems.length > 0 || showAddInput;
 
   const toggleItem = (idx: number) => {
     setCheckedItems(prev => {
@@ -78,6 +97,26 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
       else next.add(idx);
       return next;
     });
+  };
+
+  const removeItem = (idx: number) => {
+    setLocalItems(prev => prev.filter((_, i) => i !== idx));
+    setCheckedItems(prev => {
+      const next = new Set<number>();
+      for (const v of prev) {
+        if (v < idx) next.add(v);
+        else if (v > idx) next.add(v - 1);
+      }
+      return next;
+    });
+  };
+
+  const addItem = () => {
+    const label = newItemLabel.trim();
+    if (!label) return;
+    setLocalItems(prev => [...prev, { label, qty: 1 }]);
+    setNewItemLabel("");
+    setShowAddInput(false);
   };
 
   return (
@@ -137,27 +176,38 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
               <div className="flex items-center gap-1.5">
                 <Package className="h-3.5 w-3.5 text-primary" />
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/70">
-                  Matériel à emporter ({materialList.length})
+                  Matériel à emporter ({localItems.length})
                 </p>
-                {checkedItems.size > 0 && (
-                  <span className="text-[10px] text-muted-foreground ml-auto">
-                    {checkedItems.size}/{materialList.length} ✓
+                {checkedItems.size > 0 && localItems.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground ml-auto mr-1">
+                    {checkedItems.size}/{localItems.length} ✓
                   </span>
                 )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-primary/60 hover:text-primary ml-auto"
+                  onClick={() => setShowAddInput(true)}
+                  title="Ajouter du matériel"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               </div>
               <ul className="space-y-1.5">
-                {materialList.map((item, i) => (
+                {localItems.map((item, i) => (
                   <li
                     key={i}
-                    className={`flex items-start gap-2 text-sm cursor-pointer transition-opacity ${checkedItems.has(i) ? "opacity-50 line-through" : ""}`}
-                    onClick={() => toggleItem(i)}
+                    className={`flex items-center gap-2 text-sm group transition-opacity ${checkedItems.has(i) ? "opacity-50" : ""}`}
                   >
                     <Checkbox
                       checked={checkedItems.has(i)}
-                      className="mt-0.5 h-3.5 w-3.5"
+                      className="mt-0 h-3.5 w-3.5 shrink-0"
                       onCheckedChange={() => toggleItem(i)}
                     />
-                    <div className="flex-1 min-w-0">
+                    <div
+                      className={`flex-1 min-w-0 cursor-pointer ${checkedItems.has(i) ? "line-through" : ""}`}
+                      onClick={() => toggleItem(i)}
+                    >
                       <span className="text-foreground/90">
                         {item.qty > 1 && <span className="font-medium text-primary">{item.qty}× </span>}
                         {item.label}
@@ -166,9 +216,36 @@ export function SummaryBlock({ dossier }: SummaryBlockProps) {
                         <span className="text-[10px] text-muted-foreground ml-1">({item.ref})</span>
                       )}
                     </div>
+                    <button
+                      onClick={() => removeItem(i)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                      title="Supprimer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </li>
                 ))}
               </ul>
+              {showAddInput && (
+                <form
+                  className="flex items-center gap-2 mt-1"
+                  onSubmit={(e) => { e.preventDefault(); addItem(); }}
+                >
+                  <Input
+                    ref={addInputRef}
+                    value={newItemLabel}
+                    onChange={(e) => setNewItemLabel(e.target.value)}
+                    placeholder="Ajouter du matériel…"
+                    className="h-7 text-sm flex-1"
+                  />
+                  <Button type="submit" size="sm" variant="secondary" className="h-7 px-2 text-xs" disabled={!newItemLabel.trim()}>
+                    OK
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setShowAddInput(false); setNewItemLabel(""); }}>
+                    ✕
+                  </Button>
+                </form>
+              )}
             </div>
           )}
 
