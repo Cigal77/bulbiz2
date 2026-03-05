@@ -29,6 +29,8 @@ interface DossierActionsProps {
 export function DossierActions({ dossier }: DossierActionsProps) {
   const { toggleRelance, sendRelance, addNote } = useDossierActions(dossier.id);
   const { uploadFiles } = useMediaUpload(dossier.id);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
