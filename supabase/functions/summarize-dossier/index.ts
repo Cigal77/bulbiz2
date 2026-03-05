@@ -84,7 +84,7 @@ serve(async (req) => {
     const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, videoMediasRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
-      supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at").eq("dossier_id", dossier_id),
+      supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
       supabase.from("invoices").select("invoice_number, status, total_ttc, sent_at, paid_at").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
