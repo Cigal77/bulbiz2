@@ -130,6 +130,32 @@
   }
 }
 
+/* RDV Calendar dots */
+.rdv-calendar .rdv-dot-confirmed::after,
+.rdv-calendar .rdv-dot-pending::after,
+.rdv-calendar .rdv-dot-action::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+}
+
+.rdv-calendar .rdv-dot-confirmed::after {
+  background-color: hsl(var(--success));
+}
+
+.rdv-calendar .rdv-dot-pending::after {
+  background-color: hsl(var(--primary));
+}
+
+.rdv-calendar .rdv-dot-action::after {
+  background-color: hsl(var(--warning));
+}
+
 /* Mobile touch target minimum */
 @media (max-width: 767px) {
   button, a[role="button"], [role="button"] {
