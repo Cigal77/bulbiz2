@@ -203,6 +203,88 @@ serve(async (req) => {
       }
     }
 
+    // Process invoices: fetch lines + PDF downloads
+    const invoices = invoicesRes.data || [];
+    let invoicesTextContext = "";
+    let invoicePdfCount = 0;
+
+    // Fetch invoice lines for all invoices
+    const invoiceIds = invoices.map(i => i.invoice_number).length > 0 ? invoices.map(i => (i as any).id || "").filter(Boolean) : [];
+    // We don't have invoice IDs directly, so fetch lines via a separate query if invoices exist
+    if (invoices.length > 0) {
+      // Get invoice IDs by querying again
+      const { data: invoicesFull } = await supabase
+        .from("invoices").select("id, invoice_number").eq("dossier_id", dossier_id);
+      
+      if (invoicesFull && invoicesFull.length > 0) {
+        const ids = invoicesFull.map(i => i.id);
+        const { data: lines } = await supabase
+          .from("invoice_lines").select("label, qty, unit, unit_price, tva_rate, invoice_id")
+          .in("invoice_id", ids).order("sort_order");
+        
+        if (lines && lines.length > 0) {
+          const linesByInvoice = new Map<string, typeof lines>();
+          for (const line of lines) {
+            const arr = linesByInvoice.get(line.invoice_id) || [];
+            arr.push(line);
+            linesByInvoice.set(line.invoice_id, arr);
+          }
+          
+          for (const inv of invoicesFull) {
+            const invLines = linesByInvoice.get(inv.id);
+            if (invLines && invLines.length > 0) {
+              invoicesTextContext += `\nDÉTAIL FACTURE ${inv.invoice_number} :\n`;
+              for (const l of invLines) {
+                invoicesTextContext += `  - ${l.label} × ${l.qty} ${l.unit} à ${l.unit_price}€ HT (TVA ${l.tva_rate}%)\n`;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Add invoice notes
+    for (const inv of invoices) {
+      if (inv.notes) {
+        invoicesTextContext += `  Notes ${inv.invoice_number}: ${inv.notes}\n`;
+      }
+    }
+
+    // Download invoice PDFs (max 2, 5MB each)
+    const invoicesWithPdf = invoices.filter(i => i.pdf_url).slice(0, 2);
+    const invoicePdfResults = await Promise.all(
+      invoicesWithPdf.map(async (inv) => {
+        try {
+          const url = inv.pdf_url!.startsWith("http")
+            ? inv.pdf_url!
+            : `${supabaseUrl}/storage/v1/object/public/dossier-medias/${inv.pdf_url}`;
+          const resp = await fetch(url);
+          if (!resp.ok) return null;
+          const blob = await resp.arrayBuffer();
+          if (blob.byteLength > 5 * 1024 * 1024) return null;
+          const b64 = base64Encode(new Uint8Array(blob));
+          return { base64: b64, invoiceNumber: inv.invoice_number };
+        } catch (e) {
+          console.error(`Error downloading PDF for ${inv.invoice_number}:`, e);
+          return null;
+        }
+      })
+    );
+
+    const validInvoicePdfs = invoicePdfResults.filter(Boolean);
+    invoicePdfCount = validInvoicePdfs.length;
+
+    if (validInvoicePdfs.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n🧾 FACTURES PDF (${validInvoicePdfs.length}) — Analyse le contenu pour extraire les détails de facturation :` });
+      for (const pdf of validInvoicePdfs) {
+        if (!pdf) continue;
+        mediaParts.push({ type: "text", text: `[Facture "${pdf.invoiceNumber}"] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${pdf.base64}` } });
+      }
+    }
+
+    const hasInvoiceContent = invoicesTextContext.length > 0 || invoicePdfCount > 0;
+
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
