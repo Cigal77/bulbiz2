@@ -84,7 +84,7 @@ serve(async (req) => {
     const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, videoMediasRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
-      supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at").eq("dossier_id", dossier_id),
+      supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
       supabase.from("invoices").select("invoice_number, status, total_ttc, sent_at, paid_at").eq("dossier_id", dossier_id),
       supabase.from("appointment_slots").select("slot_date, time_start, time_end, selected_at").eq("dossier_id", dossier_id),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
@@ -148,10 +148,66 @@ serve(async (req) => {
       }
     }
 
+    // Process quotes: items JSONB + PDF downloads
+    const quotes = quotesRes.data || [];
+    let quotesTextContext = "";
+    let quotePdfCount = 0;
+
+    // Format quote_lines items as readable text
+    for (const q of quotes) {
+      const items = q.items as any[] | null;
+      if (items && Array.isArray(items) && items.length > 0) {
+        quotesTextContext += `\nDÉTAIL DEVIS ${q.quote_number} :\n`;
+        for (const item of items) {
+          const label = item.label || item.designation || "?";
+          const qty = item.qty ?? item.quantity ?? 1;
+          const unit = item.unit || "u";
+          const price = item.unit_price ?? item.unitPrice ?? 0;
+          quotesTextContext += `  - ${label} × ${qty} ${unit} à ${price}€ HT\n`;
+        }
+        if (q.notes) quotesTextContext += `  Notes: ${q.notes}\n`;
+      }
+    }
+
+    // Download imported quote PDFs (max 2, 5MB each)
+    const importedWithPdf = quotes.filter(q => q.pdf_url).slice(0, 2);
+    const pdfResults = await Promise.all(
+      importedWithPdf.map(async (q) => {
+        try {
+          const url = q.pdf_url!.startsWith("http")
+            ? q.pdf_url!
+            : `${supabaseUrl}/storage/v1/object/public/dossier-medias/${q.pdf_url}`;
+          const resp = await fetch(url);
+          if (!resp.ok) return null;
+          const blob = await resp.arrayBuffer();
+          if (blob.byteLength > 5 * 1024 * 1024) return null;
+          const b64 = base64Encode(new Uint8Array(blob));
+          return { base64: b64, quoteNumber: q.quote_number };
+        } catch (e) {
+          console.error(`Error downloading PDF for ${q.quote_number}:`, e);
+          return null;
+        }
+      })
+    );
+
+    const validPdfs = pdfResults.filter(Boolean);
+    quotePdfCount = validPdfs.length;
+
+    // Add PDF parts to multimodal content
+    if (validPdfs.length > 0) {
+      mediaParts.push({ type: "text", text: `\n\n📄 DEVIS PDF IMPORTÉS (${validPdfs.length}) — Analyse le contenu pour extraire matériel, prestations et infos techniques :` });
+      for (const pdf of validPdfs) {
+        if (!pdf) continue;
+        mediaParts.push({ type: "text", text: `[Devis "${pdf.quoteNumber}"] :` });
+        mediaParts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${pdf.base64}` } });
+      }
+    }
+
     const hasMedia = mediaParts.length > 0;
     const hasAudio = validAudios.length > 0;
     const hasImages = validImages.length > 0;
     const hasVideos = validVideos.length > 0;
+    const hasQuoteContent = quotesTextContext.length > 0 || quotePdfCount > 0;
 
     // Build empty fields list
     const emptyFields: string[] = [];
@@ -188,7 +244,7 @@ Relances: ${d.relance_count} envoyée(s)
 
 DEVIS (${quotesRes.data?.length || 0}):
 ${(quotesRes.data || []).map(q => `- ${q.quote_number}: ${q.status}, ${q.total_ttc ?? 0}€ TTC${q.sent_at ? ", envoyé" : ""}${q.signed_at ? ", signé" : ""}`).join("\n") || "Aucun devis"}
-
+${quotesTextContext}
 FACTURES (${invoicesRes.data?.length || 0}):
 ${(invoicesRes.data || []).map(f => `- ${f.invoice_number}: ${f.status}, ${f.total_ttc ?? 0}€ TTC${f.paid_at ? ", payée" : ""}`).join("\n") || "Aucune facture"}
 
@@ -234,6 +290,14 @@ ${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.jo
     }
     if (hasAudio) {
       mediaInstructions.push(`- Des NOTES VOCALES sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets`);
+    }
+    if (hasQuoteContent) {
+      mediaInstructions.push(`- Des DEVIS sont joints (PDF et/ou lignes détaillées). ANALYSE-LES pour identifier :
+  * La liste complète du matériel avec marques, références et quantités
+  * Les prestations prévues et leur durée estimée
+  * Les informations techniques importantes (dimensions, puissance, normes...)
+  * Le budget matériel vs main d'œuvre
+  * Intègre ces infos dans les bullets pour aider l'artisan à préparer l'intervention`);
     }
 
     const systemPrompt = `Tu es l'assistant IA d'un plombier artisan. Tu dois générer un résumé intelligent et actionnable d'un dossier client.
@@ -332,7 +396,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
-          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales"].filter(Boolean).join(", ");
+          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
             details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
@@ -347,6 +411,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
       images: validImages.length,
       videos: validVideos.length,
       audio: validAudios.length,
+      quotes: quotePdfCount + (quotesTextContext.length > 0 ? quotes.filter(q => q.items && Array.isArray(q.items) && (q.items as any[]).length > 0).length : 0),
     };
 
     return new Response(JSON.stringify(parsed), {
