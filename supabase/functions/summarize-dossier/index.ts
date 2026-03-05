@@ -316,7 +316,7 @@ serve(async (req) => {
     if (!d.access_code) emptyFields.push("access_code");
     if (!d.availability) emptyFields.push("availability");
 
-    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes);
+    const hasEmptyFields = emptyFields.length > 0 && (hasAudio || hasImages || hasNotes || hasQuoteContent || hasInvoiceContent);
 
     // Build text notes context
     let notesTextContext = "";
