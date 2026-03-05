@@ -26,12 +26,6 @@ function toImageMime(fileType: string): string {
   return fileType.startsWith("image/") ? fileType : "image/jpeg";
 }
 
-function toVideoMime(fileType: string): string {
-  if (fileType.includes("mp4")) return "video/mp4";
-  if (fileType.includes("webm")) return "video/webm";
-  if (fileType.includes("3gp")) return "video/3gpp";
-  return fileType.startsWith("video/") ? fileType : "video/mp4";
-}
 
 interface MediaRecord {
   file_url: string;
@@ -66,24 +60,6 @@ async function downloadMediaAsBase64(
 }
 
 // For large files (videos), generate a signed URL instead of downloading
-async function getSignedUrl(
-  media: MediaRecord,
-  supabase: any,
-): Promise<{ signedUrl: string; mimeType: string; name: string; date: string } | null> {
-  try {
-    if (media.file_url.startsWith("http")) {
-      return { signedUrl: media.file_url, mimeType: media.file_type, name: media.file_name, date: media.created_at };
-    }
-    const { data, error } = await supabase.storage
-      .from("dossier-medias")
-      .createSignedUrl(media.file_url, 600); // 10 min
-    if (error || !data?.signedUrl) return null;
-    return { signedUrl: data.signedUrl, mimeType: media.file_type, name: media.file_name, date: media.created_at };
-  } catch (e) {
-    console.error(`Error signing URL for ${media.file_name}:`, e);
-    return null;
-  }
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -110,7 +86,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // Fetch all data in parallel
-    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, videoMediasRes] = await Promise.all([
+    const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("quote_number, status, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
@@ -120,8 +96,6 @@ serve(async (req) => {
         .eq("dossier_id", dossier_id).like("file_type", "audio/%").order("created_at", { ascending: false }).limit(3),
       supabase.from("medias").select("file_url, file_type, file_name, created_at, media_category")
         .eq("dossier_id", dossier_id).like("file_type", "image/%").order("created_at", { ascending: false }).limit(3),
-      supabase.from("medias").select("file_url, file_type, file_name, file_size, created_at, media_category")
-        .eq("dossier_id", dossier_id).like("file_type", "video/%").order("created_at", { ascending: false }).limit(2),
     ]);
 
     if (dossierRes.error) throw dossierRes.error;
@@ -129,9 +103,8 @@ serve(async (req) => {
 
     const audioMedias = audioMediasRes.data || [];
     const imageMedias = imageMediasRes.data || [];
-    const videoMedias = videoMediasRes.data || [];
 
-    // Download images (max 2MB each) and audio (max 3MB each) — NO video downloads to avoid OOM
+    // Download images (max 2MB each) and audio (max 3MB each)
     const [audioResults, imageResults] = await Promise.all([
       Promise.all(audioMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 3))),
       Promise.all(imageMedias.map(m => downloadMediaAsBase64(m, supabaseUrl, 2))),
@@ -150,13 +123,6 @@ serve(async (req) => {
         mediaParts.push({ type: "text", text: `[Photo "${img.name}" du ${img.date.slice(0, 16)}] :` });
         mediaParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${img.base64}` } });
       }
-    }
-
-    // Videos — metadata only (no download to avoid memory limit)
-    const validVideos: any[] = []; // no actual video content
-    if (videoMedias.length > 0) {
-      const videoInfo = videoMedias.map((v: any) => `"${v.file_name}" (${v.file_size ? Math.round(v.file_size / 1024 / 1024) + ' MB' : 'taille inconnue'}, ${v.created_at.slice(0, 16)})`).join(", ");
-      mediaParts.push({ type: "text", text: `\n\n🎥 VIDÉOS DISPONIBLES (${videoMedias.length}, non analysables automatiquement) : ${videoInfo}. Mentionne dans le résumé que des vidéos du chantier sont disponibles dans le dossier.` });
     }
 
     // Audio
