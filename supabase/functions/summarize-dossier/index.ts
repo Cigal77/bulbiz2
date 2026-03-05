@@ -418,7 +418,7 @@ Réponds UNIQUEMENT en JSON valide (pas de markdown, pas de backticks) :
 
 RÈGLES STRICTES :
 - headline : max 15 mots, situation actuelle + problème
-- bullets : 3 à 7 points, préfixe emoji, max 25 mots chacun. Priorise : problème technique → matériel → accès → admin → client
+- bullets : 3 à 7 points, PAS d'emoji, max 25 mots chacun. Priorise : problème technique → matériel → accès → admin → client
 - next_action : action CONCRÈTE (ex: "Commander le ballon Thermor 200L avant intervention", "Appeler le client pour confirmer le créneau")
 - material_list : OBLIGATOIRE si un devis ou une facture existe. Extrais CHAQUE ligne de matériel/fourniture avec :
   * label : nom exact tel qu'écrit dans le devis (garde les marques, modèles, dimensions)
