@@ -26,12 +26,6 @@ function toImageMime(fileType: string): string {
   return fileType.startsWith("image/") ? fileType : "image/jpeg";
 }
 
-function toVideoMime(fileType: string): string {
-  if (fileType.includes("mp4")) return "video/mp4";
-  if (fileType.includes("webm")) return "video/webm";
-  if (fileType.includes("3gp")) return "video/3gpp";
-  return fileType.startsWith("video/") ? fileType : "video/mp4";
-}
 
 interface MediaRecord {
   file_url: string;
