@@ -291,6 +291,14 @@ ${hasEmptyFields ? `\nCHAMPS MANQUANTS À EXTRAIRE DES MÉDIAS: ${emptyFields.jo
     if (hasAudio) {
       mediaInstructions.push(`- Des NOTES VOCALES sont jointes. ÉCOUTE-LES et intègre les infos clés dans les bullets`);
     }
+    if (hasQuoteContent) {
+      mediaInstructions.push(`- Des DEVIS sont joints (PDF et/ou lignes détaillées). ANALYSE-LES pour identifier :
+  * La liste complète du matériel avec marques, références et quantités
+  * Les prestations prévues et leur durée estimée
+  * Les informations techniques importantes (dimensions, puissance, normes...)
+  * Le budget matériel vs main d'œuvre
+  * Intègre ces infos dans les bullets pour aider l'artisan à préparer l'intervention`);
+    }
 
     const systemPrompt = `Tu es l'assistant IA d'un plombier artisan. Tu dois générer un résumé intelligent et actionnable d'un dossier client.
 
@@ -388,7 +396,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
         if (updateError) {
           console.error("Error updating dossier:", updateError);
         } else {
-          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales"].filter(Boolean).join(", ");
+          const sourceLabel = [hasImages && "photos", hasVideos && "vidéos", hasAudio && "notes vocales", hasQuoteContent && "devis"].filter(Boolean).join(", ");
           await supabase.from("historique").insert({
             dossier_id, user_id: d.user_id, action: "ai_auto_fill",
             details: `IA : champs remplis automatiquement depuis ${sourceLabel} — ${updatedFields.join(", ")}`,
@@ -403,6 +411,7 @@ ${hasEmptyFields ? `- Pour extracted_fields: n'invente RIEN, ne devine RIEN, uni
       images: validImages.length,
       videos: validVideos.length,
       audio: validAudios.length,
+      quotes: quotePdfCount + (quotesTextContext.length > 0 ? quotes.filter(q => q.items && Array.isArray(q.items) && (q.items as any[]).length > 0).length : 0),
     };
 
     return new Response(JSON.stringify(parsed), {
