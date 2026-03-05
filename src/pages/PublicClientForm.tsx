@@ -44,6 +44,9 @@ export default function PublicClientForm() {
   const [existingDossier, setExistingDossier] = useState<any>(null);
   const [step, setStep] = useState(1);
 
+  const slotsEnabled = artisan?.client_slots_enabled !== false;
+  const TOTAL_STEPS = slotsEnabled ? 5 : 4;
+
   const [form, setForm] = useState({
     client_first_name: "",
     client_last_name: "",
