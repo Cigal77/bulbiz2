@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dossier } from "@/hooks/useDossier";
 import { generateStructuredSummary } from "@/lib/summary";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, RefreshCw, Loader2, Zap, Mic } from "lucide-react";
+import { Sparkles, RefreshCw, Loader2, Zap, Mic, Camera, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
