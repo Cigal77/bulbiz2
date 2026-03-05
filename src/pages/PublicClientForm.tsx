@@ -20,14 +20,13 @@ import { cn } from "@/lib/utils";
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
-const TOTAL_STEPS = 5;
-
 interface ArtisanProfile {
   first_name: string | null;
   last_name: string | null;
   company_name: string | null;
   phone: string | null;
   email: string | null;
+  client_slots_enabled?: boolean;
 }
 
 interface ProposedSlot {
@@ -44,6 +43,9 @@ export default function PublicClientForm() {
   const [success, setSuccess] = useState(false);
   const [existingDossier, setExistingDossier] = useState<any>(null);
   const [step, setStep] = useState(1);
+
+  const slotsEnabled = artisan?.client_slots_enabled !== false;
+  const TOTAL_STEPS = slotsEnabled ? 5 : 4;
 
   const [form, setForm] = useState({
     client_first_name: "",
@@ -78,7 +80,7 @@ export default function PublicClientForm() {
       if (!slug) { setNotFound(true); setLoading(false); return; }
       const { data, error } = await supabase
         .from("profiles")
-        .select("first_name, last_name, company_name, phone, email")
+        .select("first_name, last_name, company_name, phone, email, client_slots_enabled")
         .eq("public_client_slug", slug)
         .maybeSingle();
       if (error || !data) { setNotFound(true); } else { setArtisan(data); }
@@ -329,12 +331,15 @@ export default function PublicClientForm() {
     );
   }
 
+  const validationStep = TOTAL_STEPS;
+  const slotStep = slotsEnabled ? 4 : -1;
+
   const canGoNext = () => {
     if (step === 1) return selectedTrades.length > 0;
     if (step === 2) return form.client_first_name.trim() && form.client_last_name.trim() && (form.client_email ? validateEmail(form.client_email) : true);
     if (step === 3) return true;
-    if (step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
-    if (step === 5) return rgpdConsent;
+    if (slotsEnabled && step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
+    if (step === validationStep) return rgpdConsent;
     return false;
   };
 
@@ -342,7 +347,7 @@ export default function PublicClientForm() {
     if (!canGoNext()) return;
     const available = await checkSlotAvailability();
     if (available) {
-      setStep(5);
+      setStep(validationStep);
     }
   };
 
@@ -560,8 +565,8 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 4: Slot proposals */}
-        {step === 4 && (
+        {/* Step 4: Slot proposals (only if enabled) */}
+        {slotsEnabled && step === slotStep && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -641,8 +646,8 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 5: RGPD + Submit */}
-        {step === 5 && (
+        {/* Validation step */}
+        {step === validationStep && (
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Confirmation</CardTitle>
@@ -659,7 +664,7 @@ export default function PublicClientForm() {
                 {files.length > 0 && <p><strong>Médias :</strong> {files.length} fichier(s)</p>}
 
                 {/* Proposed slots summary */}
-                {getValidSlots().length > 0 && (
+                {slotsEnabled && getValidSlots().length > 0 && (
                   <div>
                     <strong>Créneaux proposés :</strong>
                     <ul className="mt-1 space-y-1">
@@ -704,7 +709,7 @@ export default function PublicClientForm() {
             </Button>
           )}
           {step < TOTAL_STEPS ? (
-            step === 4 ? (
+            step === slotStep ? (
               <Button
                 onClick={handleNextFromSlots}
                 disabled={!canGoNext() || checkingSlots}

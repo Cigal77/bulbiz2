@@ -47,6 +47,7 @@ interface SettingsForm {
   tva_intracom: string;
   vat_applicable: boolean;
   payment_terms_default: string;
+  client_slots_enabled: boolean;
 }
 
 export default function Settings() {
@@ -88,6 +89,7 @@ export default function Settings() {
         tva_intracom: profile.tva_intracom ?? "",
         vat_applicable: profile.vat_applicable ?? true,
         payment_terms_default: profile.payment_terms_default ?? "Paiement à réception de facture. Chèque, virement ou espèces.",
+        client_slots_enabled: (profile as any).client_slots_enabled ?? true,
       });
     }
   }, [profile, reset]);
@@ -114,6 +116,7 @@ export default function Settings() {
         tva_intracom: data.tva_intracom || null,
         vat_applicable: data.vat_applicable,
         payment_terms_default: data.payment_terms_default || null,
+        client_slots_enabled: data.client_slots_enabled,
       });
       toast.success("Paramètres sauvegardés");
     } catch (e) {
@@ -187,6 +190,26 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label htmlFor="default_validity_days">Validité devis (jours)</Label>
                 <Input id="default_validity_days" type="number" min={1} {...register("default_validity_days", { valueAsNumber: true })} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gestion des demandes clients */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestion des demandes clients</CardTitle>
+              <CardDescription>Options du formulaire de demande client</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Autoriser le client à proposer des créneaux</Label>
+                  <p className="text-sm text-muted-foreground">Si activé, le client pourra proposer 3 créneaux à la fin du formulaire. Sinon, vous proposerez les créneaux depuis le dossier.</p>
+                </div>
+                <Switch
+                  checked={watch("client_slots_enabled")}
+                  onCheckedChange={(v) => setValue("client_slots_enabled", v)}
+                />
               </div>
             </CardContent>
           </Card>
