@@ -102,6 +102,7 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
   const [manualStart, setManualStart] = useState("09:00");
   const [manualEnd, setManualEnd] = useState("11:00");
   const [resending, setResending] = useState(false);
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
   const hasValidContact = !!(dossier.client_email || dossier.client_phone);
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.none;
@@ -391,6 +392,56 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       syncToGoogleCalendar(selected.slot_date, selected.time_start, selected.time_end);
     },
     onSuccess: () => { toast({ title: "Rendez-vous confirmé ✅" }); invalidate(); },
+    onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
+  });
+
+  // Confirm a proposed slot (artisan picks from list)
+  const confirmProposedSlot = useMutation({
+    mutationFn: async () => {
+      if (!selectedSlotId) throw new Error("Sélectionnez un créneau");
+      const slot = slots.find((s) => s.id === selectedSlotId);
+      if (!slot) throw new Error("Créneau introuvable");
+
+      const conflicts = findConflicts(slot.slot_date, slot.time_start, slot.time_end, confirmedRdvs, dossier.id);
+      if (conflicts.length > 0) {
+        const clientName = [conflicts[0].client_first_name, conflicts[0].client_last_name].filter(Boolean).join(" ") || "un client";
+        throw new Error(`Conflit : vous avez déjà un RDV avec ${clientName} le ${slot.slot_date} de ${conflicts[0].appointment_time_start.slice(0, 5)} à ${conflicts[0].appointment_time_end.slice(0, 5)}`);
+      }
+
+      const { error } = await supabase
+        .from("dossiers")
+        .update({
+          status: "rdv_pris", status_changed_at: new Date().toISOString(),
+          appointment_status: "rdv_confirmed", appointment_date: slot.slot_date,
+          appointment_time_start: slot.time_start, appointment_time_end: slot.time_end,
+          appointment_source: "manual", appointment_confirmed_at: new Date().toISOString(),
+        } as any)
+        .eq("id", dossier.id);
+      if (error) throw error;
+
+      const dateStr = format(new Date(slot.slot_date), "EEEE d MMMM yyyy", { locale: fr });
+      await addHistorique("rdv_confirmed", `Créneau confirmé par l'artisan : ${dateStr} ${slot.time_start.slice(0, 5)}–${slot.time_end.slice(0, 5)}`);
+
+      try {
+        const fullAddress = dossier.address || [dossier.address_line, dossier.postal_code, dossier.city].filter(Boolean).join(", ");
+        await sendNotification("APPOINTMENT_CONFIRMED", {
+          appointment_date: dateStr,
+          appointment_time: slot.time_start.slice(0, 5),
+          appointment_time_end: slot.time_end.slice(0, 5),
+          address: fullAddress,
+          raw_date: slot.slot_date,
+        });
+      } catch (e) {
+        console.error("Notification error after confirm proposed slot:", e);
+      }
+
+      syncToGoogleCalendar(slot.slot_date, slot.time_start, slot.time_end);
+    },
+    onSuccess: () => {
+      toast({ title: "Rendez-vous confirmé ✅" });
+      setSelectedSlotId(null);
+      invalidate();
+    },
     onError: (e: Error) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
@@ -697,8 +748,37 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
         </div>
       )}
 
-      {/* Proposed slots list */}
-      {(status === "slots_proposed" || status === "client_selected") && slots.length > 0 && (
+      {/* Proposed slots list — interactive for slots_proposed */}
+      {status === "slots_proposed" && slots.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground font-medium">Choisissez un créneau à confirmer :</p>
+          {slots.map((slot) => (
+            <button
+              key={slot.id}
+              type="button"
+              onClick={() => setSelectedSlotId(slot.id === selectedSlotId ? null : slot.id)}
+              className={cn(
+                "w-full text-xs rounded px-2.5 py-2 flex items-center gap-2 text-left transition-colors border",
+                slot.id === selectedSlotId
+                  ? "bg-primary/10 border-primary text-primary font-medium"
+                  : "bg-muted border-transparent text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <div className={cn(
+                "h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center",
+                slot.id === selectedSlotId ? "border-primary" : "border-muted-foreground/40"
+              )}>
+                {slot.id === selectedSlotId && <div className="h-2 w-2 rounded-full bg-primary" />}
+              </div>
+              {format(new Date(slot.slot_date), "EEE d MMM", { locale: fr })} {slot.time_start.slice(0, 5)}–{slot.time_end.slice(0, 5)}
+              {slot.selected_at && <Badge variant="outline" className="ml-auto text-[9px] px-1.5 py-0">Choix client</Badge>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Static slot list for client_selected */}
+      {status === "client_selected" && slots.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground font-medium">Créneaux proposés :</p>
           {slots.map((slot) => (
@@ -713,13 +793,23 @@ export function AppointmentBlock({ dossier, onOpenSmartSheet }: AppointmentBlock
       {/* Action buttons for slots_proposed / client_selected / rdv_confirmed */}
       <div className="flex flex-col gap-2">
         {status === "slots_proposed" && (
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
-              <Plus className="h-3.5 w-3.5" /> Ajouter des créneaux
-            </Button>
-            <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
-              <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
-            </Button>
+          <div className="flex flex-col gap-2">
+            {selectedSlotId && (
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                <Button className="w-full gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold h-11" onClick={() => confirmProposedSlot.mutate()} disabled={confirmProposedSlot.isPending}>
+                  {confirmProposedSlot.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Confirmer ce créneau
+                </Button>
+              </motion.div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowSlotForm(true)}>
+                <Plus className="h-3.5 w-3.5" /> Proposer d'autres créneaux
+              </Button>
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => onOpenSmartSheet ? onOpenSmartSheet() : setShowManualForm(true)}>
+                <Edit2 className="h-3.5 w-3.5" /> Fixer manuellement
+              </Button>
+            </div>
           </div>
         )}
 
