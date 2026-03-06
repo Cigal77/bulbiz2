@@ -41,6 +41,7 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
   const [showAddInput, setShowAddInput] = useState(false);
   const [newItemLabel, setNewItemLabel] = useState("");
   const addInputRef = useRef<HTMLInputElement>(null);
+  const [forceRefresh, setForceRefresh] = useState(false);
 
   const {
     data: aiSummary,
@@ -51,13 +52,16 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
   } = useQuery<AiSummary>({
     queryKey: ["ai-summary", dossier.id, dossier.status, dossier.appointment_status, mediaCount, historiqueCount, quotesCount],
     queryFn: async () => {
+      const shouldForce = forceRefresh;
+      // Reset force flag after consuming it
+      if (shouldForce) setForceRefresh(false);
+
       const { data, error } = await supabase.functions.invoke("summarize-dossier", {
-        body: { dossier_id: dossier.id },
+        body: { dossier_id: dossier.id, force: shouldForce },
       });
 
       if (error || data?.error) {
         const message = `${error?.message ?? ""} ${data?.error ?? ""}`;
-        // Session not ready / expired token: avoid runtime crash and use local fallback
         if (message.includes("401") || message.includes("Non authentifié")) {
           return fallback as AiSummary;
         }
@@ -137,9 +141,9 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
           variant="ghost"
           size="icon"
           className="h-7 w-7 text-primary/60 hover:text-primary"
-          onClick={() => refetch()}
+          onClick={() => { setForceRefresh(true); setTimeout(() => refetch(), 0); }}
           disabled={isFetching}
-          title="Régénérer le résumé IA"
+          title="Régénérer le résumé IA (ignore le cache)"
         >
           {isFetching ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

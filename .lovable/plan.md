@@ -1,70 +1,79 @@
 
+# Audit et corrections des automatisations email/notifications
 
-## Plan : Cache en base pour le résumé IA
+## Problemes identifies
 
-### Problème
-Chaque ouverture de dossier déclenche un appel IA (~656 lignes de traitement multimodal), même si rien n'a changé. Cela consomme des crédits inutilement.
+### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
+**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
+- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
+- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
 
-### Solution
-Ajouter une table `ai_summary_cache` qui stocke le résumé IA et un "fingerprint" des données du dossier. La fonction `summarize-dossier` compare le fingerprint avant d'appeler l'IA.
+### 2. Bug `send-invoice` : authentification inconsistante
+**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
+- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
 
-### 1. Migration : table `ai_summary_cache`
+### 3. Bug `send-appointment-notification` : authentification inconsistante
+**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
+- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
 
-```sql
-CREATE TABLE public.ai_summary_cache (
-  dossier_id uuid PRIMARY KEY REFERENCES public.dossiers(id) ON DELETE CASCADE,
-  summary_json jsonb NOT NULL,
-  data_fingerprint text NOT NULL,
-  generated_at timestamptz NOT NULL DEFAULT now()
-);
+### 4. Notification artisan manquante sur confirmation RDV
+**Fichier** : `supabase/functions/submit-client-form/index.ts`
+- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
+- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
 
-ALTER TABLE public.ai_summary_cache ENABLE ROW LEVEL SECURITY;
+### 5. Notification artisan manquante sur selection de creneau (multi-slots)
+- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
 
-CREATE POLICY "Users can view own cache"
-  ON public.ai_summary_cache FOR SELECT
-  USING (dossier_id IN (SELECT id FROM public.dossiers WHERE user_id = auth.uid()));
+### 6. Lien dossier hardcode dans `submit-client-form`
+**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
+- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
 
-CREATE POLICY "Users can upsert own cache"
-  ON public.ai_summary_cache FOR INSERT
-  WITH CHECK (dossier_id IN (SELECT id FROM public.dossiers WHERE user_id = auth.uid()));
+### 7. Email facture sans signature personnalisee
+**Fichier** : `supabase/functions/send-invoice/index.ts`
+- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
 
-CREATE POLICY "Users can update own cache"
-  ON public.ai_summary_cache FOR UPDATE
-  USING (dossier_id IN (SELECT id FROM public.dossiers WHERE user_id = auth.uid()));
-```
+### 8. Email facture sans numero de facture dans le sujet
+- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
 
-### 2. Edge Function `summarize-dossier` : ajout du cache
+---
 
-Avant l'appel IA (après le fetch des données, ~ligne 110), calculer un fingerprint basé sur :
-- `dossier.updated_at`
-- nombre de médias (audio + images + notes)
-- nombre d'entrées historique
-- nombre de devis + statuts
-- nombre de factures + statuts
+## Plan de corrections
 
+### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
+- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+- Ajouter la signature personnalisee
+- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+
+### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+
+### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
+- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
+- Remplacer le lien hardcode par `app.bulbiz.io`
+- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
+
+---
+
+## Details techniques
+
+### `send-invoice/index.ts` - Changements
 ```text
-fingerprint = md5(JSON.stringify({
-  updated_at, media_count, hist_count, 
-  quotes: [{id, status, total_ttc}...],
-  invoices: [{id, status, total_ttc}...]
-}))
+Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
+Ligne 170-218 : Remonter artisanName + signature au bon scope
+Ligne 181      : Ajouter signature personnalisee dans l'email
+Ligne 218      : Fixer la reference artisanName dans le SMS
+Sujet email    : Ajouter numero facture
 ```
 
-Logique :
-1. Fetch le cache existant depuis `ai_summary_cache` WHERE `dossier_id`
-2. Si le fingerprint correspond → retourner `summary_json` directement (0 appel IA)
-3. Sinon → continuer le flow actuel, puis UPSERT le résultat dans `ai_summary_cache`
+### `send-appointment-notification/index.ts` - Changements
+```text
+Lignes 210-217 : Remplacer auth getUser() par decodage JWT
+```
 
-Le paramètre `force: true` dans le body permettra de forcer la régénération (bouton refresh).
-
-### 3. Frontend `SummaryBlock.tsx`
-
-- Passer `force: true` dans le body uniquement quand l'utilisateur clique sur le bouton refresh
-- Le comportement par défaut (chargement auto) utilisera le cache
-
-### Résultat attendu
-
-- Ouverture d'un dossier inchangé : 0 crédit IA consommé
-- Ajout d'un média/note/devis → `updated_at` change → régénération automatique
-- Bouton refresh → force la régénération
-
+### `submit-client-form/index.ts` - Changements
+```text
+Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
+Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
+Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
+```
