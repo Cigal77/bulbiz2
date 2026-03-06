@@ -54,8 +54,15 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
       const { data, error } = await supabase.functions.invoke("summarize-dossier", {
         body: { dossier_id: dossier.id },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+
+      if (error || data?.error) {
+        const message = `${error?.message ?? ""} ${data?.error ?? ""}`;
+        // Session not ready / expired token: avoid runtime crash and use local fallback
+        if (message.includes("401") || message.includes("Non authentifié")) {
+          return fallback as AiSummary;
+        }
+        throw error ?? new Error(data.error);
+      }
 
       if (data?.auto_filled?.length > 0) {
         queryClient.invalidateQueries({ queryKey: ["dossier", dossier.id] });
