@@ -5,13 +5,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
 import { useMemo, useState } from "react";
 import { isToday, parseISO } from "date-fns";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { DossierPickerSheet } from "@/components/DossierPickerSheet";
 import { ImportDevisDialog } from "@/components/dossier/ImportDevisDialog";
 import { ImportFactureDialog } from "@/components/dossier/ImportFactureDialog";
@@ -64,39 +58,67 @@ export function MobileBottomNav() {
 
   if (!isMobile) return null;
 
-  const publicPaths = ["/auth", "/client", "/devis/validation", "/facture/view"];
-  if (publicPaths.some(p => location.pathname.startsWith(p))) return null;
+  const publicPaths = [
+    "/auth",
+    "/client",
+    "/devis/validation",
+    "/facture/view",
+    "/reset-password",
+    "/cgu",
+    "/mentions-legales",
+    "/politique-confidentialite",
+    "/dpa",
+    "/cookies",
+  ];
+  if (publicPaths.some((p) => location.pathname.startsWith(p))) return null;
+
+  // PublicClientForm sur /:slug — exclure tout chemin hors routes app connues
+  const appPaths = ["/", "/a-faire", "/rdv", "/dossier", "/nouveau", "/parametres", "/devis/new", "/facture/new"];
+  const isAppPath = appPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+  if (!isAppPath) return null;
 
   const NAV_ITEMS = [
     {
-      id: "todo", icon: ClipboardList, label: "À faire",
+      id: "todo",
+      icon: ClipboardList,
+      label: "À faire",
       path: "/a-faire",
       badge: badges.todo > 0 ? badges.todo : undefined,
       isActive: location.pathname === "/a-faire",
     },
     {
-      id: "dossiers", icon: FolderOpen, label: "Dossiers",
+      id: "dossiers",
+      icon: FolderOpen,
+      label: "Dossiers",
       path: "/",
       isActive: location.pathname === "/" && !location.search,
     },
     {
-      id: "plus", icon: Plus, label: "Nouveau",
-      path: "", isAction: true, isActive: false,
+      id: "plus",
+      icon: Plus,
+      label: "Nouveau",
+      path: "",
+      isAction: true,
+      isActive: false,
     },
     {
-      id: "rdv", icon: Calendar, label: "RDV",
+      id: "rdv",
+      icon: Calendar,
+      label: "RDV",
       path: "/rdv",
-      badge: (badges.rdvToday + badges.rdvPending) > 0 ? (badges.rdvToday + badges.rdvPending) : undefined,
+      badge: badges.rdvToday + badges.rdvPending > 0 ? badges.rdvToday + badges.rdvPending : undefined,
       isActive: location.pathname === "/rdv",
     },
     {
-      id: "settings", icon: Settings, label: "Réglages",
+      id: "settings",
+      icon: Settings,
+      label: "Réglages",
       path: "/parametres",
       isActive: location.pathname === "/parametres",
     },
   ];
 
-  const handleNav = (item: typeof NAV_ITEMS[number]) => {
+  const handleNav = (item: (typeof NAV_ITEMS)[number]) => {
     if (item.isAction) {
       setActionSheetOpen(true);
     } else {
@@ -137,9 +159,7 @@ export function MobileBottomNav() {
   };
 
   const pickerTitle =
-    importType === "devis"
-      ? "Importer un devis — Choisir un dossier"
-      : "Importer une facture — Choisir un dossier";
+    importType === "devis" ? "Importer un devis — Choisir un dossier" : "Importer une facture — Choisir un dossier";
 
   return (
     <>
@@ -151,11 +171,7 @@ export function MobileBottomNav() {
               onClick={() => handleNav(item)}
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 flex-1 py-1.5 rounded-lg transition-colors min-h-[44px] relative",
-                item.isAction
-                  ? "text-primary-foreground"
-                  : item.isActive
-                    ? "text-primary"
-                    : "text-muted-foreground"
+                item.isAction ? "text-primary-foreground" : item.isActive ? "text-primary" : "text-muted-foreground",
               )}
             >
               {item.isAction ? (
@@ -172,10 +188,7 @@ export function MobileBottomNav() {
                   )}
                 </div>
               )}
-              <span className={cn(
-                "text-[10px] font-medium leading-none",
-                item.isAction ? "text-primary mt-0.5" : ""
-              )}>
+              <span className={cn("text-[10px] font-medium leading-none", item.isAction ? "text-primary mt-0.5" : "")}>
                 {item.label}
               </span>
             </button>
@@ -200,9 +213,7 @@ export function MobileBottomNav() {
               </div>
               <div>
                 <div className="font-medium text-sm">Nouveau dossier</div>
-                <div className="text-xs text-muted-foreground">
-                  Créer un dossier client de zéro
-                </div>
+                <div className="text-xs text-muted-foreground">Créer un dossier client de zéro</div>
               </div>
             </button>
 
@@ -215,9 +226,7 @@ export function MobileBottomNav() {
               </div>
               <div>
                 <div className="font-medium text-sm">Importer un devis (PDF)</div>
-                <div className="text-xs text-muted-foreground">
-                  Ajouter un devis à un dossier existant ou nouveau
-                </div>
+                <div className="text-xs text-muted-foreground">Ajouter un devis à un dossier existant ou nouveau</div>
               </div>
             </button>
 
