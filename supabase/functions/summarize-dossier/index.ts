@@ -681,6 +681,17 @@ ${hasEmptyFields ? `- extracted_fields — RÈGLES CRITIQUES :
       invoices: invoicePdfCount + (invoicesTextContext.length > 0 ? 1 : 0),
     };
 
+    // === SAVE TO CACHE ===
+    await supabase.from("ai_summary_cache").upsert({
+      dossier_id,
+      summary_json: parsed,
+      data_fingerprint: fingerprint,
+      generated_at: new Date().toISOString(),
+    }, { onConflict: "dossier_id" }).then(({ error }) => {
+      if (error) console.error("Cache upsert error:", error);
+      else console.log("Cache saved for dossier", dossier_id);
+    });
+
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
