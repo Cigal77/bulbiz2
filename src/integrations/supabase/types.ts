@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_summary_cache: {
+        Row: {
+          data_fingerprint: string
+          dossier_id: string
+          generated_at: string
+          summary_json: Json
+        }
+        Insert: {
+          data_fingerprint: string
+          dossier_id: string
+          generated_at?: string
+          summary_json: Json
+        }
+        Update: {
+          data_fingerprint?: string
+          dossier_id?: string
+          generated_at?: string
+          summary_json?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_summary_cache_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: true
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_slots: {
         Row: {
           created_at: string
