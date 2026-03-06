@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { encode as hexEncode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,7 +64,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { dossier_id } = await req.json();
+    const { dossier_id, force } = await req.json();
     if (!dossier_id) throw new Error("dossier_id requis");
 
     const authHeader = req.headers.get("Authorization");
@@ -112,6 +114,42 @@ serve(async (req) => {
     const audioMedias = audioMediasRes.data || [];
     const imageMedias = imageMediasRes.data || [];
     const noteMedias = noteMediasRes.data || [];
+    const quotes = quotesRes.data || [];
+    const invoices = invoicesRes.data || [];
+    const hist = histRes.data || [];
+
+    // === CACHE LOGIC ===
+    // Build fingerprint from data that affects the summary
+    const fingerprintData = JSON.stringify({
+      updated_at: d.updated_at,
+      status: d.status,
+      appointment_status: d.appointment_status,
+      media_count: audioMedias.length + imageMedias.length + noteMedias.length,
+      hist_count: hist.length,
+      quotes: quotes.map(q => ({ id: q.id, status: q.status, total_ttc: q.total_ttc })),
+      invoices: invoices.map(i => ({ id: i.id, status: i.status, total_ttc: i.total_ttc })),
+    });
+    const fingerprintBytes = await crypto.subtle.digest("MD5", new TextEncoder().encode(fingerprintData));
+    const fingerprint = new TextDecoder().decode(hexEncode(new Uint8Array(fingerprintBytes)));
+
+    // Check cache (skip if force refresh)
+    if (!force) {
+      const { data: cached } = await supabase
+        .from("ai_summary_cache")
+        .select("summary_json, data_fingerprint")
+        .eq("dossier_id", dossier_id)
+        .maybeSingle();
+
+      if (cached && cached.data_fingerprint === fingerprint) {
+        console.log("Cache HIT for dossier", dossier_id);
+        return new Response(JSON.stringify(cached.summary_json), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.log("Cache MISS for dossier", dossier_id);
+    } else {
+      console.log("Force refresh for dossier", dossier_id);
+    }
 
     // Download images (max 2MB each) and audio (max 3MB each)
     const [audioResults, imageResults] = await Promise.all([
