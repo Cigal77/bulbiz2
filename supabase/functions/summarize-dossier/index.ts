@@ -185,7 +185,6 @@ serve(async (req) => {
     }
 
     // Process quotes: structured lines + items JSONB + PDF downloads
-    const quotes = quotesRes.data || [];
     let quotesTextContext = "";
     let quotePdfCount = 0;
 
