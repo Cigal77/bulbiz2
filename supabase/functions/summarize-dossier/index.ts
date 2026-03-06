@@ -73,18 +73,17 @@ serve(async (req) => {
     }
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
-    // Verify the caller is authenticated via JWT claims
+    // Verify the caller is authenticated
     const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const token = authHeader.replace("Bearer ", "");
-    const { data, error: claimsError } = await authClient.auth.getClaims(token);
-    if (claimsError || !data?.claims?.sub) {
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: "Non authentifié" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userId = data.claims.sub;
+    const userId = user.id;
 
     // Use service role to bypass RLS
     const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
