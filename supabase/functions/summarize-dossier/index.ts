@@ -268,7 +268,7 @@ serve(async (req) => {
     }
 
     // Process invoices
-    const invoices = invoicesRes.data || [];
+    // invoices already declared above (line 118)
     let invoicesTextContext = "";
     let invoicePdfCount = 0;
 
