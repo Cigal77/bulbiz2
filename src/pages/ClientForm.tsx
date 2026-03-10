@@ -273,7 +273,7 @@ export default function ClientForm() {
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
     if (form.client_email && !validateEmail(form.client_email)) {
-      setEmailError("Format d'email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       setStep(2);
       return;
     }

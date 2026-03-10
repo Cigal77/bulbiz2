@@ -184,7 +184,7 @@ export default function PublicClientForm() {
   async function handleSubmit() {
     if (!form.client_first_name.trim() || !form.client_last_name.trim()) return;
     if (form.client_email && !validateEmail(form.client_email)) {
-      setEmailError("Email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       return;
     }
     if (!rgpdConsent) return;
