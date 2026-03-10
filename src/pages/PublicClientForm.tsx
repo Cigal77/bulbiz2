@@ -91,9 +91,7 @@ export default function PublicClientForm() {
 
   const artisanName = artisan?.company_name || [artisan?.first_name, artisan?.last_name].filter(Boolean).join(" ") || "Artisan";
 
-  function validateEmail(email: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  }
+// Shared email validation imported at top level
 
   function handleFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
