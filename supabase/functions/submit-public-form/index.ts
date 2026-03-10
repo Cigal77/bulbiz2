@@ -16,20 +16,57 @@ async function refreshGmailToken(supabase: any, userId: string, connection: any)
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: connection.refresh_token, grant_type: "refresh_token" }),
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: connection.refresh_token,
+        grant_type: "refresh_token",
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) return null;
-    await supabase.from("gmail_connections").update({ access_token: data.access_token, token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString() }).eq("user_id", userId);
+    await supabase
+      .from("gmail_connections")
+      .update({
+        access_token: data.access_token,
+        token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
+      })
+      .eq("user_id", userId);
     return data.access_token;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-async function sendViaGmail(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
-  const message = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`, `MIME-Version: 1.0`, `Content-Type: text/html; charset=UTF-8`, ``, html].join("\r\n");
-  const raw = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
-  if (!resp.ok) { console.error("Gmail API error:", await resp.text()); return false; }
+async function sendViaGmail(
+  accessToken: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    html,
+  ].join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  if (!resp.ok) {
+    console.error("Gmail API error:", await resp.text());
+    return false;
+  }
   await resp.json();
   return true;
 }
@@ -39,7 +76,11 @@ async function getGmailConnection(supabase: any, userId: string) {
   if (!conn) return null;
   if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
     const newToken = await refreshGmailToken(supabase, userId, conn);
-    if (newToken) { conn.access_token = newToken; } else { return null; }
+    if (newToken) {
+      conn.access_token = newToken;
+    } else {
+      return null;
+    }
   }
   return conn;
 }
@@ -53,11 +94,17 @@ Deno.serve(async (req) => {
     const { slug, data, media_urls, rgpd_consent, proposed_slots } = await req.json();
 
     if (!slug || !data) {
-      return new Response(JSON.stringify({ error: "Missing slug or data" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Missing slug or data" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (!rgpd_consent) {
-      return new Response(JSON.stringify({ error: "RGPD consent required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "RGPD consent required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -72,7 +119,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: "Artisan not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Artisan not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const userId = profile.user_id;
@@ -143,7 +193,10 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error("Dossier insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to create dossier" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Failed to create dossier" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const dossierId = newDossier.id;
@@ -173,17 +226,22 @@ Deno.serve(async (req) => {
       await supabase.from("appointment_slots").insert(slotInserts);
 
       // Set appointment_status to slots_proposed
-      await supabase.from("dossiers").update({
-        appointment_status: "slots_proposed",
-      }).eq("id", dossierId);
+      await supabase
+        .from("dossiers")
+        .update({
+          appointment_status: "slots_proposed",
+        })
+        .eq("id", dossierId);
 
       // Build HTML for email
       const dateFormatter = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-      slotsHtml = proposed_slots.map((s: any) => {
-        const d = new Date(s.date + "T00:00:00");
-        const dateStr = dateFormatter.format(d);
-        return `<li style="padding:4px 0;">${dateStr} à ${s.time_start.slice(0, 5)}</li>`;
-      }).join("");
+      slotsHtml = proposed_slots
+        .map((s: any) => {
+          const d = new Date(s.date + "T00:00:00");
+          const dateStr = dateFormatter.format(d);
+          return `<li style="padding:4px 0;">${dateStr} à ${s.time_start.slice(0, 5)}</li>`;
+        })
+        .join("");
 
       await supabase.from("historique").insert({
         dossier_id: dossierId,
@@ -203,15 +261,22 @@ Deno.serve(async (req) => {
     const hasContact = data.client_email || data.client_phone;
     const hasDescription = data.description?.trim();
     if (hasContact && hasDescription && !proposed_slots?.length) {
-      await supabase.from("dossiers").update({ status: "devis_a_faire", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
+      await supabase
+        .from("dossiers")
+        .update({ status: "devis_a_faire", status_changed_at: new Date().toISOString() })
+        .eq("id", dossierId);
     } else if (proposed_slots?.length) {
-      await supabase.from("dossiers").update({ status: "en_attente_rdv", status_changed_at: new Date().toISOString() }).eq("id", dossierId);
+      await supabase
+        .from("dossiers")
+        .update({ status: "en_attente_rdv", status_changed_at: new Date().toISOString() })
+        .eq("id", dossierId);
     }
 
     // ── Send emails ──
     const origin = req.headers.get("origin") || "https://app.bulbiz.io";
     const clientName = [data.client_first_name, data.client_last_name].filter(Boolean).join(" ") || "Client";
-    const artisanName = profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Votre artisan";
+    const artisanName =
+      profile.company_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Votre artisan";
 
     // Email to artisan
     const artisanEmailHtml = `
@@ -226,12 +291,16 @@ Deno.serve(async (req) => {
           ${data.description ? `<tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Description</td><td style="padding:8px;border-bottom:1px solid #eee;">${data.description}</td></tr>` : ""}
           ${media_urls?.length ? `<tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Médias</td><td style="padding:8px;border-bottom:1px solid #eee;">${media_urls.length} fichier(s)</td></tr>` : ""}
         </table>
-        ${slotsHtml ? `
+        ${
+          slotsHtml
+            ? `
         <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:16px;margin:16px 0;">
           <h3 style="color:#0369a1;margin:0 0 8px;">📅 Créneaux proposés par le client</h3>
           <ul style="list-style:none;padding:0;margin:0;">${slotsHtml}</ul>
         </div>
-        ` : ""}
+        `
+            : ""
+        }
         <a href="${origin}/dossier/${dossierId}" style="display:inline-block;background:#f59e0b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Voir le dossier</a>
       </div>
     `;
@@ -244,13 +313,19 @@ Deno.serve(async (req) => {
     if (profile.email) {
       const gmailConn = await getGmailConnection(supabase, userId);
       if (gmailConn) {
-        await sendViaGmail(gmailConn.access_token, gmailConn.gmail_address, profile.email, artisanSubject, artisanEmailHtml);
+        await sendViaGmail(
+          gmailConn.access_token,
+          gmailConn.gmail_address,
+          profile.email,
+          artisanSubject,
+          artisanEmailHtml,
+        );
       } else {
         const resendKey = Deno.env.get("RESEND_API_KEY");
         if (resendKey) {
           const resend = new Resend(resendKey);
           await resend.emails.send({
-            from: "Bulbiz <notifications@bulbiz.io>",
+            from: "Bulbiz <notifications@bulbiz.fr>",
             to: profile.email,
             subject: artisanSubject,
             html: artisanEmailHtml,
@@ -281,7 +356,7 @@ Deno.serve(async (req) => {
       if (resendKey) {
         const resend = new Resend(resendKey);
         await resend.emails.send({
-          from: `${artisanName} via Bulbiz <notifications@bulbiz.io>`,
+          from: `${artisanName} via Bulbiz <notifications@bulbiz.fr>`,
           to: data.client_email,
           subject: "Votre demande a bien été envoyée",
           html: clientEmailHtml,
@@ -295,10 +370,13 @@ Deno.serve(async (req) => {
         dossier_id: dossierId,
         existing_dossier: existingDossier,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("submit-public-form error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
