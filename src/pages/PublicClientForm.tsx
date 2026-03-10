@@ -16,6 +16,7 @@ import { BulbizLogo } from "@/components/BulbizLogo";
 import { TRADE_TYPES } from "@/lib/trade-types";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { cn } from "@/lib/utils";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
@@ -91,9 +92,7 @@ export default function PublicClientForm() {
 
   const artisanName = artisan?.company_name || [artisan?.first_name, artisan?.last_name].filter(Boolean).join(" ") || "Artisan";
 
-  function validateEmail(email: string) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  }
+// Shared email validation imported at top level
 
   function handleFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
@@ -186,7 +185,7 @@ export default function PublicClientForm() {
   async function handleSubmit() {
     if (!form.client_first_name.trim() || !form.client_last_name.trim()) return;
     if (form.client_email && !validateEmail(form.client_email)) {
-      setEmailError("Email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       return;
     }
     if (!rgpdConsent) return;

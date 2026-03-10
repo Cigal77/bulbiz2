@@ -6,14 +6,9 @@ import { Phone, Mail, User, Pencil, X, Check, AlertTriangle } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 interface ClientBlockProps {
   dossier: Dossier;
-}
-
-function validateEmail(email: string): boolean {
-  if (!email) return true; // empty is ok
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function normalizePhone(phone: string): string {
@@ -51,7 +46,7 @@ export function ClientBlock({ dossier }: ClientBlockProps) {
 
   const save = async () => {
     if (email && !validateEmail(email)) {
-      setEmailError("Format d'email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       return;
     }
 

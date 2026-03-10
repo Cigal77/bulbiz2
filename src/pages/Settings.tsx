@@ -20,6 +20,7 @@ import { ArrowLeft, Save, LogOut } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 import { GmailConnectionCard } from "@/components/settings/GmailConnectionCard";
 import { GoogleCalendarCard } from "@/components/settings/GoogleCalendarCard";
 import { PublicLinkCard } from "@/components/settings/PublicLinkCard";
@@ -95,6 +96,10 @@ export default function Settings() {
   }, [profile, reset]);
 
   const onSubmit = async (data: SettingsForm) => {
+    if (data.email && !validateEmail(data.email)) {
+      toast.error(EMAIL_VALIDATION_ERROR);
+      return;
+    }
     try {
       await update.mutateAsync({
         first_name: data.first_name || null,

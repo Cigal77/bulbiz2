@@ -34,6 +34,7 @@ import { URGENCY_LABELS } from "@/lib/constants";
 import { TRADE_TYPES, HOUSING_TYPES, OCCUPANT_TYPES, AVAILABILITY_OPTIONS } from "@/lib/trade-types";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { cn } from "@/lib/utils";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
@@ -72,10 +73,6 @@ interface DossierData {
   availability?: string | null;
 }
 
-function validateEmail(email: string): boolean {
-  if (!email) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
 
 function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s.\-()]/g, "");
@@ -275,7 +272,7 @@ export default function ClientForm() {
   const handleSubmit = async () => {
     if (!rgpdConsent || !dossier || submitting) return;
     if (form.client_email && !validateEmail(form.client_email)) {
-      setEmailError("Format d'email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       setStep(2);
       return;
     }

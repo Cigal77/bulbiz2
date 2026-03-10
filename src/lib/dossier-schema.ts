@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 export const dossierSchema = z.object({
   client_first_name: z.string().trim().max(100).optional().or(z.literal("")),
@@ -7,7 +8,8 @@ export const dossierSchema = z.object({
     .regex(/^[\d\s\+\-\.()]*$/, "Numéro de téléphone invalide")
     .optional()
     .or(z.literal("")),
-  client_email: z.string().trim().email("Email invalide").max(255).optional().or(z.literal("")),
+  client_email: z.string().trim().max(255).optional().or(z.literal(""))
+    .refine((val) => !val || validateEmail(val), { message: EMAIL_VALIDATION_ERROR }),
   address: z.string().trim().max(500).optional().or(z.literal("")),
   address_line: z.string().trim().max(300).optional().or(z.literal("")),
   postal_code: z.string().trim().max(20).optional().or(z.literal("")),
