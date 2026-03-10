@@ -6,7 +6,7 @@ import { Phone, Mail, User, Pencil, X, Check, AlertTriangle } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 interface ClientBlockProps {
   dossier: Dossier;
 }
