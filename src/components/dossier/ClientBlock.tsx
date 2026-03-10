@@ -11,11 +11,6 @@ interface ClientBlockProps {
   dossier: Dossier;
 }
 
-function validateEmail(email: string): boolean {
-  if (!email) return true; // empty is ok
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s.\-()]/g, "");
   if (cleaned.startsWith("0") && cleaned.length === 10) {
