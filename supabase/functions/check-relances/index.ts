@@ -16,20 +16,58 @@ async function refreshGmailToken(supabase: any, userId: string, connection: any)
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: connection.refresh_token, grant_type: "refresh_token" }),
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: connection.refresh_token,
+        grant_type: "refresh_token",
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) return null;
-    await supabase.from("gmail_connections").update({ access_token: data.access_token, token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString() }).eq("user_id", userId);
+    await supabase
+      .from("gmail_connections")
+      .update({
+        access_token: data.access_token,
+        token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
+      })
+      .eq("user_id", userId);
     return data.access_token;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-async function sendViaGmail(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
-  const message = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`, `MIME-Version: 1.0`, `Content-Type: text/html; charset=UTF-8`, ``, html].join("\r\n");
-  const raw = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
-  if (!resp.ok) { const err = await resp.text(); console.error("Gmail API error:", err); return false; }
+async function sendViaGmail(
+  accessToken: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    html,
+  ].join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error("Gmail API error:", err);
+    return false;
+  }
   await resp.json();
   return true;
 }
@@ -39,7 +77,11 @@ async function getGmailConnection(supabase: any, userId: string) {
   if (!conn) return null;
   if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
     const newToken = await refreshGmailToken(supabase, userId, conn);
-    if (newToken) { conn.access_token = newToken; } else { return null; }
+    if (newToken) {
+      conn.access_token = newToken;
+    } else {
+      return null;
+    }
   }
   return conn;
 }
@@ -96,7 +138,7 @@ Deno.serve(async (req: Request) => {
             .update({ client_token: clientToken, client_token_expires_at: expiresAt })
             .eq("id", dossier.id);
         }
-        const siteUrl = Deno.env.get("SITE_URL") || "https://bulbiz.fr";
+        const siteUrl = Deno.env.get("SITE_URL") || "https://bulbiz.io";
         const clientLink = `${siteUrl}/client?token=${clientToken}`;
 
         try {
@@ -112,7 +154,13 @@ Deno.serve(async (req: Request) => {
 
           let emailSentOk = false;
           if (gmailConn) {
-            emailSentOk = await sendViaGmail(gmailConn.access_token, `${artisanName} <${gmailConn.gmail_address}>`, dossier.client_email!, emailSubject, emailHtml);
+            emailSentOk = await sendViaGmail(
+              gmailConn.access_token,
+              `${artisanName} <${gmailConn.gmail_address}>`,
+              dossier.client_email!,
+              emailSubject,
+              emailHtml,
+            );
           }
           if (!emailSentOk) {
             await resend.emails.send({
@@ -195,7 +243,13 @@ Deno.serve(async (req: Request) => {
 
           let devisEmailSent = false;
           if (gmailConn2) {
-            devisEmailSent = await sendViaGmail(gmailConn2.access_token, `${artisanName} <${gmailConn2.gmail_address}>`, dossier.client_email!, devisSubject, devisHtml);
+            devisEmailSent = await sendViaGmail(
+              gmailConn2.access_token,
+              `${artisanName} <${gmailConn2.gmail_address}>`,
+              dossier.client_email!,
+              devisSubject,
+              devisHtml,
+            );
           }
           if (!devisEmailSent) {
             await resend.emails.send({
@@ -265,8 +319,7 @@ Deno.serve(async (req: Request) => {
           const daysSinceSent = (now.getTime() - sentDate.getTime()) / (24 * 60 * 60 * 1000);
 
           const shouldSend =
-            (currentCount === 0 && daysSinceSent >= delay1) ||
-            (currentCount === 1 && daysSinceSent >= delay2);
+            (currentCount === 0 && daysSinceSent >= delay1) || (currentCount === 1 && daysSinceSent >= delay2);
           if (!shouldSend) continue;
 
           // Anti-spam: check last relance for this dossier
@@ -295,7 +348,13 @@ Deno.serve(async (req: Request) => {
 
             let emailSentOk = false;
             if (gmailConn3) {
-              emailSentOk = await sendViaGmail(gmailConn3.access_token, `${artisanName} <${gmailConn3.gmail_address}>`, clientEmail!, factureSubject, factureHtml);
+              emailSentOk = await sendViaGmail(
+                gmailConn3.access_token,
+                `${artisanName} <${gmailConn3.gmail_address}>`,
+                clientEmail!,
+                factureSubject,
+                factureHtml,
+              );
             }
             if (!emailSentOk) {
               await resend.emails.send({
@@ -320,13 +379,13 @@ Deno.serve(async (req: Request) => {
               email_to: clientEmail!,
               status: "sent",
             });
-            await supabase
-              .from("dossiers")
-              .update({ last_relance_at: now.toISOString() })
-              .eq("id", dossier.id);
+            await supabase.from("dossiers").update({ last_relance_at: now.toISOString() }).eq("id", dossier.id);
             totalSent++;
           } catch (e) {
-            console.error(`Failed to send facture relance for dossier ${dossier.id}, invoice ${invoice.invoice_number}:`, e);
+            console.error(
+              `Failed to send facture relance for dossier ${dossier.id}, invoice ${invoice.invoice_number}:`,
+              e,
+            );
           }
         }
       }

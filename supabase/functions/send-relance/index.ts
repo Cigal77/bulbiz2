@@ -16,20 +16,58 @@ async function refreshGmailToken(supabase: any, userId: string, connection: any)
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: connection.refresh_token, grant_type: "refresh_token" }),
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: connection.refresh_token,
+        grant_type: "refresh_token",
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) return null;
-    await supabase.from("gmail_connections").update({ access_token: data.access_token, token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString() }).eq("user_id", userId);
+    await supabase
+      .from("gmail_connections")
+      .update({
+        access_token: data.access_token,
+        token_expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
+      })
+      .eq("user_id", userId);
     return data.access_token;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-async function sendViaGmail(accessToken: string, from: string, to: string, subject: string, html: string): Promise<boolean> {
-  const message = [`From: ${from}`, `To: ${to}`, `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`, `MIME-Version: 1.0`, `Content-Type: text/html; charset=UTF-8`, ``, html].join("\r\n");
-  const raw = btoa(unescape(encodeURIComponent(message))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", { method: "POST", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ raw }) });
-  if (!resp.ok) { const err = await resp.text(); console.error("Gmail API error:", err); return false; }
+async function sendViaGmail(
+  accessToken: string,
+  from: string,
+  to: string,
+  subject: string,
+  html: string,
+): Promise<boolean> {
+  const message = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/html; charset=UTF-8`,
+    ``,
+    html,
+  ].join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(message)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    console.error("Gmail API error:", err);
+    return false;
+  }
   await resp.json();
   return true;
 }
@@ -39,7 +77,11 @@ async function getGmailConnection(supabase: any, userId: string) {
   if (!conn) return null;
   if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
     const newToken = await refreshGmailToken(supabase, userId, conn);
-    if (newToken) { conn.access_token = newToken; } else { return null; }
+    if (newToken) {
+      conn.access_token = newToken;
+    } else {
+      return null;
+    }
   }
   return conn;
 }
@@ -108,7 +150,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", dossier_id);
     }
 
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.fr";
+    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/+$/, "") || "https://bulbiz.io";
     const clientLink = `${origin}/client?token=${clientToken}`;
 
     let subject: string;
@@ -159,7 +201,7 @@ Deno.serve(async (req: Request) => {
           `${artisanName} <${gmailConn.gmail_address}>`,
           dossier.client_email,
           subject,
-          htmlBody
+          htmlBody,
         );
       }
 
