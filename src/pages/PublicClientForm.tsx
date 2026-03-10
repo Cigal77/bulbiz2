@@ -58,6 +58,8 @@ export default function PublicClientForm() {
   });
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
   const [addressInput, setAddressInput] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
   const [selectedTrades, setSelectedTrades] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
