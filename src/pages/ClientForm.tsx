@@ -72,10 +72,8 @@ interface DossierData {
   availability?: string | null;
 }
 
-function validateEmail(email: string): boolean {
-  if (!email) return true;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
+// Use shared validation
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s.\-()]/g, "");
