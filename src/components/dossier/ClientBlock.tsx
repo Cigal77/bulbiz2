@@ -46,7 +46,7 @@ export function ClientBlock({ dossier }: ClientBlockProps) {
 
   const save = async () => {
     if (email && !validateEmail(email)) {
-      setEmailError("Format d'email invalide");
+      setEmailError(EMAIL_VALIDATION_ERROR);
       return;
     }
 
