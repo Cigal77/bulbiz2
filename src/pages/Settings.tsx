@@ -20,6 +20,7 @@ import { ArrowLeft, Save, LogOut } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 import { GmailConnectionCard } from "@/components/settings/GmailConnectionCard";
 import { GoogleCalendarCard } from "@/components/settings/GoogleCalendarCard";
 import { PublicLinkCard } from "@/components/settings/PublicLinkCard";
