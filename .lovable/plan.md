@@ -1,40 +1,79 @@
 
+# Audit et corrections des automatisations email/notifications
 
-## Diagnostic
+## Problemes identifies
 
-L'infrastructure existe déjà pour stocker le code postal et la ville (colonnes `postal_code`, `city` sur la table `dossiers`). Les deux edge functions (`submit-public-form` et `submit-client-form`) sauvent correctement ces champs quand ils sont fournis.
+### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
+**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
+- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
+- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
 
-**Le problème** : dans les deux formulaires clients, il n'y a **pas de champs séparés** pour le code postal et la ville. Ces données ne sont remplies que si le client sélectionne une suggestion Google Places. Si le client tape manuellement son adresse sans cliquer sur une suggestion, `postal_code` et `city` restent vides.
+### 2. Bug `send-invoice` : authentification inconsistante
+**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
+- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
 
-## Plan de correction
+### 3. Bug `send-appointment-notification` : authentification inconsistante
+**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
+- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
 
-### 1. Ajouter des champs CP / Ville dans les deux formulaires clients
+### 4. Notification artisan manquante sur confirmation RDV
+**Fichier** : `supabase/functions/submit-client-form/index.ts`
+- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
+- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
 
-**PublicClientForm.tsx** (étape 2, après l'AddressAutocomplete) :
-- Ajouter deux champs `Input` (code postal + ville) sous l'adresse
-- État local : `postalCode` et `city`, pré-remplis automatiquement quand Google Places est sélectionné
-- Inclure ces valeurs dans `submitData` envoyé au backend (déjà géré côté edge function)
+### 5. Notification artisan manquante sur selection de creneau (multi-slots)
+- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
 
-**ClientForm.tsx** (étape 2, après l'AddressAutocomplete) :
-- Même ajout : deux champs `Input` (code postal + ville)
-- État local pré-rempli depuis `addressData` ou depuis les données `dossier` existantes
-- Inclure `postal_code` et `city` dans `clientData` même sans `google_place_id` (actuellement ces champs ne sont envoyés que si `google_place_id` est présent — c'est le bug principal)
+### 6. Lien dossier hardcode dans `submit-client-form`
+**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
+- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
 
-### 2. Fix critique dans ClientForm : envoyer CP/Ville même sans Google Places
+### 7. Email facture sans signature personnalisee
+**Fichier** : `supabase/functions/send-invoice/index.ts`
+- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
 
-Actuellement lignes 323-330 de `ClientForm.tsx` :
-```typescript
-if (addressData.google_place_id) {
-  // postal_code et city ne sont envoyés QUE ici
-}
+### 8. Email facture sans numero de facture dans le sujet
+- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+
+---
+
+## Plan de corrections
+
+### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
+- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+- Ajouter la signature personnalisee
+- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+
+### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+
+### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
+- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
+- Remplacer le lien hardcode par `app.bulbiz.io`
+- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
+
+---
+
+## Details techniques
+
+### `send-invoice/index.ts` - Changements
+```text
+Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
+Ligne 170-218 : Remonter artisanName + signature au bon scope
+Ligne 181      : Ajouter signature personnalisee dans l'email
+Ligne 218      : Fixer la reference artisanName dans le SMS
+Sujet email    : Ajouter numero facture
 ```
-Modifier pour toujours inclure `postal_code` et `city` dans `clientData`, qu'ils viennent de Google Places ou de la saisie manuelle.
 
-### 3. Aucune modification backend nécessaire
+### `send-appointment-notification/index.ts` - Changements
+```text
+Lignes 210-217 : Remplacer auth getUser() par decodage JWT
+```
 
-Les edge functions et la base de données gèrent déjà ces champs correctement.
-
-### Résumé des fichiers modifiés
-- `src/pages/PublicClientForm.tsx` — ajout champs CP/Ville
-- `src/pages/ClientForm.tsx` — ajout champs CP/Ville + fix envoi données
-
+### `submit-client-form/index.ts` - Changements
+```text
+Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
+Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
+Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
+```

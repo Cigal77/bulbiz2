@@ -55,6 +55,8 @@ interface DossierData {
   client_phone: string | null;
   client_email: string | null;
   address: string | null;
+  postal_code?: string | null;
+  city?: string | null;
   category: string;
   urgency: string;
   description: string | null;
@@ -129,6 +131,8 @@ export default function ClientForm() {
     urgency: "semaine",
   });
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
@@ -213,6 +217,8 @@ export default function ClientForm() {
       // Pre-fill new fields
       if (data.trade_types?.length) setSelectedTrades(data.trade_types);
       if (data.problem_types?.length) setSelectedProblems(data.problem_types);
+      if (data.postal_code) setPostalCode(data.postal_code);
+      if (data.city) setCity(data.city);
       if (data.housing_type) setHousingType(data.housing_type);
       if (data.occupant_type) setOccupantType(data.occupant_type);
       if (data.floor_number != null) setFloorNumber(String(data.floor_number));
@@ -319,15 +325,17 @@ export default function ClientForm() {
       if (form.description.trim()) clientData.description = form.description.trim();
       if (form.urgency) clientData.urgency = form.urgency;
 
-      // Address data
+      // Address data — always send postal_code and city
       if (addressData.google_place_id) {
         clientData.google_place_id = addressData.google_place_id;
         if (addressData.lat) clientData.lat = String(addressData.lat);
         if (addressData.lng) clientData.lng = String(addressData.lng);
-        if (addressData.postal_code) clientData.postal_code = addressData.postal_code;
-        if (addressData.city) clientData.city = addressData.city;
         if (addressData.address_line) clientData.address_line = addressData.address_line;
       }
+      const finalPostalCode = postalCode || addressData.postal_code || "";
+      const finalCity = city || addressData.city || "";
+      if (finalPostalCode) clientData.postal_code = finalPostalCode;
+      if (finalCity) clientData.city = finalCity;
 
       // New fields
       if (selectedTrades.length > 0) clientData.trade_types = selectedTrades;
@@ -759,8 +767,33 @@ export default function ClientForm() {
                     onAddressSelect={(data) => {
                       setForm({ ...form, address: data.address });
                       setAddressData(data);
+                      if (data.postal_code) setPostalCode(data.postal_code);
+                      if (data.city) setCity(data.city);
                     }}
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Code postal</Label>
+                    <Input
+                      placeholder="75002"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      maxLength={10}
+                      autoComplete="postal-code"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ville</Label>
+                    <Input
+                      placeholder="Paris"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      maxLength={100}
+                      autoComplete="address-level2"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">

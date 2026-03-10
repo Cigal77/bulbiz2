@@ -58,6 +58,8 @@ export default function PublicClientForm() {
   });
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
   const [addressInput, setAddressInput] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
   const [selectedTrades, setSelectedTrades] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -228,8 +230,8 @@ export default function PublicClientForm() {
         ...form,
         address: addressData.address || addressInput,
         address_line: addressData.address_line || "",
-        postal_code: addressData.postal_code || "",
-        city: addressData.city || "",
+        postal_code: postalCode || addressData.postal_code || "",
+        city: city || addressData.city || "",
         country: addressData.country || "France",
         google_place_id: addressData.google_place_id || "",
         lat: addressData.lat,
@@ -475,8 +477,34 @@ export default function PublicClientForm() {
                   onAddressSelect={(data) => {
                     setAddressData(data);
                     setAddressInput(data.address || "");
+                    if (data.postal_code) setPostalCode(data.postal_code);
+                    if (data.city) setCity(data.city);
                   }}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="postal_code">Code postal</Label>
+                  <Input
+                    id="postal_code"
+                    placeholder="75002"
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
+                    maxLength={10}
+                    autoComplete="postal-code"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="city">Ville</Label>
+                  <Input
+                    id="city"
+                    placeholder="Paris"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    maxLength={100}
+                    autoComplete="address-level2"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
