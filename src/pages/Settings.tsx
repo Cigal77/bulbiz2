@@ -96,6 +96,10 @@ export default function Settings() {
   }, [profile, reset]);
 
   const onSubmit = async (data: SettingsForm) => {
+    if (data.email && !validateEmail(data.email)) {
+      toast.error(EMAIL_VALIDATION_ERROR);
+      return;
+    }
     try {
       await update.mutateAsync({
         first_name: data.first_name || null,
