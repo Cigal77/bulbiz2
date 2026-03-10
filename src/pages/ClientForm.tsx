@@ -129,6 +129,8 @@ export default function ClientForm() {
     urgency: "semaine",
   });
   const [addressData, setAddressData] = useState<Partial<AddressData>>({});
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
