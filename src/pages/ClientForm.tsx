@@ -217,6 +217,8 @@ export default function ClientForm() {
       // Pre-fill new fields
       if (data.trade_types?.length) setSelectedTrades(data.trade_types);
       if (data.problem_types?.length) setSelectedProblems(data.problem_types);
+      if (data.postal_code) setPostalCode(data.postal_code);
+      if (data.city) setCity(data.city);
       if (data.housing_type) setHousingType(data.housing_type);
       if (data.occupant_type) setOccupantType(data.occupant_type);
       if (data.floor_number != null) setFloorNumber(String(data.floor_number));

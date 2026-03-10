@@ -76,6 +76,8 @@ Deno.serve(async (req) => {
         client_phone: dossier.client_phone,
         client_email: dossier.client_email,
         address: dossier.address,
+        postal_code: dossier.postal_code,
+        city: dossier.city,
         category: dossier.category,
         urgency: dossier.urgency,
         description: dossier.description,
