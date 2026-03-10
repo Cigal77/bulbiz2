@@ -55,6 +55,8 @@ interface DossierData {
   client_phone: string | null;
   client_email: string | null;
   address: string | null;
+  postal_code?: string | null;
+  city?: string | null;
   category: string;
   urgency: string;
   description: string | null;
