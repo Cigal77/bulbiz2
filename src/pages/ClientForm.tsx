@@ -763,8 +763,33 @@ export default function ClientForm() {
                     onAddressSelect={(data) => {
                       setForm({ ...form, address: data.address });
                       setAddressData(data);
+                      if (data.postal_code) setPostalCode(data.postal_code);
+                      if (data.city) setCity(data.city);
                     }}
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Code postal</Label>
+                    <Input
+                      placeholder="75002"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      maxLength={10}
+                      autoComplete="postal-code"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ville</Label>
+                    <Input
+                      placeholder="Paris"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      maxLength={100}
+                      autoComplete="address-level2"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
