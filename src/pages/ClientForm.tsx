@@ -321,15 +321,17 @@ export default function ClientForm() {
       if (form.description.trim()) clientData.description = form.description.trim();
       if (form.urgency) clientData.urgency = form.urgency;
 
-      // Address data
+      // Address data — always send postal_code and city
       if (addressData.google_place_id) {
         clientData.google_place_id = addressData.google_place_id;
         if (addressData.lat) clientData.lat = String(addressData.lat);
         if (addressData.lng) clientData.lng = String(addressData.lng);
-        if (addressData.postal_code) clientData.postal_code = addressData.postal_code;
-        if (addressData.city) clientData.city = addressData.city;
         if (addressData.address_line) clientData.address_line = addressData.address_line;
       }
+      const finalPostalCode = postalCode || addressData.postal_code || "";
+      const finalCity = city || addressData.city || "";
+      if (finalPostalCode) clientData.postal_code = finalPostalCode;
+      if (finalCity) clientData.city = finalCity;
 
       // New fields
       if (selectedTrades.length > 0) clientData.trade_types = selectedTrades;
