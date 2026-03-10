@@ -34,6 +34,7 @@ import { URGENCY_LABELS } from "@/lib/constants";
 import { TRADE_TYPES, HOUSING_TYPES, OCCUPANT_TYPES, AVAILABILITY_OPTIONS } from "@/lib/trade-types";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { cn } from "@/lib/utils";
+import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
