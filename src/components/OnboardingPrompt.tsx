@@ -23,22 +23,33 @@ export function OnboardingPrompt() {
 
   useEffect(() => {
     if (isLoading || !user) return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
-    if (location.pathname === "/parametres") return;
+    if (localStorage.getItem(DISMISS_KEY)) { setVisible(false); return; }
+
+    // Hide on /parametres so it doesn't block the form on mobile
+    if (location.pathname === "/parametres") { setVisible(false); return; }
 
     const createdAt = new Date(user.created_at);
     const ageDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
-    if (ageDays > MAX_ACCOUNT_AGE_DAYS) return;
+    if (ageDays > MAX_ACCOUNT_AGE_DAYS) { setVisible(false); return; }
 
     if (isProfileIncomplete(profile)) {
       const timer = setTimeout(() => setVisible(true), 2000);
       return () => clearTimeout(timer);
+    } else {
+      setVisible(false);
     }
   }, [isLoading, user, profile, location.pathname]);
 
+  // Permanently dismiss (X button or "Plus tard")
   const dismiss = () => {
     setVisible(false);
     localStorage.setItem(DISMISS_KEY, "1");
+  };
+
+  // Temporarily hide (navigate to settings without persisting dismiss)
+  const goToSettings = () => {
+    setVisible(false);
+    navigate("/parametres");
   };
 
   return (
