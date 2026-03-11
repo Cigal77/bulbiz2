@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 const DISMISS_KEY = "onboarding_popup_dismissed";
 const MAX_ACCOUNT_AGE_DAYS = 30;
 
-function isProfileIncomplete(profile: { company_name?: string | null; phone?: string | null; siret?: string | null } | null) {
-  if (!profile) return false;
+function isProfileIncomplete(profile: { company_name?: string | null; phone?: string | null; siret?: string | null } | null | undefined) {
+  if (!profile) return true; // No profile yet = incomplete
   return !profile.company_name || !profile.phone || !profile.siret;
 }
 
@@ -18,11 +18,13 @@ export function OnboardingPrompt() {
   const { user } = useAuth();
   const { profile, isLoading } = useProfile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isLoading || !user || !profile) return;
+    if (isLoading || !user) return;
     if (localStorage.getItem(DISMISS_KEY)) return;
+    if (location.pathname === "/parametres") return;
 
     const createdAt = new Date(user.created_at);
     const ageDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -32,7 +34,7 @@ export function OnboardingPrompt() {
       const timer = setTimeout(() => setVisible(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [isLoading, user, profile]);
+  }, [isLoading, user, profile, location.pathname]);
 
   const dismiss = () => {
     setVisible(false);
