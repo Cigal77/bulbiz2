@@ -18,6 +18,7 @@ export function OnboardingPrompt() {
   const { user } = useAuth();
   const { profile, isLoading } = useProfile();
   const navigate = useNavigate();
+  const location = useLocation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
