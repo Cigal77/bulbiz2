@@ -24,6 +24,7 @@ export function OnboardingPrompt() {
   useEffect(() => {
     if (isLoading || !user || !profile) return;
     if (localStorage.getItem(DISMISS_KEY)) return;
+    if (location.pathname === "/parametres") return;
 
     const createdAt = new Date(user.created_at);
     const ageDays = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
