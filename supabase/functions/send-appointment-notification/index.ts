@@ -279,6 +279,29 @@ Deno.serve(async (req: Request) => {
     const artisanName =
       profile?.company_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Votre artisan";
 
+    // ── For SLOTS_PROPOSED: ensure appointment_link exists ──
+    let appointmentLink = extraPayload?.appointment_link as string || "";
+
+    if (event_type === "SLOTS_PROPOSED" && !appointmentLink) {
+      // Check if client_token exists and is not expired
+      let clientToken = dossier.client_token;
+      const tokenExpiry = dossier.client_token_expires_at ? new Date(dossier.client_token_expires_at) : null;
+      const validityDays = profile?.client_link_validity_days || 7;
+
+      if (!clientToken || !tokenExpiry || tokenExpiry < new Date()) {
+        // Generate a new token
+        clientToken = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000).toISOString();
+        await supabase
+          .from("dossiers")
+          .update({ client_token: clientToken, client_token_expires_at: expiresAt })
+          .eq("id", dossier_id);
+        console.log("Generated new client_token for SLOTS_PROPOSED email");
+      }
+
+      appointmentLink = `https://app.bulbiz.io/client?token=${clientToken}`;
+    }
+
     // Build payload
     const notifPayload: Record<string, unknown> = {
       client_first_name: dossier.client_first_name,
@@ -287,6 +310,7 @@ Deno.serve(async (req: Request) => {
       artisan_phone: profile?.phone || "",
       artisan_email: profile?.email || "",
       ...extraPayload,
+      ...(appointmentLink ? { appointment_link: appointmentLink } : {}),
     };
 
     const label = EVENT_LABELS[event_type as EventType];
