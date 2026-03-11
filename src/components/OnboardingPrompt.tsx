@@ -34,7 +34,7 @@ export function OnboardingPrompt() {
       const timer = setTimeout(() => setVisible(true), 2000);
       return () => clearTimeout(timer);
     }
-  }, [isLoading, user, profile]);
+  }, [isLoading, user, profile, location.pathname]);
 
   const dismiss = () => {
     setVisible(false);
