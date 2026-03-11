@@ -22,7 +22,7 @@ export function OnboardingPrompt() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (isLoading || !user || !profile) return;
+    if (isLoading || !user) return;
     if (localStorage.getItem(DISMISS_KEY)) return;
     if (location.pathname === "/parametres") return;
 
