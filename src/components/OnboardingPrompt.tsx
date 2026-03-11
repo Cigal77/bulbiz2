@@ -9,8 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 const DISMISS_KEY = "onboarding_popup_dismissed";
 const MAX_ACCOUNT_AGE_DAYS = 30;
 
-function isProfileIncomplete(profile: { company_name?: string | null; phone?: string | null; siret?: string | null } | null) {
-  if (!profile) return false;
+function isProfileIncomplete(profile: { company_name?: string | null; phone?: string | null; siret?: string | null } | null | undefined) {
+  if (!profile) return true; // No profile yet = incomplete
   return !profile.company_name || !profile.phone || !profile.siret;
 }
 
