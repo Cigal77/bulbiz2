@@ -84,7 +84,7 @@ export function OnboardingPrompt() {
             </div>
 
             <div className="flex gap-2 mt-4">
-              <Button size="sm" className="flex-1" onClick={() => { dismiss(); navigate("/parametres"); }}>
+              <Button size="sm" className="flex-1" onClick={goToSettings}>
                 Compléter mon profil
               </Button>
               <Button size="sm" variant="ghost" onClick={dismiss}>
