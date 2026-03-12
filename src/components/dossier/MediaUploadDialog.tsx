@@ -34,38 +34,39 @@ function getMaxSize(file: File, mode: string) {
 export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUploadDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [entries, setEntries] = useState<{ file: File; preview: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  const files = entries.map((e) => e.file);
+
   const addFiles = useCallback(
     (newFiles: FileList | File[]) => {
       const arr = Array.from(newFiles);
-      const valid: File[] = [];
+      const valid: { file: File; preview: string }[] = [];
       for (const f of arr) {
         const max = getMaxSize(f, mode);
         if (f.size > max) {
           setError(`${f.name} dépasse la taille max (${Math.round(max / 1024 / 1024)} MB)`);
           return;
         }
-        valid.push(f);
+        valid.push({
+          file: f,
+          preview: f.type.startsWith("image/") ? URL.createObjectURL(f) : "",
+        });
       }
       setError(null);
-      setFiles((prev) => [...prev, ...valid]);
-      setPreviews((prev) => [
-        ...prev,
-        ...valid.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : "")),
-      ]);
+      setEntries((prev) => [...prev, ...valid]);
     },
     [mode],
   );
 
   const removeFile = (idx: number) => {
-    if (previews[idx]) URL.revokeObjectURL(previews[idx]);
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
-    setPreviews((prev) => prev.filter((_, i) => i !== idx));
+    setEntries((prev) => {
+      if (prev[idx]?.preview) URL.revokeObjectURL(prev[idx].preview);
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const handleUpload = async () => {
@@ -83,9 +84,8 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
   };
 
   const cleanup = () => {
-    previews.forEach((p) => p && URL.revokeObjectURL(p));
-    setFiles([]);
-    setPreviews([]);
+    entries.forEach((e) => e.preview && URL.revokeObjectURL(e.preview));
+    setEntries([]);
     setError(null);
   };
 
@@ -175,8 +175,8 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
                   key={i}
                   className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border"
                 >
-                  {previews[i] ? (
-                    <img src={previews[i]} alt={f.name} className="h-full w-full object-cover" />
+                  {entries[i]?.preview ? (
+                    <img src={entries[i].preview} alt={f.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
                       {f.type.startsWith("video/") ? (
