@@ -175,8 +175,8 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
                   key={i}
                   className="relative group aspect-square rounded-lg overflow-hidden bg-muted border border-border"
                 >
-                  {previews[i] ? (
-                    <img src={previews[i]} alt={f.name} className="h-full w-full object-cover" />
+                  {entries[i]?.preview ? (
+                    <img src={entries[i].preview} alt={f.name} className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-2">
                       {f.type.startsWith("video/") ? (
