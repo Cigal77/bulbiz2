@@ -84,9 +84,8 @@ export function MediaUploadDialog({ open, onClose, onUpload, mode }: MediaUpload
   };
 
   const cleanup = () => {
-    previews.forEach((p) => p && URL.revokeObjectURL(p));
-    setFiles([]);
-    setPreviews([]);
+    entries.forEach((e) => e.preview && URL.revokeObjectURL(e.preview));
+    setEntries([]);
     setError(null);
   };
 
