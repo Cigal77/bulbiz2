@@ -428,6 +428,42 @@ export type Database = {
         }
         Relationships: []
       }
+      error_logs: {
+        Row: {
+          created_at: string
+          error_message: string
+          error_stack: string | null
+          function_name: string | null
+          id: string
+          metadata: Json | null
+          resolved: boolean
+          source: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message: string
+          error_stack?: string | null
+          function_name?: string | null
+          id?: string
+          metadata?: Json | null
+          resolved?: boolean
+          source?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string
+          error_stack?: string | null
+          function_name?: string | null
+          id?: string
+          metadata?: Json | null
+          resolved?: boolean
+          source?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       gmail_connections: {
         Row: {
           access_token: string
