@@ -260,7 +260,7 @@ export default function PublicClientForm() {
       const { logErrorFromCatch } = await import("@/lib/error-logger");
       logErrorFromCatch(err, {
         function_name: "PublicClientForm.handleSubmit",
-        metadata: { slug, step: currentStep, trades: selectedTrades },
+        metadata: { slug, step, trades: selectedTrades },
       });
       alert("Erreur lors de l'envoi. Veuillez réessayer.");
     } finally {
