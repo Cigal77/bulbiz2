@@ -26,6 +26,14 @@ window.addEventListener("error", (event) => {
   ) {
     console.error("[runtime] chunk error detected", message);
     safeReload();
+  } else if (event?.error) {
+    logError({
+      error_message: event.error.message || message,
+      error_stack: event.error.stack,
+      function_name: "global_error_handler",
+      source: "client",
+      metadata: { filename: event.filename, lineno: event.lineno, colno: event.colno },
+    });
   }
 });
 
