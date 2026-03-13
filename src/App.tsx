@@ -159,6 +159,14 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+                  <Route
+                    path="/admin/errors"
+                    element={
+                      <ProtectedRoute>
+                        <AdminErrors />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/cgu" element={<CGU />} />
                   <Route path="/mentions-legales" element={<MentionsLegales />} />
                   <Route path="/politique-confidentialite" element={<PolitiqueConfidentialite />} />

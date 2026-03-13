@@ -47,6 +47,13 @@ window.addEventListener("unhandledrejection", (event) => {
     console.error("[runtime] chunk rejection detected", reasonText);
     event.preventDefault();
     safeReload();
+  } else {
+    logError({
+      error_message: reasonText || "Unhandled promise rejection",
+      error_stack: event.reason?.stack,
+      function_name: "unhandled_rejection",
+      source: "client",
+    });
   }
 });
 

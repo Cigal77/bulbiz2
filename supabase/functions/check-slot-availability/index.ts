@@ -100,6 +100,15 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error("check-slot-availability error:", e);
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("error_logs").insert({
+        source: "edge_function",
+        function_name: "check-slot-availability",
+        error_message: e instanceof Error ? e.message : String(e),
+        error_stack: e instanceof Error ? e.stack : null,
+      });
+    } catch { /* silent */ }
     return new Response(
       JSON.stringify({ error: "Erreur serveur" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

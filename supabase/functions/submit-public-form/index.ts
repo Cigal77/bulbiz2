@@ -374,6 +374,17 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("submit-public-form error:", err);
+    // Log error to error_logs table
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("error_logs").insert({
+        source: "edge_function",
+        function_name: "submit-public-form",
+        error_message: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : null,
+        metadata: { body: "redacted" },
+      });
+    } catch { /* silent */ }
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
