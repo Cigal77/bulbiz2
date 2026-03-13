@@ -118,6 +118,15 @@ Deno.serve(async (req) => {
     );
   } catch (e) {
     console.error("upload-client-media error:", e);
+    try {
+      const svc = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await svc.from("error_logs").insert({
+        source: "edge_function",
+        function_name: "upload-client-media",
+        error_message: e instanceof Error ? e.message : String(e),
+        error_stack: e instanceof Error ? e.stack : null,
+      });
+    } catch { /* silent */ }
     return new Response(
       JSON.stringify({ error: "Erreur lors de l'upload" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

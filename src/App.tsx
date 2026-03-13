@@ -36,6 +36,7 @@ const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
 const PolitiqueConfidentialite = lazy(() => import("./pages/PolitiqueConfidentialite"));
 const DPA = lazy(() => import("./pages/DPA"));
 const Cookies = lazy(() => import("./pages/Cookies"));
+const AdminErrors = lazy(() => import("./pages/AdminErrors"));
 
 const queryClient = new QueryClient();
 
@@ -155,6 +156,14 @@ const App = () => (
                         <AppLayout>
                           <ComingSoon />
                         </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/errors"
+                    element={
+                      <ProtectedRoute>
+                        <AdminErrors />
                       </ProtectedRoute>
                     }
                   />

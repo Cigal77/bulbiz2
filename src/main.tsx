@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { logError } from "./lib/error-logger";
 
 let hasReloadedAfterChunkError = false;
 
@@ -25,6 +26,14 @@ window.addEventListener("error", (event) => {
   ) {
     console.error("[runtime] chunk error detected", message);
     safeReload();
+  } else if (event?.error) {
+    logError({
+      error_message: event.error.message || message,
+      error_stack: event.error.stack,
+      function_name: "global_error_handler",
+      source: "client",
+      metadata: { filename: event.filename, lineno: event.lineno, colno: event.colno },
+    });
   }
 });
 
@@ -38,6 +47,13 @@ window.addEventListener("unhandledrejection", (event) => {
     console.error("[runtime] chunk rejection detected", reasonText);
     event.preventDefault();
     safeReload();
+  } else {
+    logError({
+      error_message: reasonText || "Unhandled promise rejection",
+      error_stack: event.reason?.stack,
+      function_name: "unhandled_rejection",
+      source: "client",
+    });
   }
 });
 

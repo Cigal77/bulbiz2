@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { logError } from "@/lib/error-logger";
 
 interface Props {
   children: React.ReactNode;
@@ -24,6 +25,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[ErrorBoundary] Caught error:", error, errorInfo);
+    logError({
+      error_message: error.message,
+      error_stack: error.stack,
+      function_name: "ErrorBoundary",
+      source: "client",
+      metadata: { componentStack: errorInfo.componentStack?.slice(0, 1000) },
+    });
   }
 
   handleReload = () => {

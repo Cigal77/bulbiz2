@@ -1,69 +1,79 @@
 
+# Audit et corrections des automatisations email/notifications
 
-## Plan: Système de tracking d'erreurs client
+## Problemes identifies
 
-### Probleme
-Les utilisateurs rencontrent des bugs (upload media, sélection de créneaux sur le formulaire public, etc.) mais il n'y a aucune visibilité centralisée. Les erreurs sont uniquement loguées dans la console du navigateur du client.
+### 1. Bug `send-invoice` : variable `artisanName` non definie dans le SMS
+**Fichier** : `supabase/functions/send-invoice/index.ts` (ligne 218)
+- La variable `artisanName` est utilisee dans le body SMS mais elle est declaree dans un bloc `if` plus haut (ligne 170/189) et n'est pas accessible dans le scope du SMS.
+- **Impact** : Le SMS de facture plante avec une erreur `ReferenceError`.
 
-### Approche
+### 2. Bug `send-invoice` : authentification inconsistante
+**Fichier** : `supabase/functions/send-invoice/index.ts` (lignes 101-108)
+- Utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT direct comme les autres fonctions. Selon la memoire technique, cette methode cause des erreurs 401 en environnement Lovable Cloud.
 
-Créer une table `error_logs` en base de données et un mécanisme de capture automatique des erreurs côté client + côté Edge Functions, avec un récapitulatif consultable dans une page admin.
+### 3. Bug `send-appointment-notification` : authentification inconsistante
+**Fichier** : `supabase/functions/send-appointment-notification/index.ts` (lignes 210-217)
+- Meme probleme : utilise `supabaseUser.auth.getUser()` au lieu du decodage JWT.
 
-### 1. Table `error_logs`
+### 4. Notification artisan manquante sur confirmation RDV
+**Fichier** : `supabase/functions/submit-client-form/index.ts`
+- Quand un client selectionne un creneau (action `select_slot`), l'artisan n'est **pas notifie par email**. Seul le client recoit un email de confirmation.
+- L'artisan devrait recevoir un email du type "Le client a confirme le RDV du..."
 
-```sql
-CREATE TABLE public.error_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  source text NOT NULL DEFAULT 'client',        -- 'client' | 'edge_function'
-  function_name text,                            -- nom de la page ou edge function
-  error_message text NOT NULL,
-  error_stack text,
-  user_id uuid,                                  -- null pour les visiteurs publics
-  metadata jsonb DEFAULT '{}'::jsonb,            -- URL, user agent, slug, dossier_id, etc.
-  resolved boolean NOT NULL DEFAULT false
-);
-ALTER TABLE public.error_logs ENABLE ROW LEVEL SECURITY;
+### 5. Notification artisan manquante sur selection de creneau (multi-slots)
+- Quand le client choisit un creneau parmi plusieurs (non auto-confirme), l'artisan n'est pas notifie que le client a fait son choix.
+
+### 6. Lien dossier hardcode dans `submit-client-form`
+**Fichier** : `supabase/functions/submit-client-form/index.ts` (ligne 337)
+- Le lien vers le dossier pointe vers `bulbiz2.lovable.app` au lieu de `app.bulbiz.io` (domaine de production).
+
+### 7. Email facture sans signature personnalisee
+**Fichier** : `supabase/functions/send-invoice/index.ts`
+- L'email de facture utilise une signature generique "Cordialement, artisanName" au lieu de la signature personnalisee du profil (`email_signature`).
+
+### 8. Email facture sans numero de facture dans le sujet
+- Le sujet est simplement "Votre facture" sans le numero, contrairement aux emails de devis qui incluent le nom de l'artisan.
+
+---
+
+## Plan de corrections
+
+### Correction 1 : `send-invoice/index.ts` - Fix artisanName scope + auth JWT + signature + sujet
+- Extraire `artisanName` et `signature` du profil au bon scope (avant le bloc email/SMS)
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+- Ajouter la signature personnalisee
+- Ameliorer le sujet : `"${artisanName} - Facture ${invoice.invoice_number}"`
+
+### Correction 2 : `send-appointment-notification/index.ts` - Fix auth JWT
+- Remplacer `supabaseUser.auth.getUser()` par le decodage JWT direct
+
+### Correction 3 : `submit-client-form/index.ts` - Notifier l'artisan sur RDV + fix lien
+- Ajouter un email a l'artisan quand un client selectionne/confirme un creneau
+- Remplacer le lien hardcode par `app.bulbiz.io`
+- Ajouter notification artisan aussi pour le cas multi-slots (client_selected)
+
+---
+
+## Details techniques
+
+### `send-invoice/index.ts` - Changements
+```text
+Lignes 96-110 : Remplacer l'auth getUser() par decodage JWT
+Ligne 170-218 : Remonter artisanName + signature au bon scope
+Ligne 181      : Ajouter signature personnalisee dans l'email
+Ligne 218      : Fixer la reference artisanName dans le SMS
+Sujet email    : Ajouter numero facture
 ```
 
-Policies :
-- **INSERT** pour `anon` et `authenticated` (tout le monde peut logger une erreur)
-- **SELECT** restreint aux admins via `has_role(auth.uid(), 'admin')`
+### `send-appointment-notification/index.ts` - Changements
+```text
+Lignes 210-217 : Remplacer auth getUser() par decodage JWT
+```
 
-### 2. Edge Function `log-client-error`
-
-Une petite Edge Function (`verify_jwt = false`) qui reçoit les erreurs du client et les insère via service role. Payload : `{ error_message, error_stack, function_name, metadata }`.
-
-### 3. Capture automatique côté client
-
-- **ErrorBoundary** : dans `componentDidCatch`, envoyer l'erreur à `log-client-error` avec la page courante
-- **Global handler** : ajouter un listener `window.addEventListener('error')` et `window.addEventListener('unhandledrejection')` dans `main.tsx` pour capturer les erreurs non attrapées
-- **Formulaire public** : dans le `catch` de `handleSubmit` (PublicClientForm), logger l'erreur avec le slug et l'étape courante en metadata
-
-### 4. Capture côté Edge Functions
-
-Ajouter un `try/catch` amélioré dans les fonctions critiques (`submit-public-form`, `check-slot-availability`, `upload-client-media`) qui insère dans `error_logs` avant de retourner l'erreur 500.
-
-### 5. Page admin `/admin/errors`
-
-- Route protégée avec vérification du rôle `admin` via `has_role`
-- Tableau listant les erreurs des dernières 24h par défaut, avec filtres (source, date, résolu)
-- Colonnes : date, source, fonction, message, metadata (expandable), bouton "marquer résolu"
-- Compteurs en haut : total erreurs, par source, non résolues
-
-### 6. Résumé email quotidien (optionnel)
-
-Un cron pg_cron qui appelle une Edge Function `send-error-digest` chaque soir pour envoyer un email récapitulatif aux admins si des erreurs ont été loguées dans la journée.
-
-### Fichiers impactés
-
-- **Nouveau** : `supabase/functions/log-client-error/index.ts`
-- **Nouveau** : `src/pages/AdminErrors.tsx`
-- **Nouveau** : `src/lib/error-logger.ts` (helper d'envoi)
-- **Modifié** : `src/components/ErrorBoundary.tsx` (ajout envoi)
-- **Modifié** : `src/main.tsx` (global handlers)
-- **Modifié** : `src/pages/PublicClientForm.tsx` (catch amélioré)
-- **Modifié** : `src/App.tsx` (nouvelle route admin)
-- **Modifié** : `supabase/functions/submit-public-form/index.ts` (logging erreurs)
-- **Migration** : création table `error_logs` + policies
-
+### `submit-client-form/index.ts` - Changements
+```text
+Ligne 337       : Remplacer bulbiz2.lovable.app par app.bulbiz.io
+Apres ligne 456 : Ajouter email artisan pour confirmation RDV (auto-confirm)
+Apres ligne 468 : Ajouter email artisan pour selection creneau (multi-slots)
+```
