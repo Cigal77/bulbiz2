@@ -8,9 +8,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Camera, Upload, CheckCircle2, AlertTriangle, Loader2, X, Shield, Info, Calendar, Clock, Plus,
+  Camera,
+  Upload,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  X,
+  Shield,
+  Info,
+  Calendar,
+  Clock,
+  Plus,
 } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
 import { TRADE_TYPES } from "@/lib/trade-types";
@@ -20,7 +29,16 @@ import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "video/mp4", "video/quicktime"];
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "video/mp4",
+  "video/quicktime",
+];
+
 interface ArtisanProfile {
   first_name: string | null;
   last_name: string | null;
@@ -34,6 +52,12 @@ interface ProposedSlot {
   date: string;
   time: string;
 }
+
+const URGENCY_OPTIONS = [
+  { value: "aujourdhui", label: "Aujourd'hui" },
+  { value: "48h", label: "Sous 48h" },
+  { value: "semaine", label: "Dans la semaine" },
+];
 
 export default function PublicClientForm() {
   const { slug } = useParams<{ slug: string }>();
@@ -80,26 +104,33 @@ export default function PublicClientForm() {
   // Load artisan profile
   useEffect(() => {
     async function loadArtisan() {
-      if (!slug) { setNotFound(true); setLoading(false); return; }
+      if (!slug) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
       const { data, error } = await supabase
         .from("profiles")
         .select("first_name, last_name, company_name, phone, email, client_slots_enabled")
         .eq("public_client_slug", slug)
         .maybeSingle();
-      if (error || !data) { setNotFound(true); } else { setArtisan(data); }
+      if (error || !data) {
+        setNotFound(true);
+      } else {
+        setArtisan(data);
+      }
       setLoading(false);
     }
     loadArtisan();
   }, [slug]);
 
-  const artisanName = artisan?.company_name || [artisan?.first_name, artisan?.last_name].filter(Boolean).join(" ") || "Artisan";
-
-// Shared email validation imported at top level
+  const artisanName =
+    artisan?.company_name || [artisan?.first_name, artisan?.last_name].filter(Boolean).join(" ") || "Artisan";
 
   function handleFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files).filter(
-      (f) => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_FILE_SIZE
+      (f) => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_FILE_SIZE,
     );
     setFiles((prev) => [...prev, ...newFiles].slice(0, MAX_FILES));
     e.target.value = "";
@@ -111,29 +142,29 @@ export default function PublicClientForm() {
 
   // Slot helpers
   function updateSlot(index: number, field: keyof ProposedSlot, value: string) {
-    setProposedSlots(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
-    setSlotErrors(prev => prev.map((e, i) => i === index ? null : e));
+    setProposedSlots((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+    setSlotErrors((prev) => prev.map((e, i) => (i === index ? null : e)));
   }
 
   function addSlot() {
     if (proposedSlots.length >= 5) return;
-    setProposedSlots(prev => [...prev, { date: "", time: "09:00" }]);
-    setSlotErrors(prev => [...prev, null]);
+    setProposedSlots((prev) => [...prev, { date: "", time: "09:00" }]);
+    setSlotErrors((prev) => [...prev, null]);
   }
 
   function removeSlot(index: number) {
     if (proposedSlots.length <= 3) return;
-    setProposedSlots(prev => prev.filter((_, i) => i !== index));
-    setSlotErrors(prev => prev.filter((_, i) => i !== index));
+    setProposedSlots((prev) => prev.filter((_, i) => i !== index));
+    setSlotErrors((prev) => prev.filter((_, i) => i !== index));
   }
 
   function getValidSlots(): ProposedSlot[] {
-    return proposedSlots.filter(s => s.date && s.time);
+    return proposedSlots.filter((s) => s.date && s.time);
   }
 
   function hasDuplicateSlots(): boolean {
     const valid = getValidSlots();
-    const keys = valid.map(s => `${s.date}_${s.time}`);
+    const keys = valid.map((s) => `${s.date}_${s.time}`);
     return new Set(keys).size !== keys.length;
   }
 
@@ -144,7 +175,7 @@ export default function PublicClientForm() {
   function hasFutureSlots(): boolean {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
-    return getValidSlots().every(s => s.date >= today);
+    return getValidSlots().every((s) => s.date >= today);
   }
 
   async function checkSlotAvailability(): Promise<boolean> {
@@ -153,7 +184,7 @@ export default function PublicClientForm() {
 
     setCheckingSlots(true);
     try {
-      const slotsToCheck = valid.map(s => ({
+      const slotsToCheck = valid.map((s) => ({
         date: s.date,
         time_start: s.time,
         time_end: `${String(Math.min(23, parseInt(s.time.split(":")[0]) + 2)).padStart(2, "0")}:${s.time.split(":")[1]}`,
@@ -163,7 +194,7 @@ export default function PublicClientForm() {
         body: { slug, slots: slotsToCheck },
       });
 
-      if (error || !data?.results) return true; // Allow if check fails
+      if (error || !data?.results) return true;
 
       const newErrors: (string | null)[] = proposedSlots.map(() => null);
       let hasConflict = false;
@@ -178,7 +209,7 @@ export default function PublicClientForm() {
       setSlotErrors(newErrors);
       return !hasConflict;
     } catch {
-      return true; // Allow if check fails
+      return true;
     } finally {
       setCheckingSlots(false);
     }
@@ -196,7 +227,6 @@ export default function PublicClientForm() {
     setUploadProgress(10);
 
     try {
-      // Upload files
       const mediaUrls: string[] = [];
       if (files.length > 0) {
         for (let i = 0; i < files.length; i++) {
@@ -219,8 +249,7 @@ export default function PublicClientForm() {
 
       setUploadProgress(70);
 
-      // Prepare proposed slots
-      const validSlots = getValidSlots().map(s => ({
+      const validSlots = getValidSlots().map((s) => ({
         date: s.date,
         time_start: s.time,
         time_end: `${String(Math.min(23, parseInt(s.time.split(":")[0]) + 2)).padStart(2, "0")}:${s.time.split(":")[1]}`,
@@ -285,7 +314,9 @@ export default function PublicClientForm() {
           <CardContent className="flex flex-col items-center gap-4 pt-8 pb-8">
             <AlertTriangle className="h-12 w-12 text-destructive" />
             <h2 className="text-xl font-semibold text-foreground">Page introuvable</h2>
-            <p className="text-muted-foreground text-center">Ce lien n'est pas valide. Vérifiez l'adresse ou contactez votre artisan.</p>
+            <p className="text-muted-foreground text-center">
+              Ce lien n'est pas valide. Vérifiez l'adresse ou contactez votre artisan.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -310,20 +341,32 @@ export default function PublicClientForm() {
             {existingDossier && (
               <div className="bg-accent/50 border border-accent rounded-lg p-3 text-sm text-center w-full">
                 <Info className="h-4 w-4 inline mr-1 text-accent-foreground" />
-                Une demande précédente existe déjà pour ces coordonnées. Votre nouvelle demande a bien été créée séparément.
+                Une demande précédente existe déjà pour ces coordonnées. Votre nouvelle demande a bien été créée
+                séparément.
               </div>
             )}
             <Button
               variant="outline"
               onClick={() => {
                 setSuccess(false);
-                setForm({ client_first_name: "", client_last_name: "", client_phone: "", client_email: "", description: "", urgency: "semaine" });
+                setForm({
+                  client_first_name: "",
+                  client_last_name: "",
+                  client_phone: "",
+                  client_email: "",
+                  description: "",
+                  urgency: "semaine",
+                });
                 setFiles([]);
                 setAddressData({});
                 setAddressInput("");
                 setSelectedTrades([]);
                 setRgpdConsent(false);
-                setProposedSlots([{ date: "", time: "09:00" }, { date: "", time: "14:00" }, { date: "", time: "10:00" }]);
+                setProposedSlots([
+                  { date: "", time: "09:00" },
+                  { date: "", time: "14:00" },
+                  { date: "", time: "10:00" },
+                ]);
                 setSlotErrors([null, null, null]);
                 setStep(1);
                 setExistingDossier(null);
@@ -342,7 +385,12 @@ export default function PublicClientForm() {
 
   const canGoNext = () => {
     if (step === 1) return selectedTrades.length > 0;
-    if (step === 2) return form.client_first_name.trim() && form.client_last_name.trim() && (form.client_email ? validateEmail(form.client_email) : true);
+    if (step === 2)
+      return (
+        form.client_first_name.trim() &&
+        form.client_last_name.trim() &&
+        (form.client_email ? validateEmail(form.client_email) : true)
+      );
     if (step === 3) return true;
     if (slotsEnabled && step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
     if (step === validationStep) return rgpdConsent;
@@ -357,7 +405,6 @@ export default function PublicClientForm() {
     }
   };
 
-  // Format date for display
   const formatSlotDate = (dateStr: string) => {
     if (!dateStr) return "";
     try {
@@ -382,7 +429,9 @@ export default function PublicClientForm() {
         {/* Progress */}
         <div className="mb-6">
           <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>Étape {step}/{TOTAL_STEPS}</span>
+            <span>
+              Étape {step}/{TOTAL_STEPS}
+            </span>
             <span>{Math.round((step / TOTAL_STEPS) * 100)}%</span>
           </div>
           <Progress value={(step / TOTAL_STEPS) * 100} className="h-2" />
@@ -403,14 +452,14 @@ export default function PublicClientForm() {
                     type="button"
                     onClick={() => {
                       setSelectedTrades((prev) =>
-                        prev.includes(trade.id) ? prev.filter((t) => t !== trade.id) : [...prev, trade.id]
+                        prev.includes(trade.id) ? prev.filter((t) => t !== trade.id) : [...prev, trade.id],
                       );
                     }}
                     className={cn(
                       "flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors",
                       selectedTrades.includes(trade.id)
                         ? "border-primary bg-primary/10 text-primary font-medium"
-                        : "border-border hover:border-primary/40"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
                     <span>{trade.icon}</span>
@@ -532,23 +581,34 @@ export default function PublicClientForm() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
+
+              {/* Urgency: boutons natifs à la place du Select Radix (fix crash Android portal) */}
               <div className="space-y-1.5">
                 <Label>Urgence</Label>
-                <Select value={form.urgency} onValueChange={(v) => setForm({ ...form, urgency: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="aujourdhui">Aujourd'hui</SelectItem>
-                    <SelectItem value="48h">Sous 48h</SelectItem>
-                    <SelectItem value="semaine">Dans la semaine</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  {URGENCY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setForm({ ...form, urgency: opt.value })}
+                      className={cn(
+                        "flex-1 rounded-lg border p-2 text-sm transition-colors",
+                        form.urgency === opt.value
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Media upload */}
               <div className="space-y-2">
-                <Label>Photos / Vidéos ({files.length}/{MAX_FILES})</Label>
+                <Label>
+                  Photos / Vidéos ({files.length}/{MAX_FILES})
+                </Label>
                 {files.length > 0 && (
                   <div className="grid grid-cols-3 gap-2">
                     {files.map((f, i) => (
@@ -640,7 +700,12 @@ export default function PublicClientForm() {
                         />
                       </div>
                       {proposedSlots.length > 3 && (
-                        <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0" onClick={() => removeSlot(idx)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          onClick={() => removeSlot(idx)}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
@@ -687,13 +752,41 @@ export default function PublicClientForm() {
             <CardContent className="space-y-4">
               {/* Summary */}
               <div className="rounded-lg border bg-muted/50 p-4 space-y-2 text-sm">
-                <p><strong>Type :</strong> {selectedTrades.map(t => TRADE_TYPES.find(tt => tt.id === t)?.label).join(", ") || "—"}</p>
-                <p><strong>Nom :</strong> {form.client_first_name} {form.client_last_name}</p>
-                {form.client_phone && <p><strong>Tél :</strong> {form.client_phone}</p>}
-                {form.client_email && <p><strong>Email :</strong> {form.client_email}</p>}
-                {(addressData.address || addressInput) && <p><strong>Adresse :</strong> {addressData.address || addressInput}</p>}
-                {form.description && <p><strong>Description :</strong> {form.description}</p>}
-                {files.length > 0 && <p><strong>Médias :</strong> {files.length} fichier(s)</p>}
+                <p>
+                  <strong>Type :</strong>{" "}
+                  {selectedTrades.map((t) => TRADE_TYPES.find((tt) => tt.id === t)?.label).join(", ") || "—"}
+                </p>
+                <p>
+                  <strong>Nom :</strong> {form.client_first_name} {form.client_last_name}
+                </p>
+                {form.client_phone && (
+                  <p>
+                    <strong>Tél :</strong> {form.client_phone}
+                  </p>
+                )}
+                {form.client_email && (
+                  <p>
+                    <strong>Email :</strong> {form.client_email}
+                  </p>
+                )}
+                {(addressData.address || addressInput) && (
+                  <p>
+                    <strong>Adresse :</strong> {addressData.address || addressInput}
+                  </p>
+                )}
+                {form.description && (
+                  <p>
+                    <strong>Description :</strong> {form.description}
+                  </p>
+                )}
+                <p>
+                  <strong>Urgence :</strong> {URGENCY_OPTIONS.find((o) => o.value === form.urgency)?.label}
+                </p>
+                {files.length > 0 && (
+                  <p>
+                    <strong>Médias :</strong> {files.length} fichier(s)
+                  </p>
+                )}
 
                 {/* Proposed slots summary */}
                 {slotsEnabled && getValidSlots().length > 0 && (
@@ -712,14 +805,14 @@ export default function PublicClientForm() {
               </div>
 
               <div className="flex items-start gap-3 p-3 border rounded-lg">
-                <Checkbox
-                  id="rgpd"
-                  checked={rgpdConsent}
-                  onCheckedChange={(v) => setRgpdConsent(v === true)}
-                />
+                <Checkbox id="rgpd" checked={rgpdConsent} onCheckedChange={(v) => setRgpdConsent(v === true)} />
                 <Label htmlFor="rgpd" className="text-xs leading-relaxed cursor-pointer">
-                  J'accepte que mes données soient traitées par {artisanName} pour le suivi de ma demande, conformément à la{" "}
-                  <a href="/politique-confidentialite" target="_blank" className="underline text-primary">politique de confidentialité</a>.
+                  J'accepte que mes données soient traitées par {artisanName} pour le suivi de ma demande, conformément
+                  à la{" "}
+                  <a href="/politique-confidentialite" target="_blank" className="underline text-primary">
+                    politique de confidentialité
+                  </a>
+                  .
                 </Label>
               </div>
 
@@ -742,11 +835,7 @@ export default function PublicClientForm() {
           )}
           {step < TOTAL_STEPS ? (
             step === slotStep ? (
-              <Button
-                onClick={handleNextFromSlots}
-                disabled={!canGoNext() || checkingSlots}
-                className="flex-1 gap-2"
-              >
+              <Button onClick={handleNextFromSlots} disabled={!canGoNext() || checkingSlots} className="flex-1 gap-2">
                 {checkingSlots && <Loader2 className="h-4 w-4 animate-spin" />}
                 {checkingSlots ? "Vérification..." : "Suivant"}
               </Button>
