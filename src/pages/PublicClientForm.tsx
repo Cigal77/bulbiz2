@@ -659,7 +659,7 @@ export default function PublicClientForm() {
 
         {/* Step 4: Slot proposals (only if enabled) */}
         {slotsEnabled && step === slotStep && (
-          <Card>
+          <Card key="step-slots">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
