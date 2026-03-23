@@ -586,7 +586,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 1: Type d'intervention ═══ */}
         {step === 1 && (
-          <Card>
+          <Card key="step-1">
             <CardHeader>
               <CardTitle className="text-lg">Quel type d'intervention ?</CardTitle>
               <CardDescription>Sélectionnez un ou plusieurs corps de métier concernés.</CardDescription>
