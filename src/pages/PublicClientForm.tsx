@@ -566,7 +566,7 @@ export default function PublicClientForm() {
 
         {/* Step 3: Problem description + media */}
         {step === 3 && (
-          <Card>
+          <Card key="step-3">
             <CardHeader>
               <CardTitle className="text-lg">Décrivez votre problème</CardTitle>
             </CardHeader>
