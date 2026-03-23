@@ -1004,7 +1004,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 4: Photos ═══ */}
         {step === 4 && (
-          <Card>
+          <Card key="step-4">
             <CardHeader>
               <CardTitle className="text-lg">Ajoutez des photos</CardTitle>
               <CardDescription>Photos ou vidéos du problème (optionnel, max {MAX_FILES} fichiers)</CardDescription>
