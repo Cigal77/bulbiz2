@@ -845,7 +845,7 @@ export default function ClientForm() {
         {step === 3 && (
           <>
             <ReassuranceBanner />
-            <Card>
+            <Card key="step-3">
               <CardHeader>
                 <CardTitle className="text-lg">Quelques infos pratiques</CardTitle>
                 <CardDescription>
