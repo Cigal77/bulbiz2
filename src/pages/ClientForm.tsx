@@ -687,7 +687,7 @@ export default function ClientForm() {
                 Certaines informations sont pré-remplies par votre artisan. Vous pouvez les corriger si nécessaire.
               </div>
             )}
-            <Card>
+            <Card key="step-2">
               <CardHeader>
                 <CardTitle className="text-lg">Vos informations</CardTitle>
                 <CardDescription>Vérifiez et corrigez si besoin.</CardDescription>
