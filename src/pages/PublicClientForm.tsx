@@ -439,7 +439,7 @@ export default function PublicClientForm() {
 
         {/* Step 1: Trade selection */}
         {step === 1 && (
-          <Card>
+          <Card key="step-1">
             <CardHeader>
               <CardTitle className="text-lg">Type d'intervention</CardTitle>
             </CardHeader>
