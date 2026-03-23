@@ -1097,7 +1097,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 5: RGPD + Submit ═══ */}
         {step === 5 && (
-          <Card>
+          <Card key="step-5">
             <CardHeader>
               <CardTitle className="text-lg">Validation</CardTitle>
               <CardDescription>Relisez et confirmez votre envoi</CardDescription>

@@ -745,7 +745,7 @@ export default function PublicClientForm() {
 
         {/* Validation step */}
         {step === validationStep && (
-          <Card>
+          <Card key="step-validation">
             <CardHeader>
               <CardTitle className="text-lg">Confirmation</CardTitle>
             </CardHeader>
