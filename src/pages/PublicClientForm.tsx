@@ -439,7 +439,7 @@ export default function PublicClientForm() {
 
         {/* Step 1: Trade selection */}
         {step === 1 && (
-          <Card>
+          <Card key="step-1">
             <CardHeader>
               <CardTitle className="text-lg">Type d'intervention</CardTitle>
             </CardHeader>
@@ -473,7 +473,7 @@ export default function PublicClientForm() {
 
         {/* Step 2: Client info */}
         {step === 2 && (
-          <Card>
+          <Card key="step-2">
             <CardHeader>
               <CardTitle className="text-lg">Vos coordonnées</CardTitle>
             </CardHeader>
@@ -566,7 +566,7 @@ export default function PublicClientForm() {
 
         {/* Step 3: Problem description + media */}
         {step === 3 && (
-          <Card>
+          <Card key="step-3">
             <CardHeader>
               <CardTitle className="text-lg">Décrivez votre problème</CardTitle>
             </CardHeader>
@@ -659,7 +659,7 @@ export default function PublicClientForm() {
 
         {/* Step 4: Slot proposals (only if enabled) */}
         {slotsEnabled && step === slotStep && (
-          <Card>
+          <Card key="step-slots">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -745,7 +745,7 @@ export default function PublicClientForm() {
 
         {/* Validation step */}
         {step === validationStep && (
-          <Card>
+          <Card key="step-validation">
             <CardHeader>
               <CardTitle className="text-lg">Confirmation</CardTitle>
             </CardHeader>

@@ -586,7 +586,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 1: Type d'intervention ═══ */}
         {step === 1 && (
-          <Card>
+          <Card key="step-1">
             <CardHeader>
               <CardTitle className="text-lg">Quel type d'intervention ?</CardTitle>
               <CardDescription>Sélectionnez un ou plusieurs corps de métier concernés.</CardDescription>
@@ -687,7 +687,7 @@ export default function ClientForm() {
                 Certaines informations sont pré-remplies par votre artisan. Vous pouvez les corriger si nécessaire.
               </div>
             )}
-            <Card>
+            <Card key="step-2">
               <CardHeader>
                 <CardTitle className="text-lg">Vos informations</CardTitle>
                 <CardDescription>Vérifiez et corrigez si besoin.</CardDescription>
@@ -845,7 +845,7 @@ export default function ClientForm() {
         {step === 3 && (
           <>
             <ReassuranceBanner />
-            <Card>
+            <Card key="step-3">
               <CardHeader>
                 <CardTitle className="text-lg">Quelques infos pratiques</CardTitle>
                 <CardDescription>
@@ -1004,7 +1004,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 4: Photos ═══ */}
         {step === 4 && (
-          <Card>
+          <Card key="step-4">
             <CardHeader>
               <CardTitle className="text-lg">Ajoutez des photos</CardTitle>
               <CardDescription>Photos ou vidéos du problème (optionnel, max {MAX_FILES} fichiers)</CardDescription>
@@ -1097,7 +1097,7 @@ export default function ClientForm() {
 
         {/* ═══ STEP 5: RGPD + Submit ═══ */}
         {step === 5 && (
-          <Card>
+          <Card key="step-5">
             <CardHeader>
               <CardTitle className="text-lg">Validation</CardTitle>
               <CardDescription>Relisez et confirmez votre envoi</CardDescription>
