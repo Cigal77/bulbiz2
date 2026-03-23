@@ -473,7 +473,7 @@ export default function PublicClientForm() {
 
         {/* Step 2: Client info */}
         {step === 2 && (
-          <Card>
+          <Card key="step-2">
             <CardHeader>
               <CardTitle className="text-lg">Vos coordonnées</CardTitle>
             </CardHeader>
