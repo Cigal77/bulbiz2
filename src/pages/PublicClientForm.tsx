@@ -94,6 +94,12 @@ export default function PublicClientForm() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [rgpdConsent, setRgpdConsent] = useState(false);
   const [emailError, setEmailError] = useState("");
+  const [housingType, setHousingType] = useState("");
+  const [occupantType, setOccupantType] = useState("");
+  const [floorNumber, setFloorNumber] = useState("");
+  const [hasElevator, setHasElevator] = useState<boolean | null>(null);
+  const [accessCode, setAccessCode] = useState("");
+  const [availability, setAvailability] = useState("");
 
   // Slot proposal state
   const [proposedSlots, setProposedSlots] = useState<ProposedSlot[]>([
