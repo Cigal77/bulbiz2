@@ -958,6 +958,19 @@ export default function PublicClientForm() {
                   </p>
                 )}
 
+                {/* Infos pratiques summary */}
+                {(housingType || occupantType || floorNumber || hasElevator !== null || accessCode || availability) && (
+                  <div className="space-y-1">
+                    <strong>Infos pratiques :</strong>
+                    {housingType && <p>{HOUSING_TYPES.find((h) => h.id === housingType)?.label}</p>}
+                    {occupantType && <p>{OCCUPANT_TYPES.find((o) => o.id === occupantType)?.label}</p>}
+                    {floorNumber && <p>Étage {floorNumber}{hasElevator === true ? " (avec ascenseur)" : hasElevator === false ? " (sans ascenseur)" : ""}</p>}
+                    {!floorNumber && hasElevator !== null && <p>Ascenseur : {hasElevator ? "Oui" : "Non"}</p>}
+                    {accessCode && <p>Digicode : {accessCode}</p>}
+                    {availability && <p>Dispo : {AVAILABILITY_OPTIONS.find((a) => a.id === availability)?.label}</p>}
+                  </div>
+                )}
+
                 {/* Proposed slots summary */}
                 {slotsEnabled && getValidSlots().length > 0 && (
                   <div>
