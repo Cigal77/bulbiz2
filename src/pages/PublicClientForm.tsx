@@ -415,7 +415,8 @@ export default function PublicClientForm() {
         (form.client_email ? validateEmail(form.client_email) : true)
       );
     if (step === 3) return true;
-    if (slotsEnabled && step === 4) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
+    if (step === 4) return true; // infos pratiques - all optional
+    if (slotsEnabled && step === 5) return hasMinimumSlots() && !hasDuplicateSlots() && hasFutureSlots();
     if (step === validationStep) return rgpdConsent;
     return false;
   };
