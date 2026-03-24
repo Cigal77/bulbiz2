@@ -404,7 +404,7 @@ export default function PublicClientForm() {
   }
 
   const validationStep = TOTAL_STEPS;
-  const slotStep = slotsEnabled ? 4 : -1;
+  const slotStep = slotsEnabled ? 5 : -1;
 
   const canGoNext = () => {
     if (step === 1) return selectedTrades.length > 0;
