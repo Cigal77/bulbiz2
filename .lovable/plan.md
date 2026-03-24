@@ -1,31 +1,28 @@
 
 
-## Ajout de keys uniques sur les Cards d'étapes
+## Ajouter l'étape "Infos pratiques" dans PublicClientForm
 
-Ajouter un attribut `key` sur chaque `<Card>` d'étape dans les deux formulaires pour forcer le démontage/remontage React au changement d'étape.
+Le formulaire public passe directement de "Décrivez votre problème" (step 3) aux créneaux/validation. Il manque l'étape facultative présente dans ClientForm : type de logement, occupant, étage, ascenseur, digicode, disponibilités.
 
-### ClientForm.tsx (5 modifications)
+### Modifications dans `src/pages/PublicClientForm.tsx`
 
-| Étape | Ligne | Changement |
-|-------|-------|------------|
-| Step 1 | 589 | `<Card>` → `<Card key="step-1">` |
-| Step 2 | 690 | `<Card>` → `<Card key="step-2">` |
-| Step 3 | 848 | `<Card>` → `<Card key="step-3">` |
-| Step 4 | 1007 | `<Card>` → `<Card key="step-4">` |
-| Step 5 | 1100 | `<Card>` → `<Card key="step-5">` |
+**1. Imports** -- Ajouter les icônes et constantes manquantes :
+- Icônes : `Building2`, `User`, `ArrowUpDown`, `KeyRound`, `CalendarDays` depuis lucide-react
+- Constantes : `HOUSING_TYPES`, `OCCUPANT_TYPES`, `AVAILABILITY_OPTIONS` depuis `@/lib/trade-types`
+- Importer `CardDescription` depuis `@/components/ui/card`
 
-Note : Steps 2 et 3 sont wrappés dans `<>...</>` avec du contenu avant la Card. La key sera mise sur la Card directement (pas sur le fragment).
+**2. State** -- Ajouter les variables d'état (après les states existants ~ligne 91) :
+- `housingType`, `occupantType`, `floorNumber`, `hasElevator`, `accessCode`, `availability`
 
-### PublicClientForm.tsx (5 modifications)
+**3. Recompter les étapes** -- TOTAL_STEPS passe de `slotsEnabled ? 5 : 4` à `slotsEnabled ? 6 : 5`. Le slotStep passe de `4` à `5`.
 
-| Étape | Ligne | Changement |
-|-------|-------|------------|
-| Step 1 | 442 | `<Card>` → `<Card key="step-1">` |
-| Step 2 | 476 | `<Card>` → `<Card key="step-2">` |
-| Step 3 | 569 | `<Card>` → `<Card key="step-3">` |
-| Step slots | 662 | `<Card>` → `<Card key="step-slots">` |
-| Validation | 748 | `<Card>` → `<Card key="step-validation">` |
+**4. canGoNext** -- Step 4 (infos pratiques) retourne toujours `true` (tout est facultatif). Décaler les conditions des steps suivants.
 
-### Impact
-Modification purement technique, aucun changement visuel. Corrige les bugs potentiels de state React qui "persiste" entre étapes (inputs pas réinitialisés, composants pas correctement remontés).
+**5. Nouvelle Card step 4** -- Insérer entre step 3 et step slots/validation, copie exacte du bloc de ClientForm (lignes 848-1001) avec les mêmes champs : housing type, occupant type, étage/ascenseur, digicode, disponibilités. Boutons de navigation adaptés (retour vers step 3, passer ou continuer vers step suivant).
+
+**6. submitData** -- Ajouter dans l'objet `submitData` les nouveaux champs : `housing_type`, `occupant_type`, `floor_number`, `has_elevator`, `access_code`, `availability`.
+
+**7. Reset** -- Ajouter le reset des nouveaux champs dans le callback "Envoyer une autre demande".
+
+**8. Résumé validation** -- Ajouter l'affichage des infos pratiques dans la Card de confirmation (step validation) si renseignées.
 
