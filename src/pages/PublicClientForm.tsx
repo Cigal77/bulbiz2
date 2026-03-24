@@ -385,6 +385,12 @@ export default function PublicClientForm() {
                   { date: "", time: "10:00" },
                 ]);
                 setSlotErrors([null, null, null]);
+                setHousingType("");
+                setOccupantType("");
+                setFloorNumber("");
+                setHasElevator(null);
+                setAccessCode("");
+                setAvailability("");
                 setStep(1);
                 setExistingDossier(null);
               }}
