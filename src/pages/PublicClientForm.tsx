@@ -27,7 +27,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { BulbizLogo } from "@/components/BulbizLogo";
-import { TRADE_TYPES } from "@/lib/trade-types";
+import { TRADE_TYPES, HOUSING_TYPES, OCCUPANT_TYPES, AVAILABILITY_OPTIONS } from "@/lib/trade-types";
 import { AddressAutocomplete, type AddressData } from "@/components/AddressAutocomplete";
 import { cn } from "@/lib/utils";
 import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
