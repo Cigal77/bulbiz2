@@ -278,6 +278,12 @@ export default function PublicClientForm() {
         lng: addressData.lng,
         trade_types: selectedTrades,
         category: "autre",
+        housing_type: housingType || null,
+        occupant_type: occupantType || null,
+        floor_number: floorNumber ? parseInt(floorNumber) : null,
+        has_elevator: hasElevator,
+        access_code: accessCode || null,
+        availability: availability || null,
       };
 
       const { data: result, error } = await supabase.functions.invoke("submit-public-form", {
