@@ -681,7 +681,153 @@ export default function PublicClientForm() {
           </Card>
         )}
 
-        {/* Step 4: Slot proposals (only if enabled) */}
+        {/* Step 4: Infos pratiques */}
+        {step === 4 && (
+          <Card key="step-4">
+            <CardHeader>
+              <CardTitle className="text-lg">Quelques infos pratiques</CardTitle>
+              <CardDescription>
+                Pour intervenir dans les meilleures conditions.{" "}
+                <span className="text-primary font-medium">Tout est facultatif.</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Housing type */}
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  Type de logement
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {HOUSING_TYPES.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => setHousingType(housingType === h.id ? "" : h.id)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                        housingType === h.id
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-foreground hover:border-primary/40",
+                      )}
+                    >
+                      {h.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Occupant type */}
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  Vous êtes
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {OCCUPANT_TYPES.map((o) => (
+                    <button
+                      key={o.id}
+                      onClick={() => setOccupantType(occupantType === o.id ? "" : o.id)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                        occupantType === o.id
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-foreground hover:border-primary/40",
+                      )}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Access info */}
+              <div className="space-y-3">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  Accès
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Étage</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={99}
+                      placeholder="Ex : 3"
+                      value={floorNumber}
+                      onChange={(e) => setFloorNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Ascenseur</Label>
+                    <div className="flex gap-2 h-10 items-center">
+                      <button
+                        onClick={() => setHasElevator(hasElevator === true ? null : true)}
+                        className={cn(
+                          "rounded-lg border px-3 py-1.5 text-sm transition-all",
+                          hasElevator === true
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card",
+                        )}
+                      >
+                        Oui
+                      </button>
+                      <button
+                        onClick={() => setHasElevator(hasElevator === false ? null : false)}
+                        className={cn(
+                          "rounded-lg border px-3 py-1.5 text-sm transition-all",
+                          hasElevator === false
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border bg-card",
+                        )}
+                      >
+                        Non
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground flex items-center gap-1">
+                    <KeyRound className="h-3 w-3" />
+                    Digicode / badge
+                  </Label>
+                  <Input
+                    placeholder="Ex : 1234A"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    maxLength={50}
+                  />
+                </div>
+              </div>
+
+              {/* Availability */}
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  Disponibilités
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {AVAILABILITY_OPTIONS.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setAvailability(availability === a.id ? "" : a.id)}
+                      className={cn(
+                        "rounded-full border px-3.5 py-1.5 text-sm transition-all active:scale-95",
+                        availability === a.id
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card text-foreground hover:border-primary/40",
+                      )}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 5: Slot proposals (only if enabled) */}
         {slotsEnabled && step === slotStep && (
           <Card key="step-slots">
             <CardHeader>
