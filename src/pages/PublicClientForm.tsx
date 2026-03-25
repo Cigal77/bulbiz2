@@ -484,7 +484,7 @@ export default function PublicClientForm() {
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">Sélectionnez le(s) type(s) de travaux concernés :</p>
               <div className="grid grid-cols-2 gap-2">
-                {TRADE_TYPES.map((trade) => (
+                {activeTrades.map((trade) => (
                   <button
                     key={trade.id}
                     type="button"
