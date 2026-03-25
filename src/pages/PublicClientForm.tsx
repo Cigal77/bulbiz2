@@ -32,6 +32,18 @@ import { AddressAutocomplete, type AddressData } from "@/components/AddressAutoc
 import { cn } from "@/lib/utils";
 import { validateEmail, EMAIL_VALIDATION_ERROR } from "@/lib/email-validation";
 
+const CEDRIC_SCHORR_TRADES: typeof TRADE_TYPES = [
+  { id: "plomberie", label: "Plomberie", icon: "🛠️", problems: [] },
+  { id: "chauffage", label: "Chauffage", icon: "🔥", problems: [] },
+  { id: "sanitaire", label: "Sanitaire", icon: "🚿", problems: [] },
+  { id: "depannage", label: "Dépannage", icon: "⚡", problems: [] },
+  { id: "chantier_renovation", label: "Chantier et rénovation", icon: "🏗️", problems: [] },
+];
+
+const CUSTOM_TRADES_BY_EMAIL: Record<string, typeof TRADE_TYPES> = {
+  "schorr.cedric@gmail.com": CEDRIC_SCHORR_TRADES,
+};
+
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 200 * 1024 * 1024;
 const ALLOWED_TYPES = [
