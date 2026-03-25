@@ -1,28 +1,35 @@
 
 
-## Ajouter l'étape "Infos pratiques" dans PublicClientForm
-
-Le formulaire public passe directement de "Décrivez votre problème" (step 3) aux créneaux/validation. Il manque l'étape facultative présente dans ClientForm : type de logement, occupant, étage, ascenseur, digicode, disponibilités.
+## Personnaliser les types d'intervention par email artisan
 
 ### Modifications dans `src/pages/PublicClientForm.tsx`
 
-**1. Imports** -- Ajouter les icônes et constantes manquantes :
-- Icônes : `Building2`, `User`, `ArrowUpDown`, `KeyRound`, `CalendarDays` depuis lucide-react
-- Constantes : `HOUSING_TYPES`, `OCCUPANT_TYPES`, `AVAILABILITY_OPTIONS` depuis `@/lib/trade-types`
-- Importer `CardDescription` depuis `@/components/ui/card`
+**1. Constantes** (après les imports, ~ligne 35) : ajouter les trades personnalisés et le mapping par email :
 
-**2. State** -- Ajouter les variables d'état (après les states existants ~ligne 91) :
-- `housingType`, `occupantType`, `floorNumber`, `hasElevator`, `accessCode`, `availability`
+```ts
+const CEDRIC_SCHORR_TRADES: typeof TRADE_TYPES = [
+  { id: "plomberie", label: "Plomberie", icon: "🛠️", problems: [] },
+  { id: "chauffage", label: "Chauffage", icon: "🔥", problems: [] },
+  { id: "sanitaire", label: "Sanitaire", icon: "🚿", problems: [] },
+  { id: "depannage", label: "Dépannage", icon: "⚡", problems: [] },
+  { id: "chantier_renovation", label: "Chantier et rénovation", icon: "🏗️", problems: [] },
+];
 
-**3. Recompter les étapes** -- TOTAL_STEPS passe de `slotsEnabled ? 5 : 4` à `slotsEnabled ? 6 : 5`. Le slotStep passe de `4` à `5`.
+const CUSTOM_TRADES_BY_EMAIL: Record<string, typeof TRADE_TYPES> = {
+  "schorr.cedric@gmail.com": CEDRIC_SCHORR_TRADES,
+};
+```
 
-**4. canGoNext** -- Step 4 (infos pratiques) retourne toujours `true` (tout est facultatif). Décaler les conditions des steps suivants.
+**2. Variable dynamique** (après `artisanName`, ligne ~139) :
 
-**5. Nouvelle Card step 4** -- Insérer entre step 3 et step slots/validation, copie exacte du bloc de ClientForm (lignes 848-1001) avec les mêmes champs : housing type, occupant type, étage/ascenseur, digicode, disponibilités. Boutons de navigation adaptés (retour vers step 3, passer ou continuer vers step suivant).
+```ts
+const activeTrades = (artisan?.email && CUSTOM_TRADES_BY_EMAIL[artisan.email.toLowerCase()]) || TRADE_TYPES;
+```
 
-**6. submitData** -- Ajouter dans l'objet `submitData` les nouveaux champs : `housing_type`, `occupant_type`, `floor_number`, `has_elevator`, `access_code`, `availability`.
+**3. Rendu Step 1** (ligne 473) : remplacer `TRADE_TYPES.map(...)` par `activeTrades.map(...)`.
 
-**7. Reset** -- Ajouter le reset des nouveaux champs dans le callback "Envoyer une autre demande".
-
-**8. Résumé validation** -- Ajouter l'affichage des infos pratiques dans la Card de confirmation (step validation) si renseignées.
+### Résultat
+- Pour `schorr.cedric@gmail.com` : 5 catégories personnalisées
+- Pour tout autre artisan : liste standard inchangée
+- Extensible : ajouter d'autres emails dans `CUSTOM_TRADES_BY_EMAIL`
 
