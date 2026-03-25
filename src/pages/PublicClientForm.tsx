@@ -150,6 +150,8 @@ export default function PublicClientForm() {
   const artisanName =
     artisan?.company_name || [artisan?.first_name, artisan?.last_name].filter(Boolean).join(" ") || "Artisan";
 
+  const activeTrades = (artisan?.email && CUSTOM_TRADES_BY_EMAIL[artisan.email.toLowerCase()]) || TRADE_TYPES;
+
   function handleFileAdd(e: React.ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files).filter(
