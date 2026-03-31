@@ -5,7 +5,7 @@ import { GOOGLE_MAPS_API_KEY } from "@/lib/constants";
 import { MapPin, AlertTriangle } from "lucide-react";
 
 export interface AddressData {
-  address: string; // display address
+  address: string;
   address_line?: string;
   postal_code?: string;
   city?: string;
@@ -86,6 +86,18 @@ export function AddressAutocomplete({
   const [selectedFromGoogle, setSelectedFromGoogle] = useState(false);
   const [hasTyped, setHasTyped] = useState(false);
 
+  // Stable refs for callbacks to avoid re-initializing autocomplete
+  const onChangeRef = useRef(onChange);
+  const onAddressSelectRef = useRef(onAddressSelect);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onAddressSelectRef.current = onAddressSelect;
+  }, [onAddressSelect]);
+
   // Load Google Maps if API key exists
   useEffect(() => {
     if (!GOOGLE_MAPS_API_KEY) return;
@@ -96,7 +108,7 @@ export function AddressAutocomplete({
     });
   }, []);
 
-  // Initialize autocomplete
+  // Initialize autocomplete — only once when Google is ready
   useEffect(() => {
     if (!isGoogleReady || !inputRef.current || autocompleteRef.current) return;
 
@@ -113,8 +125,8 @@ export function AddressAutocomplete({
       const data = extractAddressComponents(place);
       setSelectedFromGoogle(true);
       setHasTyped(false);
-      onChange(data.address);
-      onAddressSelect?.(data);
+      onChangeRef.current(data.address);
+      onAddressSelectRef.current?.(data);
     });
 
     autocompleteRef.current = autocomplete;
@@ -122,7 +134,7 @@ export function AddressAutocomplete({
     return () => {
       google.maps.event.clearInstanceListeners(autocomplete);
     };
-  }, [isGoogleReady, onChange, onAddressSelect]);
+  }, [isGoogleReady]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,7 +142,7 @@ export function AddressAutocomplete({
       setSelectedFromGoogle(false);
       onChange(e.target.value);
     },
-    [onChange]
+    [onChange],
   );
 
   const showWarning = hasTyped && !selectedFromGoogle && value.length > 5 && isGoogleReady;
