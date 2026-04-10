@@ -1,35 +1,29 @@
 
 
-## Personnaliser les types d'intervention par email artisan
+## Rendre l'email obligatoire dans PublicClientForm
 
-### Modifications dans `src/pages/PublicClientForm.tsx`
+### Problème
+Dans `src/pages/PublicClientForm.tsx`, ligne 429, la condition `canGoNext` pour l'étape 2 rend l'email optionnel : si le champ est vide, la validation passe quand même. Sans email, les notifications (confirmation client, relances) ne fonctionnent pas.
 
-**1. Constantes** (après les imports, ~ligne 35) : ajouter les trades personnalisés et le mapping par email :
+### Modification unique
 
-```ts
-const CEDRIC_SCHORR_TRADES: typeof TRADE_TYPES = [
-  { id: "plomberie", label: "Plomberie", icon: "🛠️", problems: [] },
-  { id: "chauffage", label: "Chauffage", icon: "🔥", problems: [] },
-  { id: "sanitaire", label: "Sanitaire", icon: "🚿", problems: [] },
-  { id: "depannage", label: "Dépannage", icon: "⚡", problems: [] },
-  { id: "chantier_renovation", label: "Chantier et rénovation", icon: "🏗️", problems: [] },
-];
+**Fichier** : `src/pages/PublicClientForm.tsx`
 
-const CUSTOM_TRADES_BY_EMAIL: Record<string, typeof TRADE_TYPES> = {
-  "schorr.cedric@gmail.com": CEDRIC_SCHORR_TRADES,
-};
-```
-
-**2. Variable dynamique** (après `artisanName`, ligne ~139) :
+**1. `canGoNext` (ligne 425-430)** — Rendre l'email requis et validé :
 
 ```ts
-const activeTrades = (artisan?.email && CUSTOM_TRADES_BY_EMAIL[artisan.email.toLowerCase()]) || TRADE_TYPES;
+if (step === 2)
+  return (
+    form.client_first_name.trim() &&
+    form.client_last_name.trim() &&
+    form.client_email.trim() !== "" &&
+    validateEmail(form.client_email)
+  );
 ```
 
-**3. Rendu Step 1** (ligne 473) : remplacer `TRADE_TYPES.map(...)` par `activeTrades.map(...)`.
+**2. Label du champ email (dans le rendu step 2)** — Ajouter un astérisque `*` pour indiquer visuellement que le champ est obligatoire, comme pour le prénom et le nom.
 
-### Résultat
-- Pour `schorr.cedric@gmail.com` : 5 catégories personnalisées
-- Pour tout autre artisan : liste standard inchangée
-- Extensible : ajouter d'autres emails dans `CUSTOM_TRADES_BY_EMAIL`
+### Impact
+- Le bouton "Suivant" reste grisé tant qu'un email valide n'est pas saisi
+- Aucun changement sur `ClientForm.tsx` (formulaire par token, logique différente)
 
