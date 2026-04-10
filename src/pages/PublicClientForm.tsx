@@ -426,7 +426,8 @@ export default function PublicClientForm() {
       return (
         form.client_first_name.trim() &&
         form.client_last_name.trim() &&
-        (form.client_email ? validateEmail(form.client_email) : true)
+        form.client_email.trim() !== "" &&
+        validateEmail(form.client_email)
       );
     if (step === 3) return true;
     if (step === 4) return true; // infos pratiques - all optional
@@ -548,7 +549,7 @@ export default function PublicClientForm() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
                 <Input
                   id="email"
                   type="email"
