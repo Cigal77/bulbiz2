@@ -89,23 +89,20 @@ export default function QuoteValidation() {
       return;
     }
 
-    // Load dossier & profile
+    // Load dossier & public-safe artisan profile
     const [dRes, pRes] = await Promise.all([
       supabase
         .from("dossiers")
         .select("client_first_name, client_last_name, address")
         .eq("id", q.dossier_id)
         .maybeSingle(),
-      supabase
-        .from("profiles")
-        .select("company_name, first_name, last_name, phone, email, siret")
-        .eq("user_id", q.user_id)
-        .maybeSingle(),
+      supabase.rpc("get_public_profile_for_quote", { _signature_token: token! }),
     ]);
 
     setQuote(q as QuoteData);
     setDossier(dRes.data);
-    setProfile(pRes.data);
+    const profileRow = Array.isArray(pRes.data) ? pRes.data[0] : pRes.data;
+    setProfile(profileRow as any);
     setState("view");
   };
 
