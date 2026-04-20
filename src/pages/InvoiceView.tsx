@@ -107,22 +107,19 @@ export default function InvoiceView() {
 
         setInvoice(inv as unknown as InvoiceData);
 
-        // Fetch lines and profile in parallel
+        // Fetch lines and public-safe artisan profile in parallel
         const [linesRes, profileRes] = await Promise.all([
           supabase
             .from("invoice_lines")
             .select("*")
             .eq("invoice_id", inv.id)
             .order("sort_order"),
-          supabase
-            .from("profiles")
-            .select("*")
-            .eq("user_id", inv.user_id)
-            .maybeSingle(),
+          supabase.rpc("get_public_profile_for_invoice", { _client_token: token }),
         ]);
 
         setLines((linesRes.data || []) as unknown as InvoiceLine[]);
-        setProfile(profileRes.data as Record<string, unknown> | null);
+        const profileRow = Array.isArray(profileRes.data) ? profileRes.data[0] : profileRes.data;
+        setProfile(profileRow as Record<string, unknown> | null);
       } catch (e: any) {
         setError(e.message || "Erreur inattendue");
       } finally {

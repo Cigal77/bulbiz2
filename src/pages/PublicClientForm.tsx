@@ -133,14 +133,13 @@ export default function PublicClientForm() {
         return;
       }
       const { data, error } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, company_name, phone, email, client_slots_enabled")
-        .eq("public_client_slug", slug)
-        .maybeSingle();
-      if (error || !data) {
+        .rpc("get_public_profile_by_slug", { _slug: slug });
+      const row = Array.isArray(data) ? data[0] : data;
+      if (error || !row) {
         setNotFound(true);
       } else {
-        setArtisan(data);
+        // Email is intentionally not exposed by the RPC; provide null fallback for downstream logic
+        setArtisan({ ...row, email: null, phone: null } as any);
       }
       setLoading(false);
     }
