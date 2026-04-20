@@ -340,8 +340,11 @@ export type Database = {
       }
       catalog_material: {
         Row: {
+          active: boolean
           brand: string | null
+          category_id: string | null
           category_path: string
+          confidence_score: number | null
           created_at: string
           default_qty: number | null
           id: string
@@ -352,7 +355,12 @@ export type Database = {
           last_used_at: string | null
           last_used_price: number | null
           notes: string | null
+          raw_name: string | null
+          sector_id: string | null
           slug: string | null
+          source_external_id: string | null
+          source_id: string | null
+          source_url: string | null
           subcategory: string | null
           supplier: string | null
           supplier_ref: string | null
@@ -361,13 +369,17 @@ export type Database = {
           type: string
           unit: string | null
           unit_price: number | null
+          updated_at: string
           usage_count: number
           user_id: string | null
           vat_rate: number | null
         }
         Insert: {
+          active?: boolean
           brand?: string | null
+          category_id?: string | null
           category_path: string
+          confidence_score?: number | null
           created_at?: string
           default_qty?: number | null
           id?: string
@@ -378,7 +390,12 @@ export type Database = {
           last_used_at?: string | null
           last_used_price?: number | null
           notes?: string | null
+          raw_name?: string | null
+          sector_id?: string | null
           slug?: string | null
+          source_external_id?: string | null
+          source_id?: string | null
+          source_url?: string | null
           subcategory?: string | null
           supplier?: string | null
           supplier_ref?: string | null
@@ -387,13 +404,17 @@ export type Database = {
           type?: string
           unit?: string | null
           unit_price?: number | null
+          updated_at?: string
           usage_count?: number
           user_id?: string | null
           vat_rate?: number | null
         }
         Update: {
+          active?: boolean
           brand?: string | null
+          category_id?: string | null
           category_path?: string
+          confidence_score?: number | null
           created_at?: string
           default_qty?: number | null
           id?: string
@@ -404,7 +425,12 @@ export type Database = {
           last_used_at?: string | null
           last_used_price?: number | null
           notes?: string | null
+          raw_name?: string | null
+          sector_id?: string | null
           slug?: string | null
+          source_external_id?: string | null
+          source_id?: string | null
+          source_url?: string | null
           subcategory?: string | null
           supplier?: string | null
           supplier_ref?: string | null
@@ -413,11 +439,34 @@ export type Database = {
           type?: string
           unit?: string | null
           unit_price?: number | null
+          updated_at?: string
           usage_count?: number
           user_id?: string | null
           vat_rate?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "catalog_material_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_material_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "product_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_material_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       catalog_usage_log: {
         Row: {
@@ -506,6 +555,45 @@ export type Database = {
           updated_at?: string
           user_id?: string
           waste_management_text?: string | null
+        }
+        Relationships: []
+      }
+      data_sources: {
+        Row: {
+          base_url: string | null
+          config: Json | null
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          name: string
+          notes: string | null
+          source_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          base_url?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          name: string
+          notes?: string | null
+          source_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          base_url?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          name?: string
+          notes?: string | null
+          source_type?: string
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -799,6 +887,59 @@ export type Database = {
           },
         ]
       }
+      ingestion_jobs: {
+        Row: {
+          created_at: string
+          data_source_id: string | null
+          errors_json: Json | null
+          finished_at: string | null
+          id: string
+          items_created: number | null
+          items_flagged: number | null
+          items_found: number | null
+          items_updated: number | null
+          started_at: string | null
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_source_id?: string | null
+          errors_json?: Json | null
+          finished_at?: string | null
+          id?: string
+          items_created?: number | null
+          items_flagged?: number | null
+          items_found?: number | null
+          items_updated?: number | null
+          started_at?: string | null
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_source_id?: string | null
+          errors_json?: Json | null
+          finished_at?: string | null
+          id?: string
+          items_created?: number | null
+          items_flagged?: number | null
+          items_found?: number | null
+          items_updated?: number | null
+          started_at?: string | null
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingestion_jobs_data_source_id_fkey"
+            columns: ["data_source_id"]
+            isOneToOne: false
+            referencedRelation: "data_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       insurance_profiles: {
         Row: {
           created_at: string
@@ -843,6 +984,94 @@ export type Database = {
           validity_start?: string | null
         }
         Relationships: []
+      }
+      intervention_product_packs: {
+        Row: {
+          id: string
+          intervention_type_id: string
+          labor_lines: Json
+          often_added_products: Json
+          optional_products: Json
+          qualification_questions: Json
+          required_products: Json
+          travel_lines: Json
+          updated_at: string
+          waste_lines: Json
+        }
+        Insert: {
+          id?: string
+          intervention_type_id: string
+          labor_lines?: Json
+          often_added_products?: Json
+          optional_products?: Json
+          qualification_questions?: Json
+          required_products?: Json
+          travel_lines?: Json
+          updated_at?: string
+          waste_lines?: Json
+        }
+        Update: {
+          id?: string
+          intervention_type_id?: string
+          labor_lines?: Json
+          often_added_products?: Json
+          optional_products?: Json
+          qualification_questions?: Json
+          required_products?: Json
+          travel_lines?: Json
+          updated_at?: string
+          waste_lines?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_product_packs_intervention_type_id_fkey"
+            columns: ["intervention_type_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intervention_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sector_id: string | null
+          slug: string
+          sort_order: number | null
+          synonyms: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sector_id?: string | null
+          slug: string
+          sort_order?: number | null
+          synonyms?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sector_id?: string | null
+          slug?: string
+          sort_order?: number | null
+          synonyms?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intervention_types_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "product_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_lines: {
         Row: {
@@ -1339,6 +1568,136 @@ export type Database = {
           },
         ]
       }
+      product_associations: {
+        Row: {
+          created_at: string
+          id: string
+          intervention_type_id: string | null
+          parent_product_id: string
+          related_product_id: string
+          relation_type: string
+          relevance_score: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          parent_product_id: string
+          related_product_id: string
+          relation_type: string
+          relevance_score?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          parent_product_id?: string
+          related_product_id?: string
+          relation_type?: string
+          relevance_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_associations_intervention_type_id_fkey"
+            columns: ["intervention_type_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_associations_parent_product_id_fkey"
+            columns: ["parent_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_associations_related_product_id_fkey"
+            columns: ["related_product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_categories: {
+        Row: {
+          created_at: string
+          id: string
+          level: number
+          name: string
+          parent_id: string | null
+          sector_id: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level?: number
+          name: string
+          parent_id?: string | null
+          sector_id: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: number
+          name?: string
+          parent_id?: string | null
+          sector_id?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_categories_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "product_sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_sectors: {
+        Row: {
+          active: boolean
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           accepted_payment_methods: string[] | null
@@ -1793,6 +2152,92 @@ export type Database = {
           },
         ]
       }
+      user_intervention_kits: {
+        Row: {
+          created_at: string
+          id: string
+          intervention_type_id: string | null
+          is_default: boolean
+          items: Json
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          is_default?: boolean
+          items?: Json
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          is_default?: boolean
+          items?: Json
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_intervention_kits_intervention_type_id_fkey"
+            columns: ["intervention_type_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_product_usage: {
+        Row: {
+          behavior_type: string
+          created_at: string
+          id: string
+          intervention_type_id: string | null
+          metadata: Json | null
+          product_id: string | null
+          user_id: string
+        }
+        Insert: {
+          behavior_type: string
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          metadata?: Json | null
+          product_id?: string | null
+          user_id: string
+        }
+        Update: {
+          behavior_type?: string
+          created_at?: string
+          id?: string
+          intervention_type_id?: string | null
+          metadata?: Json | null
+          product_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_product_usage_intervention_type_id_fkey"
+            columns: ["intervention_type_id"]
+            isOneToOne: false
+            referencedRelation: "intervention_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_product_usage_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_material"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -1874,6 +2319,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "artisan"
