@@ -32,21 +32,21 @@ export function StatusCounters({ counts, activeFilter, onFilterChange }: StatusC
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2">
       {DASHBOARD_STATUSES.map((status) => (
         <button
           key={status}
           onClick={() => onFilterChange(activeFilter === status ? null : status)}
           className={cn(
-            "flex flex-col items-start gap-1 rounded-xl border p-4 transition-all hover:shadow-sm",
+            "flex flex-col items-start gap-1.5 rounded-xl border p-3 transition-all hover:shadow-sm min-w-0",
             activeFilter === status
               ? "border-primary bg-primary/5 ring-1 ring-primary/20"
               : "border-border bg-card hover:border-primary/30"
           )}
         >
-          <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium", STATUS_COLORS[status])}>
-            {STATUS_ICONS[status]}
-            <span>{STATUS_LABELS[status]}</span>
+          <div className={cn("flex items-start gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-tight w-full min-w-0", STATUS_COLORS[status])}>
+            <span className="shrink-0 mt-0.5">{STATUS_ICONS[status]}</span>
+            <span className="text-left whitespace-normal break-words min-w-0">{STATUS_LABELS[status]}</span>
           </div>
           <span className="text-2xl font-bold text-foreground tabular-nums">{mergedCounts[status] || 0}</span>
         </button>

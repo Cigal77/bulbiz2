@@ -74,15 +74,15 @@ export function AppointmentCounters({ dossiers, activeFilter, onFilterChange }: 
               key={tile.key}
               onClick={() => onFilterChange(isActive ? null : tile.key)}
               className={cn(
-                "flex flex-col items-start gap-1 rounded-xl border p-3 transition-all hover:shadow-sm",
+                "flex flex-col items-start gap-1.5 rounded-xl border p-3 transition-all hover:shadow-sm min-w-0",
                 isActive
                   ? tile.activeColor
                   : "border-border bg-card hover:border-primary/30"
               )}
             >
-              <div className={cn("flex items-center gap-1.5 text-xs font-medium", tile.color)}>
-                {tile.icon}
-                <span>{tile.label}</span>
+              <div className={cn("flex items-start gap-1.5 text-xs font-medium leading-tight w-full min-w-0", tile.color)}>
+                <span className="shrink-0 mt-0.5">{tile.icon}</span>
+                <span className="text-left whitespace-normal break-words min-w-0">{tile.label}</span>
               </div>
               <span className="text-xl font-bold text-foreground tabular-nums">{count}</span>
             </button>
