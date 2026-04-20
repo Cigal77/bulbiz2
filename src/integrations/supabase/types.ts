@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_quote_suggestions_log: {
+        Row: {
+          ai_fallback_count: number | null
+          catalog_match_count: number | null
+          confidence: number | null
+          created_at: string
+          dossier_id: string
+          id: string
+          line_ref: string | null
+          quote_id: string | null
+          resolved_at: string | null
+          status: string
+          suggestion_payload: Json
+          user_id: string
+        }
+        Insert: {
+          ai_fallback_count?: number | null
+          catalog_match_count?: number | null
+          confidence?: number | null
+          created_at?: string
+          dossier_id: string
+          id?: string
+          line_ref?: string | null
+          quote_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          suggestion_payload?: Json
+          user_id: string
+        }
+        Update: {
+          ai_fallback_count?: number | null
+          catalog_match_count?: number | null
+          confidence?: number | null
+          created_at?: string
+          dossier_id?: string
+          id?: string
+          line_ref?: string | null
+          quote_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          suggestion_payload?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_quote_suggestions_log_dossier_id_fkey"
+            columns: ["dossier_id"]
+            isOneToOne: false
+            referencedRelation: "dossiers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_quote_suggestions_log_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_summary_cache: {
         Row: {
           data_fingerprint: string
