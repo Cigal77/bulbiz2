@@ -37,10 +37,13 @@ export default function InvoiceEditor() {
 
   const { data: invoice, isLoading: invLoading } = useInvoice(invoiceId!);
   const { data: lines = [] } = useInvoiceLines(invoiceId!);
+  const { data: dossier } = useDossier(dossierId!);
+  const { data: medias = [] } = useDossierMedias(dossierId!);
 
   const [form, setForm] = useState<Partial<Invoice>>({});
   const [localLines, setLocalLines] = useState<InvoiceLine[]>([]);
   const [origin, setOrigin] = useState<InvoiceOrigin>("standalone");
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -48,6 +51,32 @@ export default function InvoiceEditor() {
 
   useEffect(() => { if (invoice) setForm(invoice); }, [invoice]);
   useEffect(() => { if (lines.length > 0) setLocalLines(lines); }, [lines]);
+
+  // Prefill depuis dossier si la facture est neuve / champs vides
+  useEffect(() => {
+    if (!dossier || !invoice) return;
+    setForm((prev) => ({
+      ...prev,
+      client_first_name: prev.client_first_name ?? dossier.client_first_name,
+      client_last_name: prev.client_last_name ?? dossier.client_last_name,
+      client_email: prev.client_email ?? dossier.client_email,
+      client_phone: prev.client_phone ?? dossier.client_phone,
+      client_address: prev.client_address ?? dossier.address,
+    }));
+  }, [dossier, invoice]);
+
+  const refreshFromDossier = () => {
+    if (!dossier) return;
+    setForm((prev) => ({
+      ...prev,
+      client_first_name: touchedFields.has("client_first_name") ? prev.client_first_name : dossier.client_first_name,
+      client_last_name: touchedFields.has("client_last_name") ? prev.client_last_name : dossier.client_last_name,
+      client_email: touchedFields.has("client_email") ? prev.client_email : dossier.client_email,
+      client_phone: touchedFields.has("client_phone") ? prev.client_phone : dossier.client_phone,
+      client_address: touchedFields.has("client_address") ? prev.client_address : dossier.address,
+    }));
+    toast({ title: "Données rechargées depuis le dossier" });
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["invoice", invoiceId] });
