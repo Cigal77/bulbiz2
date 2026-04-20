@@ -2312,6 +2312,59 @@ export type Database = {
         Args: { p_client_name?: string; p_user_id: string }
         Returns: string
       }
+      get_public_profile_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          client_message_template: string
+          client_slots_enabled: boolean
+          company_name: string
+          first_name: string
+          last_name: string
+          logo_url: string
+          primary_color: string
+          public_client_slug: string
+          trade_name: string
+          user_id: string
+        }[]
+      }
+      get_public_profile_for_invoice: {
+        Args: { _client_token: string }
+        Returns: {
+          address: string
+          company_name: string
+          email: string
+          email_signature: string
+          first_name: string
+          footer_text: string
+          last_name: string
+          legal_form: string
+          logo_url: string
+          phone: string
+          primary_color: string
+          siret: string
+          trade_name: string
+          user_id: string
+        }[]
+      }
+      get_public_profile_for_quote: {
+        Args: { _signature_token: string }
+        Returns: {
+          address: string
+          company_name: string
+          email: string
+          email_signature: string
+          first_name: string
+          footer_text: string
+          last_name: string
+          legal_form: string
+          logo_url: string
+          phone: string
+          primary_color: string
+          siret: string
+          trade_name: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
