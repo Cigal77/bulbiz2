@@ -42,6 +42,7 @@ const Cookies = lazy(() => import("./pages/Cookies"));
 const AdminErrors = lazy(() => import("./pages/AdminErrors"));
 const ComplianceOnboarding = lazy(() => import("./pages/ComplianceOnboarding"));
 const ComplianceSettings = lazy(() => import("./pages/ComplianceSettings"));
+const MaterialLibrary = lazy(() => import("./pages/MaterialLibrary"));
 
 const queryClient = new QueryClient();
 
@@ -192,6 +193,16 @@ const App = () => (
                       <ProtectedRoute>
                         <AppLayout>
                           <ComplianceSettings />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/bibliotheque-materiel"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <MaterialLibrary />
                         </AppLayout>
                       </ProtectedRoute>
                     }

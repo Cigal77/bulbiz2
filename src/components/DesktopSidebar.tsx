@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, FolderOpen, Plus, Calendar, Settings, LogOut } from "lucide-react";
+import { ClipboardList, FolderOpen, Plus, Calendar, Settings, LogOut, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useDossiers } from "@/hooks/useDossiers";
@@ -39,6 +39,7 @@ const NAV_ITEMS = [
   { id: "todo", icon: ClipboardList, label: "À faire", path: "/a-faire" },
   { id: "dossiers", icon: FolderOpen, label: "Dossiers", path: "/" },
   { id: "rdv", icon: Calendar, label: "Rendez-vous", path: "/rdv" },
+  { id: "biblio", icon: Library, label: "Matériel", path: "/bibliotheque-materiel" },
   { id: "settings", icon: Settings, label: "Paramètres", path: "/parametres" },
 ];
 
