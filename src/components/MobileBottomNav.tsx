@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, FolderOpen, Plus, Calendar, Settings, FileText, Receipt } from "lucide-react";
+import { ClipboardList, FolderOpen, Plus, Calendar, Settings, FileText, Receipt, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useDossiers, type Dossier } from "@/hooks/useDossiers";
@@ -143,6 +143,11 @@ export function MobileBottomNav() {
     navigate("/nouveau");
   };
 
+  const handleOpenLibrary = () => {
+    setActionSheetOpen(false);
+    navigate("/bibliotheque-materiel");
+  };
+
   const handleDossierSelected = (dossier: Dossier) => {
     setPickerOpen(false);
     setSelectedDossier(dossier);
@@ -242,6 +247,19 @@ export function MobileBottomNav() {
                 <div className="text-xs text-muted-foreground">
                   Ajouter une facture à un dossier existant ou nouveau
                 </div>
+              </div>
+            </button>
+
+            <button
+              onClick={handleOpenLibrary}
+              className="w-full flex items-center gap-3 p-3.5 rounded-lg hover:bg-accent text-left transition-colors"
+            >
+              <div className="flex items-center justify-center h-10 w-10 rounded-full bg-emerald-500/10 shrink-0">
+                <Library className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <div className="font-medium text-sm">Bibliothèque matériel</div>
+                <div className="text-xs text-muted-foreground">Consulter ou importer mes articles</div>
               </div>
             </button>
           </div>
