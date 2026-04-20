@@ -1,84 +1,127 @@
 
 
-The user approved the AI pre-quote generator plan. Let me finalize a concise plan before switching to default mode.
+Plan concis pour le devis vocal. Le route actuelle `/dossier/.../devis?ai=auto` confirme que l'éditeur de devis est central.
 
-## Plan — Générateur de pré-devis IA (PATCH 3)
+## Plan — Devis Vocal IA (PATCH 4)
 
-### 1. Base de données (migration)
-Nouvelle table `ai_quote_suggestions_log` :
-- `id`, `user_id`, `dossier_id`, `quote_id` (nullable)
-- `suggestion_payload` jsonb (lignes proposées par l'IA)
-- `status` text ('proposed' | 'accepted' | 'modified' | 'rejected')
-- `confidence` numeric (0-1)
-- `catalog_match_count` int, `ai_fallback_count` int
-- `created_at`, `resolved_at`
-- RLS : user_id = auth.uid()
+### 1. Edge Function `voice-quote-command`
+Input : `{ audio_base64, mime_type, quote_id, current_lines[], mode: 'command' | 'dictation' }`
 
-### 2. Edge Function `generate-ai-quote-draft`
-Input : `{ dossier_id, quote_id? }`
 Logique :
-1. Charge dossier + medias + historique + 5 derniers devis de l'artisan (apprentissage léger)
-2. Appel Lovable AI (`google/gemini-3-flash-preview`) avec **tool calling** structuré : titre, description, lignes (label, qty, unit, type, estimated_price), hypothèses, questions manquantes, niveau de confiance, variantes
-3. **Hybride prix** : pour chaque ligne, match dans `catalog_material` (ilike + tags) → prix catalogue ; sinon prix IA + flag `source: 'ai_fallback'`
-4. Insère un log `ai_quote_suggestions_log` (status='proposed')
-5. Retourne le payload structuré
+1. **Transcription** : Lovable AI Gateway avec `google/gemini-3-flash-preview` (multimodal audio input — Gemini accepte l'audio inline base64). Fallback : si Gemini audio indisponible, utiliser ElevenLabs Scribe `scribe_v2` (batch).
+2. **Interprétation NLU via tool calling** : prompt structuré qui retourne un JSON d'actions :
+   ```json
+   {
+     "transcript": "Ajoute remplacement mécanisme WC...",
+     "actions": [
+       { "type": "add_line", "label": "...", "qty": 2, "unit": "h", "unit_price": 65, "vat_rate": 10, "line_type": "main_oeuvre", "confidence": 0.92 },
+       { "type": "update_line", "line_ref": "L3", "field": "qty", "value": 2 },
+       { "type": "delete_line", "line_ref": "L1" },
+       { "type": "set_discount", "line_ref": "L2", "value": 30, "unit": "EUR" },
+       { "type": "rename_quote", "value": "Remplacement mitigeur cuisine" }
+     ],
+     "needs_confirmation": false,
+     "ambiguities": []
+   }
+   ```
+3. Match prix dans `catalog_material` (réutilise logique PATCH 3).
+4. Retourne payload sans rien appliquer (validation côté client).
 
-### 3. Frontend — Hook & types
-- `src/lib/ai-quote-types.ts` — interfaces `AiQuoteDraft`, `AiQuoteLine`
-- `src/hooks/useAiQuoteDraft.tsx` — `generate()`, `logDecision(lineId, status)`
+### 2. Hook `useVoiceQuoteCommand.tsx`
+- `startRecording()` / `stopRecording()` (MediaRecorder API, réutilise logique de `VoiceRecorderDialog`)
+- `transcribeAndInterpret(blob)` → appelle l'edge function
+- États : `idle` | `listening` | `transcribing` | `interpreting` | `ready_to_validate` | `error`
 
-### 4. Composant `AiQuoteDraftPanel.tsx`
-4ème onglet de `AssistantSidebar` (icône Sparkles ✨ "IA"). Affiche :
-- Bouton "Générer un pré-devis avec l'IA" (état initial)
-- Loading skeleton pendant l'appel
-- Résumé + niveau de confiance (badge)
-- Liste des lignes proposées (chacune : badge "✨ Proposition IA", source catalogue/IA, boutons Accepter / Modifier / Refuser)
-- Section "Questions manquantes" (alertes orange)
-- Section "Variantes" (collapsibles si présentes)
-- Boutons globaux : "Tout appliquer" / "Ignorer tout"
-- Microcopie obligatoire : *« Proposition générée à partir du dossier. Vérifie et ajuste avant envoi. »*
+### 3. Composant `VoiceQuoteSheet.tsx` (Bottom sheet mobile / Dialog desktop)
+4 écrans séquencés :
 
-### 5. Bouton "Pré-devis IA" dans `DossierActions.tsx`
-Nouveau bouton primaire (sous "Créer un devis") :
-- Crée un brouillon devis vide → navigue vers `/dossier/:id/devis?ai=auto`
-- L'éditeur détecte `?ai=auto` et déclenche automatiquement la génération IA + ouvre l'onglet Assistant IA
+**A. État initial — Prêt à écouter**
+- Gros bouton micro central (96px, animation subtle pulse)
+- Toggle mode : "Commande" / "Dictée libre"
+- Microcopie : *« Décris une intervention ou donne une commande »*
+- Exemples cliquables : "Ajoute 2h de main-d'œuvre", "Supprime la dernière ligne"
 
-### 6. Intégration `QuoteEditor.tsx`
-- Détecte `?ai=auto` au mount → `useAiQuoteDraft.generate()` automatique
-- `AssistantSidebar` reçoit nouvelle prop `defaultTab="ai"` quand auto-déclenché
-- Lignes acceptées via `onAddItem` / `onAddItems` existants (réutilise l'infra)
-- Chaque ligne ajoutée porte un flag visuel "Proposition IA" (badge dans `QuoteItemRow` si `source: 'ai'`)
-- Au click "Accepter" → log `status='accepted'` / "Refuser" → `status='rejected'` / édition après ajout → `status='modified'`
+**B. État écoute**
+- Bouton micro en rouge avec waveform animée
+- Timer
+- Bouton "Stop" large
+- Microcopie : *« J'écoute…* »
 
-### 7. UX mobile
-- Sur mobile, l'onglet IA est dans le `Sheet` existant (bottom drawer)
-- Cards lignes IA : swipe-friendly, boutons larges (44px)
+**C. État transcription/interprétation**
+- Skeleton loader
+- Texte transcrit qui apparaît progressivement
+- Microcopie : *« Je comprends ce que tu dis… »*
 
-### 8. Apprentissage (passif v1)
-- Toutes les décisions journalisées dans `ai_quote_suggestions_log`
-- Pas d'effet immédiat sur les futures suggestions (v1) — données prêtes pour analyse / fine-tuning ultérieur
+**D. État validation** (CRITIQUE)
+- Texte transcrit affiché en haut, **éditable** (Textarea)
+- Bouton "Re-interpréter" si l'utilisateur corrige le texte
+- Bloc **"Actions comprises"** :
+  - Cards par action avec icône colorée :
+    - 🟢 Ajout ligne (vert)
+    - 🟡 Modification (orange)
+    - 🔴 Suppression (rouge)
+    - 🔵 Remise / TVA (bleu)
+  - Chaque card affiche : description action + détails + **toggle accept/reject individuel**
+  - Badge "Confiance: 92%" si <0.7 → warning visuel
+- Boutons globaux : **"Appliquer toutes"** (primary) / **"Recommencer"** / **"Annuler"**
+- Microcopie obligatoire : *« Vérifie avant d'appliquer. Tu peux décocher chaque action. »*
 
-### États gérés
-- Loading (skeleton)
-- Erreur 402 (crédits IA épuisés) → toast "Crédits IA épuisés, recharger"
-- Erreur 429 (rate limit) → toast "Trop de requêtes, réessayer dans 1 min"
-- Dossier vide / pas assez d'infos → IA renvoie `questions[]` plutôt que des lignes
+### 4. Application des actions côté client
+Dans `QuoteEditor.tsx`, fonction `applyVoiceActions(actions[])` :
+- `add_line` → push dans `items` state
+- `update_line` → modifie ligne ciblée (matching par `line_ref` ou index ou label fuzzy)
+- `delete_line` → filter
+- `set_discount` / `set_vat` → patch ligne
+- `rename_quote` → met à jour titre brouillon
+- Toast récap : "✓ 3 actions appliquées"
+- Log dans `historique` (action: `voice_quote_edit`, details: transcript + nb actions)
+
+### 5. Bouton flottant micro dans `QuoteEditor.tsx`
+- FAB rond 56px en bas à droite (mobile) / en haut de l'éditeur (desktop)
+- Icône `Mic` Lucide, gradient primary
+- Badge "Vocal" discret
+- Au click → ouvre `VoiceQuoteSheet`
+- Toujours visible dans l'éditeur de devis
+
+### 6. Gestion ambiguïtés
+Si `needs_confirmation: true` ou `ambiguities[]` non vide :
+- L'IA renvoie une question : "Quelle ligne veux-tu modifier ? Il y en a deux qui correspondent."
+- Affichage d'un sélecteur (cards des lignes candidates)
+- L'utilisateur choisit → l'action est complétée
+
+### 7. Modes
+- **Commande structurée** : prompt strict, attend des verbes d'action explicites
+- **Dictée libre** : prompt plus permissif, l'IA infère les lignes depuis une description naturelle ("Fuite sous évier, siphon à changer + raccords")
+- Toggle dans la sheet, persisté localement
+
+### 8. UX mobile (390px - viewport actuel)
+- Bottom sheet pleine hauteur
+- Bouton micro 96px tactile
+- Cards actions empilées, swipe gauche = reject
+- Boutons fixes en bas (sticky footer)
+- Vibrations haptiques (`navigator.vibrate(50)`) au début/fin enregistrement
+
+### 9. États gérés
+- Permission micro refusée → message clair + lien paramètres navigateur
+- Pas de réseau → toast retry
+- 402/429 → toast crédits IA / rate limit
+- Audio trop long (>2 min) → stop auto + message
+- Aucune action détectée → "Je n'ai pas compris d'action. Reformule ?"
 
 ### Fichiers
 **Créés :**
-- `supabase/functions/generate-ai-quote-draft/index.ts`
-- `src/lib/ai-quote-types.ts`
-- `src/hooks/useAiQuoteDraft.tsx`
-- `src/components/quote-editor/AiQuoteDraftPanel.tsx`
+- `supabase/functions/voice-quote-command/index.ts`
+- `src/hooks/useVoiceQuoteCommand.tsx`
+- `src/components/quote-editor/VoiceQuoteSheet.tsx`
+- `src/components/quote-editor/VoiceCommandActionCard.tsx`
+- `src/lib/voice-quote-types.ts`
 
 **Modifiés :**
-- `src/components/quote-editor/AssistantSidebar.tsx` — 4ème onglet "IA"
-- `src/components/quote-editor/QuoteItemRow.tsx` — badge "✨ Proposition IA"
-- `src/components/dossier/DossierActions.tsx` — bouton "Pré-devis IA"
-- `src/pages/QuoteEditor.tsx` — détection `?ai=auto`
+- `src/pages/QuoteEditor.tsx` — FAB micro + handler `applyVoiceActions`
 
 ### Hors scope v1
-- Apprentissage actif (le log existe mais ne nourrit pas encore les prompts)
-- Édition swipe complète mobile (cartes + boutons suffisent)
-- Analyse images via Gemini multimodal — basculé en v1.1 si volume token ok
+- Streaming temps-réel (WebRTC ElevenLabs) → batch suffisant
+- Multi-langue (FR uniquement v1)
+- Création de devis depuis 0 à la voix (uniquement édition d'un brouillon existant)
+- Confirmation vocale ("Oui, applique") — validation tactile uniquement
 
