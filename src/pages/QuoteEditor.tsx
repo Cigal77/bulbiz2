@@ -13,6 +13,11 @@ import { QuoteHeaderBar } from "@/components/quote-editor/QuoteHeaderBar";
 import { QuoteSectionChecklist } from "@/components/quote-editor/QuoteSectionChecklist";
 import { AssistantSidebar } from "@/components/quote-editor/AssistantSidebar";
 import { QuoteSections } from "@/components/quote-editor/QuoteSections";
+import { QuoteClientBlock, type QuoteClientData } from "@/components/quote-editor/QuoteClientBlock";
+import { QuoteWorksiteBlock } from "@/components/quote-editor/QuoteWorksiteBlock";
+import { QuoteDocumentBlock } from "@/components/quote-editor/QuoteDocumentBlock";
+import { QuotePreviewBlock } from "@/components/quote-editor/QuotePreviewBlock";
+import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
 import { ComplianceBlockerDialog } from "@/components/compliance/ComplianceBlockerDialog";
 import { useComplianceProfile } from "@/hooks/useComplianceProfile";
@@ -43,6 +48,12 @@ export default function QuoteEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [client, setClient] = useState<QuoteClientData>({
+    type: "individual", first_name: null, last_name: null, email: null, phone: null, company: null,
+  });
+  const [worksiteAddress, setWorksiteAddress] = useState<string | null>(null);
+  const [depositType, setDepositType] = useState<string | null>(null);
+  const [depositValue, setDepositValue] = useState<number | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { profile: compProfile, insurance, settings } = useComplianceProfile();
   const [blockerOpen, setBlockerOpen] = useState(false);
