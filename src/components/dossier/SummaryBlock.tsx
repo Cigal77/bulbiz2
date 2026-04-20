@@ -61,11 +61,19 @@ export function SummaryBlock({ dossier, mediaCount, historiqueCount, quotesCount
       });
 
       if (error || data?.error) {
-        const message = `${error?.message ?? ""} ${data?.error ?? ""}`;
+        const message = `${error?.message ?? ""} ${data?.error ?? ""}`.trim();
+        console.error("[SummaryBlock] summarize-dossier failed:", { error, data });
         if (message.includes("401") || message.includes("Non authentifié")) {
           return fallback as AiSummary;
         }
-        throw error ?? new Error(data.error);
+        if (message.includes("402")) {
+          toast({ title: "Crédits IA épuisés", description: "Rechargez vos crédits pour continuer.", variant: "destructive" });
+        } else if (message.includes("429")) {
+          toast({ title: "Trop de requêtes IA", description: "Réessayez dans une minute.", variant: "destructive" });
+        } else {
+          toast({ title: "IA indisponible", description: message || "Résumé basique affiché.", variant: "destructive" });
+        }
+        throw error ?? new Error(data?.error ?? "Erreur IA");
       }
 
       if (data?.auto_filled?.length > 0) {

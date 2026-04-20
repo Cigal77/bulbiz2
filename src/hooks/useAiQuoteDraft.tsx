@@ -21,6 +21,7 @@ export function useAiQuoteDraft() {
           { body: { dossier_id: dossierId, quote_id: quoteId ?? null } },
         );
         if (fnError) {
+          console.error("[useAiQuoteDraft] generate-ai-quote-draft failed:", fnError);
           // Surface 402/429 from edge function
           const msg = fnError.message || "Erreur";
           if (msg.includes("402")) {

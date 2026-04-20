@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,10 +32,13 @@ export function AiQuoteDraftPanel({
   const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
 
   // Auto-trigger once on mount if requested
-  if (autoGenerate && !hasAutoTriggered && !draft && !isGenerating) {
-    setHasAutoTriggered(true);
-    generate(dossierId, quoteId);
-  }
+  useEffect(() => {
+    if (autoGenerate && !hasAutoTriggered && !draft && !isGenerating) {
+      setHasAutoTriggered(true);
+      generate(dossierId, quoteId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerate, hasAutoTriggered, draft, isGenerating, dossierId, quoteId]);
 
   const handleAcceptLine = (line: AiQuoteLine, log_id: string) => {
     onAddItem(aiLineToQuoteItem(line));

@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { Star, Pencil, Trash2, Package, Wrench, Truck, Hammer, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +28,15 @@ const TYPE_META: Record<string, { icon: typeof Package; label: string; color: st
   standard: { icon: Package, label: "Standard", color: "bg-muted text-muted-foreground" },
 };
 
-export function MaterialCard({ material, isOwner, onToggleFavorite, onEdit, onDelete }: MaterialCardProps) {
+export const MaterialCard = forwardRef<HTMLDivElement, MaterialCardProps>(function MaterialCard(
+  { material, isOwner, onToggleFavorite, onEdit, onDelete },
+  ref,
+) {
   const meta = TYPE_META[material.type] ?? TYPE_META.standard;
   const Icon = meta.icon;
 
   return (
-    <Card className="p-3 hover:shadow-md transition-shadow flex flex-col gap-2">
+    <Card ref={ref} className="p-3 hover:shadow-md transition-shadow flex flex-col gap-2">
       <div className="flex items-start gap-2">
         <div className={cn("rounded-md p-1.5 shrink-0", meta.color)}>
           <Icon className="h-4 w-4" />
@@ -94,4 +98,4 @@ export function MaterialCard({ material, isOwner, onToggleFavorite, onEdit, onDe
       )}
     </Card>
   );
-}
+});

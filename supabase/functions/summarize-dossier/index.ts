@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
 
     // Fetch all data in parallel (including text notes and quote_lines)
     const [dossierRes, histRes, quotesRes, invoicesRes, slotsRes, audioMediasRes, imageMediasRes, noteMediasRes, quoteLinesRes] = await Promise.all([
-      supabase.from("dossiers").select("*").eq("id", dossier_id).single(),
+      supabase.from("dossiers").select("*").eq("id", dossier_id).maybeSingle(),
       supabase.from("historique").select("action, details, created_at").eq("dossier_id", dossier_id).order("created_at", { ascending: false }).limit(15),
       supabase.from("quotes").select("id, quote_number, status, total_ht, total_ttc, sent_at, signed_at, pdf_url, is_imported, items, notes").eq("dossier_id", dossier_id),
       supabase.from("invoices").select("id, invoice_number, status, total_ht, total_tva, total_ttc, sent_at, paid_at, pdf_url, notes, client_first_name, client_last_name, client_email, client_phone, client_address").eq("dossier_id", dossier_id),
@@ -108,6 +108,12 @@ Deno.serve(async (req) => {
     ]);
 
     if (dossierRes.error) throw dossierRes.error;
+    if (!dossierRes.data) {
+      return new Response(JSON.stringify({ error: "Dossier introuvable" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const d = dossierRes.data;
 
     const audioMedias = audioMediasRes.data || [];
@@ -694,8 +700,9 @@ ${hasEmptyFields ? `- extracted_fields — RÈGLES CRITIQUES :
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("summarize-dossier error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    const message = e instanceof Error ? e.message : (typeof e === "string" ? e : JSON.stringify(e));
+    console.error("summarize-dossier error:", message, e);
+    return new Response(JSON.stringify({ error: message || "Erreur inconnue côté serveur" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
