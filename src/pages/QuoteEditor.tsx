@@ -268,26 +268,6 @@ export default function QuoteEditor() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
-            <QuoteSectionChecklist items={items} />
-
-            <QuoteSections
-              items={items}
-              setItems={setItems}
-              labourSummary={labourSummary}
-              onLabourSummaryChange={setLabourSummary}
-              problemLabel={problemLabel}
-              notes={notes}
-              validityDays={validityDays}
-              onNotesChange={setNotes}
-              onValidityChange={setValidityDays}
-            />
-          </div>
-        </main>
-      </div>
-
-      {/* Mobile assistant (floating button + drawer) */}
-        <main className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
             <ComplianceChecklist validation={validation} title="Conformité du devis" />
             <QuoteSectionChecklist items={items} />
@@ -307,6 +287,7 @@ export default function QuoteEditor() {
         </main>
       </div>
 
+      {/* Mobile assistant (floating button + drawer) */}
       {isMobile && (
         <AssistantSidebar
           onAddItem={addItemFromAssistant}
