@@ -30,18 +30,24 @@ const BUCKETS: { key: SuggestionBucket; label: string; icon: typeof Wrench; defa
 ];
 
 function toQuoteItem(s: SmartSuggestion): Omit<QuoteItem, "id"> {
+  // Map manoeuvre/bundle item_type -> QuoteItemType
+  const t = (s.type ?? "").toLowerCase();
+  let qType: QuoteItem["type"] = "standard";
+  if (t === "main_oeuvre" || t === "labor") qType = "main_oeuvre";
+  else if (t === "deplacement" || t === "travel") qType = "deplacement";
+  else if (t === "consommable" || t === "consumable" || t === "fourniture") qType = "fourniture";
+  else if (t === "materiel" || t === "material") qType = "materiel";
+
   return {
     label: s.label,
     description: s.description ?? "",
     qty: s.default_qty || 1,
     unit: s.unit || "u",
     unit_price: s.unit_price || 0,
-    tva_rate: s.vat_rate ?? 10,
+    vat_rate: s.vat_rate ?? 10,
     discount: 0,
-    sort_order: 0,
-    line_type: "standard",
-    source: "MANUAL",
-  } as Omit<QuoteItem, "id">;
+    type: qType,
+  };
 }
 
 export function SmartSuggestionsPanel({
