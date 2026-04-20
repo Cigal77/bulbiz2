@@ -22,6 +22,9 @@ import { InvoicePaymentBlock } from "@/components/invoice-editor/InvoicePaymentB
 import { InvoicePreviewBlock } from "@/components/invoice-editor/InvoicePreviewBlock";
 import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
+import { DossierPrefillBanner, type PrefillField } from "@/components/documents/DossierPrefillBanner";
+import { DossierContextSummary } from "@/components/documents/DossierContextSummary";
+import { useDossier, useDossierMedias } from "@/hooks/useDossier";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function InvoiceEditor() {
