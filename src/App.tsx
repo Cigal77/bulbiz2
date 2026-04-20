@@ -151,7 +151,7 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <ComingSoon />
+                          <NewQuoteRedirect />
                         </AppLayout>
                       </ProtectedRoute>
                     }
@@ -161,7 +161,7 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <ComingSoon />
+                          <NewInvoiceRedirect />
                         </AppLayout>
                       </ProtectedRoute>
                     }
