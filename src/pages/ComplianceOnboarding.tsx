@@ -49,24 +49,35 @@ const STEPS = [
 
 export default function ComplianceOnboarding() {
   const navigate = useNavigate();
-  const { profile, insurance, settings, isLoading, score, updateProfile, updateInsurance, updateSettings } =
+  const { profile, rawProfile, insurance, settings, isLoading, score, updateProfile, updateInsurance, updateSettings } =
     useComplianceProfile();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Form state (initialised from server)
+  // Form state (initialised once from server, then user-owned)
   const [form, setForm] = useState<Record<string, any>>({});
   const [insForm, setInsForm] = useState<Record<string, any>>({});
   const [setForm_, setSetForm] = useState<Record<string, any>>({});
 
+  const initRef = useRef({ profile: false, insurance: false, settings: false });
+
   useEffect(() => {
-    if (profile) setForm({ ...profile });
-  }, [profile]);
+    if (!initRef.current.profile && (rawProfile || profile)) {
+      setForm({ ...((rawProfile as any) ?? profile) });
+      initRef.current.profile = true;
+    }
+  }, [rawProfile, profile]);
   useEffect(() => {
-    if (insurance) setInsForm({ ...insurance });
+    if (!initRef.current.insurance && insurance) {
+      setInsForm({ ...insurance });
+      initRef.current.insurance = true;
+    }
   }, [insurance]);
   useEffect(() => {
-    if (settings) setSetForm({ ...settings });
+    if (!initRef.current.settings && settings) {
+      setSetForm({ ...settings });
+      initRef.current.settings = true;
+    }
   }, [settings]);
 
   const setField = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }));
@@ -79,6 +90,27 @@ export default function ComplianceOnboarding() {
       "accepted_payment_methods",
       current.includes(m) ? current.filter((x) => x !== m) : [...current, m],
     );
+  };
+
+  /** Validation par étape — true si OK, sinon affiche un toast */
+  const validateStep = (s: number): boolean => {
+    if (s === 1) {
+      if (!form.legal_form) { toast.error("Forme juridique requise"); return false; }
+      if (!form.company_name?.trim()) { toast.error("Raison sociale requise"); return false; }
+      const siret = (form.siret ?? "").replace(/\s/g, "");
+      if (!/^\d{14}$/.test(siret)) { toast.error("SIRET invalide (14 chiffres requis)"); return false; }
+      if (!form.address?.trim()) { toast.error("Adresse du siège requise"); return false; }
+      if (!form.email?.trim()) { toast.error("Email professionnel requis"); return false; }
+    }
+    if (s === 3 && insForm.decennial_required) {
+      if (!insForm.insurer_name?.trim()) { toast.error("Nom de l'assureur requis"); return false; }
+      if (!insForm.policy_number?.trim()) { toast.error("N° de police requis"); return false; }
+    }
+    if (s === 4) {
+      if (!form.iban?.trim()) { toast.error("IBAN requis pour être payé"); return false; }
+      if (!form.payment_terms_default?.trim()) { toast.error("Conditions de règlement requises"); return false; }
+    }
+    return true;
   };
 
   const saveCurrentStep = async () => {
@@ -96,11 +128,28 @@ export default function ComplianceOnboarding() {
   };
 
   const handleNext = async () => {
+    if (!validateStep(step)) return;
     try {
       await saveCurrentStep();
       if (step < STEPS.length) setStep(step + 1);
     } catch {
       /* toast déjà affiché */
+    }
+  };
+
+  const handleSkip = async () => {
+    setSaving(true);
+    try {
+      await updateProfile.mutateAsync({
+        ...form,
+        onboarding_compliance_completed_at: new Date().toISOString(),
+      } as any);
+      toast.success("Configuration reportée — vous pourrez la compléter dans les paramètres.");
+      navigate("/");
+    } catch (e: any) {
+      toast.error(e.message || "Erreur");
+    } finally {
+      setSaving(false);
     }
   };
 
