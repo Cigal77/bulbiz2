@@ -47,11 +47,34 @@ export interface UnknownSuggestion {
   last_used_at: string;
 }
 
-export function useMaterialLibrary(tab: MaterialTab, search: string) {
+export interface MaterialFilters {
+  sectorId?: string | null;
+  categoryId?: string | null;
+  type?: string | null;
+  brand?: string | null;
+  sort?: "popular" | "alpha" | "price_asc" | "price_desc";
+}
+
+export function useMaterialLibrary(
+  tab: MaterialTab,
+  search: string,
+  filters: MaterialFilters = {},
+) {
   const { user } = useAuth();
+  const { sectorId, categoryId, type, brand, sort = "alpha" } = filters;
 
   return useQuery({
-    queryKey: ["material-library", tab, search, user?.id],
+    queryKey: [
+      "material-library",
+      tab,
+      search,
+      sectorId ?? null,
+      categoryId ?? null,
+      type ?? null,
+      brand ?? null,
+      sort,
+      user?.id,
+    ],
     queryFn: async (): Promise<LibraryMaterial[]> => {
       if (!user) return [];
 
@@ -65,10 +88,10 @@ export function useMaterialLibrary(tab: MaterialTab, search: string) {
           query = query.eq("user_id", user.id).eq("is_favorite", true);
           break;
         case "frequent":
-          query = query.eq("user_id", user.id).gt("usage_count", 0).order("usage_count", { ascending: false }).limit(50);
+          query = query.eq("user_id", user.id).gt("usage_count", 0);
           break;
         case "recent":
-          query = query.eq("user_id", user.id).not("last_used_at", "is", null).order("last_used_at", { ascending: false }).limit(50);
+          query = query.eq("user_id", user.id).not("last_used_at", "is", null);
           break;
         case "bulbiz":
           query = query.is("user_id", null);
@@ -80,13 +103,37 @@ export function useMaterialLibrary(tab: MaterialTab, search: string) {
           return [];
       }
 
+      // Filtres additionnels
+      if (sectorId) query = query.eq("sector_id", sectorId);
+      if (categoryId) query = query.eq("category_id", categoryId);
+      if (type) query = query.eq("type", type);
+      if (brand) query = query.ilike("brand", brand);
+
       if (search.trim().length >= 2) {
         const s = search.trim();
-        query = query.or(`label.ilike.%${s}%,supplier.ilike.%${s}%,internal_code.ilike.%${s}%,brand.ilike.%${s}%`);
+        query = query.or(
+          `label.ilike.%${s}%,supplier.ilike.%${s}%,internal_code.ilike.%${s}%,brand.ilike.%${s}%`,
+        );
       }
 
-      if (!["frequent", "recent"].includes(tab)) {
-        query = query.order("label", { ascending: true });
+      // Tri
+      if (tab === "recent") {
+        query = query.order("last_used_at", { ascending: false });
+      } else {
+        switch (sort) {
+          case "popular":
+            query = query.order("usage_count", { ascending: false }).order("label");
+            break;
+          case "price_asc":
+            query = query.order("unit_price", { ascending: true, nullsFirst: false });
+            break;
+          case "price_desc":
+            query = query.order("unit_price", { ascending: false, nullsFirst: false });
+            break;
+          case "alpha":
+          default:
+            query = query.order("label", { ascending: true });
+        }
       }
 
       const { data, error } = await query.limit(500);
