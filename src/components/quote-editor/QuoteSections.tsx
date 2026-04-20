@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { Plus, ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, FileText, Save } from "lucide-react";
 import { SECTIONS, QUOTE_TEMPLATES, createEmptyItem, calcLineTotal, type QuoteItem, type QuoteItemType } from "@/lib/quote-types";
 import { QuoteItemRow } from "./QuoteItemRow";
 import { LabourSummaryBlock } from "./LabourSummaryBlock";
@@ -24,11 +24,12 @@ interface QuoteSectionsProps {
   validityDays: number;
   onNotesChange: (v: string) => void;
   onValidityChange: (v: number) => void;
+  onSaveAsKit?: () => void;
 }
 
 export function QuoteSections({
   items, setItems, labourSummary, onLabourSummaryChange, problemLabel,
-  notes, validityDays, onNotesChange, onValidityChange,
+  notes, validityDays, onNotesChange, onValidityChange, onSaveAsKit,
 }: QuoteSectionsProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -86,8 +87,8 @@ export function QuoteSections({
 
   return (
     <div className="space-y-3">
-      {/* Templates */}
-      <div className="flex items-center gap-2 mb-1">
+      {/* Templates + Save as kit */}
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
@@ -105,6 +106,17 @@ export function QuoteSections({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        {onSaveAsKit && items.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 h-8 text-xs"
+            onClick={onSaveAsKit}
+          >
+            <Save className="h-3.5 w-3.5" />
+            Sauvegarder comme pack
+          </Button>
+        )}
       </div>
 
       {/* Sections */}
