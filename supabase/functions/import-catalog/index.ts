@@ -392,7 +392,7 @@ const CORRESPONDENCE_DATA = [
   ["clim_ventilation_ventilation_vmc_vmc_simple_flux_groupe","clim_ventilation_ventilation_vmc_colliers_de_serrage_vmc",100,"Réseau",1,"{\"vmc\":true}"],
 ];
 
-Deno.Deno.serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {

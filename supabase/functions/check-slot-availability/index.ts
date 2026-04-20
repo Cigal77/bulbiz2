@@ -15,7 +15,7 @@ function slotsOverlap(startA: string, endA: string, startB: string, endB: string
   return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(startB) < timeToMinutes(endA);
 }
 
-Deno.Deno.serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
