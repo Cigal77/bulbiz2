@@ -22,6 +22,9 @@ import { InvoicePaymentBlock } from "@/components/invoice-editor/InvoicePaymentB
 import { InvoicePreviewBlock } from "@/components/invoice-editor/InvoicePreviewBlock";
 import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
+import { DossierPrefillBanner, type PrefillField } from "@/components/documents/DossierPrefillBanner";
+import { DossierContextSummary } from "@/components/documents/DossierContextSummary";
+import { useDossier, useDossierMedias } from "@/hooks/useDossier";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function InvoiceEditor() {
@@ -34,10 +37,13 @@ export default function InvoiceEditor() {
 
   const { data: invoice, isLoading: invLoading } = useInvoice(invoiceId!);
   const { data: lines = [] } = useInvoiceLines(invoiceId!);
+  const { data: dossier } = useDossier(dossierId!);
+  const { data: medias = [] } = useDossierMedias(dossierId!);
 
   const [form, setForm] = useState<Partial<Invoice>>({});
   const [localLines, setLocalLines] = useState<InvoiceLine[]>([]);
   const [origin, setOrigin] = useState<InvoiceOrigin>("standalone");
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -45,6 +51,32 @@ export default function InvoiceEditor() {
 
   useEffect(() => { if (invoice) setForm(invoice); }, [invoice]);
   useEffect(() => { if (lines.length > 0) setLocalLines(lines); }, [lines]);
+
+  // Prefill depuis dossier si la facture est neuve / champs vides
+  useEffect(() => {
+    if (!dossier || !invoice) return;
+    setForm((prev) => ({
+      ...prev,
+      client_first_name: prev.client_first_name ?? dossier.client_first_name,
+      client_last_name: prev.client_last_name ?? dossier.client_last_name,
+      client_email: prev.client_email ?? dossier.client_email,
+      client_phone: prev.client_phone ?? dossier.client_phone,
+      client_address: prev.client_address ?? dossier.address,
+    }));
+  }, [dossier, invoice]);
+
+  const refreshFromDossier = () => {
+    if (!dossier) return;
+    setForm((prev) => ({
+      ...prev,
+      client_first_name: touchedFields.has("client_first_name") ? prev.client_first_name : dossier.client_first_name,
+      client_last_name: touchedFields.has("client_last_name") ? prev.client_last_name : dossier.client_last_name,
+      client_email: touchedFields.has("client_email") ? prev.client_email : dossier.client_email,
+      client_phone: touchedFields.has("client_phone") ? prev.client_phone : dossier.client_phone,
+      client_address: touchedFields.has("client_address") ? prev.client_address : dossier.address,
+    }));
+    toast({ title: "Données rechargées depuis le dossier" });
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["invoice", invoiceId] });
@@ -65,7 +97,28 @@ export default function InvoiceEditor() {
 
   const totals = computeTotals(localLines, form.vat_mode || "normal");
 
-  const patchForm = (patch: Partial<Invoice>) => setForm((f) => ({ ...f, ...patch }));
+  const patchForm = (patch: Partial<Invoice>) => {
+    setTouchedFields((prev) => {
+      const next = new Set(prev);
+      Object.keys(patch).forEach((k) => next.add(k));
+      return next;
+    });
+    setForm((f) => ({ ...f, ...patch }));
+  };
+
+  const prefillFields: PrefillField[] = dossier
+    ? [
+        {
+          key: "client_last_name",
+          label: "Nom",
+          value: [form.client_first_name, form.client_last_name].filter(Boolean).join(" ") || null,
+          modified: touchedFields.has("client_first_name") || touchedFields.has("client_last_name"),
+        },
+        { key: "client_email", label: "Email", value: form.client_email, modified: touchedFields.has("client_email") },
+        { key: "client_phone", label: "Téléphone", value: form.client_phone, modified: touchedFields.has("client_phone") },
+        { key: "client_address", label: "Adresse", value: form.client_address, modified: touchedFields.has("client_address") },
+      ]
+    : [];
 
   const handleSave = async () => {
     if (!invoice) return;
@@ -271,6 +324,27 @@ export default function InvoiceEditor() {
 
       <main className="flex-1 overflow-y-auto pb-24 md:pb-4">
         <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+          {/* 0a. Préremplissage depuis dossier */}
+          {dossier && (
+            <DossierPrefillBanner
+              dossierRef={dossier.id}
+              fields={prefillFields}
+              onRefresh={refreshFromDossier}
+            />
+          )}
+
+          {/* 0b. Résumé du dossier */}
+          {dossier && (
+            <DossierContextSummary
+              category={dossier.category}
+              urgency={dossier.urgency}
+              description={dossier.description}
+              notes={null}
+              updatedAt={dossier.updated_at}
+              mediaCount={medias.length}
+            />
+          )}
+
           {/* 1. Origine */}
           <InvoiceOriginBlock value={origin} onChange={setOrigin} disabled={isLocked} />
 

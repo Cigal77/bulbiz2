@@ -18,6 +18,9 @@ import { QuoteWorksiteBlock } from "@/components/quote-editor/QuoteWorksiteBlock
 import { QuoteDocumentBlock } from "@/components/quote-editor/QuoteDocumentBlock";
 import { QuotePreviewBlock } from "@/components/quote-editor/QuotePreviewBlock";
 import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
+import { DossierPrefillBanner, type PrefillField } from "@/components/documents/DossierPrefillBanner";
+import { DossierContextSummary } from "@/components/documents/DossierContextSummary";
+import { useDossierMedias } from "@/hooks/useDossier";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
 import { ComplianceBlockerDialog } from "@/components/compliance/ComplianceBlockerDialog";
 import { useComplianceProfile } from "@/hooks/useComplianceProfile";
@@ -54,8 +57,10 @@ export default function QuoteEditor() {
   const [worksiteAddress, setWorksiteAddress] = useState<string | null>(null);
   const [depositType, setDepositType] = useState<string | null>(null);
   const [depositValue, setDepositValue] = useState<number | null>(null);
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { profile: compProfile, insurance, settings } = useComplianceProfile();
+  const { data: medias = [] } = useDossierMedias(dossierId!);
   const [blockerOpen, setBlockerOpen] = useState(false);
   const [blockerAction, setBlockerAction] = useState("générer ce devis");
 
@@ -100,7 +105,22 @@ export default function QuoteEditor() {
     }
   }, [profile, quoteId]);
 
-  // Prefill client + worksite from dossier
+  // Prefill client + worksite from dossier — n'écrase JAMAIS un champ déjà touché
+  const refreshFromDossier = useCallback(() => {
+    if (!dossier) return;
+    setClient((prev) => ({
+      ...prev,
+      first_name: touchedFields.has("first_name") ? prev.first_name : dossier.client_first_name,
+      last_name: touchedFields.has("last_name") ? prev.last_name : dossier.client_last_name,
+      email: touchedFields.has("email") ? prev.email : dossier.client_email,
+      phone: touchedFields.has("phone") ? prev.phone : dossier.client_phone,
+    }));
+    if (!touchedFields.has("worksite")) {
+      setWorksiteAddress(dossier.address ?? null);
+    }
+    toast({ title: "Données rechargées depuis le dossier" });
+  }, [dossier, touchedFields, toast]);
+
   useEffect(() => {
     if (dossier) {
       setClient((prev) => ({
@@ -113,6 +133,42 @@ export default function QuoteEditor() {
       setWorksiteAddress((prev) => prev ?? dossier.address ?? null);
     }
   }, [dossier]);
+
+  // Wrappers qui marquent les champs comme "touchés"
+  const handleClientChange = (next: QuoteClientData) => {
+    const changed = new Set(touchedFields);
+    (Object.keys(next) as Array<keyof QuoteClientData>).forEach((k) => {
+      if (next[k] !== client[k]) changed.add(k as string);
+    });
+    setTouchedFields(changed);
+    setClient(next);
+  };
+
+  const handleWorksiteChange = (addr: string | null) => {
+    if (addr !== worksiteAddress) {
+      setTouchedFields((prev) => new Set(prev).add("worksite"));
+    }
+    setWorksiteAddress(addr);
+  };
+
+  const prefillFields: PrefillField[] = dossier
+    ? [
+        {
+          key: "name",
+          label: "Nom",
+          value: [client.first_name, client.last_name].filter(Boolean).join(" ") || null,
+          modified: touchedFields.has("first_name") || touchedFields.has("last_name"),
+        },
+        { key: "email", label: "Email", value: client.email, modified: touchedFields.has("email") },
+        { key: "phone", label: "Téléphone", value: client.phone, modified: touchedFields.has("phone") },
+        {
+          key: "worksite",
+          label: "Chantier",
+          value: worksiteAddress,
+          modified: touchedFields.has("worksite"),
+        },
+      ]
+    : [];
 
   // Auto-save
   const saveDraft = useCallback(async () => {
@@ -294,14 +350,31 @@ export default function QuoteEditor() {
         {/* Main content — 8 blocs */}
         <main className="flex-1 overflow-y-auto pb-24 md:pb-4">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+            {/* 0a. Préremplissage depuis dossier */}
+            <DossierPrefillBanner
+              dossierRef={dossier.id}
+              fields={prefillFields}
+              onRefresh={refreshFromDossier}
+            />
+
+            {/* 0b. Résumé du dossier */}
+            <DossierContextSummary
+              category={dossier.category}
+              urgency={dossier.urgency}
+              description={dossier.description}
+              notes={null}
+              updatedAt={dossier.updated_at}
+              mediaCount={medias.length}
+            />
+
             {/* 1. Infos client */}
-            <QuoteClientBlock value={client} onChange={setClient} />
+            <QuoteClientBlock value={client} onChange={handleClientChange} />
 
             {/* 2. Infos chantier */}
             <QuoteWorksiteBlock
               worksiteAddress={worksiteAddress}
               clientAddress={dossier.address ?? undefined}
-              onChange={setWorksiteAddress}
+              onChange={handleWorksiteChange}
             />
 
             {/* 3. Infos document */}
