@@ -7,6 +7,7 @@ import { Copy, GripVertical, Trash2 } from "lucide-react";
 import type { QuoteItem } from "@/lib/quote-types";
 import { calcLineTotal, UNIT_OPTIONS } from "@/lib/quote-types";
 import { cn } from "@/lib/utils";
+import { MaterialAutocomplete } from "@/components/quote-editor/MaterialAutocomplete";
 
 interface QuoteItemRowProps {
   item: QuoteItem;
@@ -36,12 +37,20 @@ export function QuoteItemRow({ item, index, onChange, onDuplicate, onDelete, dra
           <GripVertical className="h-4 w-4" />
         </div>
         <span className="text-[10px] font-medium text-muted-foreground w-5">{index + 1}</span>
-        <Input
-          value={item.label}
-          onChange={(e) => onChange(item.id, "label", e.target.value)}
-          placeholder="Désignation"
-          className="flex-1 font-medium h-8 text-sm"
-        />
+        <div className="flex-1">
+          <MaterialAutocomplete
+            value={item.label}
+            onChange={(v) => onChange(item.id, "label", v)}
+            onPick={(s) => {
+              onChange(item.id, "label", s.label);
+              onChange(item.id, "unit", s.unit);
+              onChange(item.id, "unit_price", s.unit_price);
+              onChange(item.id, "vat_rate", s.vat_rate);
+            }}
+            placeholder="Désignation"
+            className="h-8 text-sm"
+          />
+        </div>
         <div className="flex gap-0.5">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDuplicate(item.id)}>
             <Copy className="h-3 w-3" />

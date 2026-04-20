@@ -223,9 +223,9 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
               <p className="font-medium text-sm">Import terminé</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-sm">
-              <div className="rounded border p-2"><div className="text-2xl font-bold text-emerald-600">{result.created}</div><div className="text-xs text-muted-foreground">créés</div></div>
-              <div className="rounded border p-2"><div className="text-2xl font-bold text-blue-600">{result.updated}</div><div className="text-xs text-muted-foreground">mis à jour</div></div>
-              <div className="rounded border p-2"><div className="text-2xl font-bold text-amber-600">{result.skipped}</div><div className="text-xs text-muted-foreground">ignorés</div></div>
+              <div className="rounded border p-2"><div className="text-2xl font-bold text-primary">{result.created}</div><div className="text-xs text-muted-foreground">créés</div></div>
+              <div className="rounded border p-2"><div className="text-2xl font-bold text-foreground">{result.updated}</div><div className="text-xs text-muted-foreground">mis à jour</div></div>
+              <div className="rounded border p-2"><div className="text-2xl font-bold text-muted-foreground">{result.skipped}</div><div className="text-xs text-muted-foreground">ignorés</div></div>
               <div className="rounded border p-2"><div className="text-2xl font-bold text-destructive">{result.errors}</div><div className="text-xs text-muted-foreground">erreurs</div></div>
             </div>
             {result.error_details?.length > 0 && (
