@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, Copy, CheckCircle2, ShieldCheck,
+  FileText, Upload, Loader2, ExternalLink, Send, Trash2, FilePlus, Copy, CheckCircle2, ShieldCheck, Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -124,11 +124,20 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
             variant="default"
             size="sm"
             className="gap-1.5"
+            onClick={() => navigate(`/devis/new?dossier=${dossier.id}`)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {quotes.length === 0 ? "Créer" : "Nouveau"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
             {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            Importer PDF
+            Importer
           </Button>
         </div>
       </CardHeader>
@@ -138,22 +147,36 @@ export function QuoteBlock({ dossier }: QuoteBlockProps) {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : quotes.length === 0 ? (
-          <div 
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                "text-center py-8 space-y-3 cursor-pointer rounded-lg border-2 border-dashed border-transparent transition-all",
-                "hover:bg-accent/50 hover:border-muted-foreground/20",
-                uploading && "opacity-50 pointer-events-none"
-              )}
-            >
-              <FilePlus className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Aucun devis</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {uploading ? "Importation en cours..." : "Cliquez ici pour importer un devis au format PDF."}
-                </p>
-              </div>
+          <div className="text-center py-6 space-y-4">
+            <FilePlus className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Aucun devis</p>
+              <p className="text-xs text-muted-foreground">
+                Créez un nouveau devis ou importez un PDF existant.
+              </p>
             </div>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate(`/devis/new?dossier=${dossier.id}`)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Créer un devis
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Importer un PDF
+              </Button>
+            </div>
+          </div>
         ) : (
           quotes.map((quote) => (
             <QuoteRow

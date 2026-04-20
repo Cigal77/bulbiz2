@@ -21,6 +21,7 @@ import {
   Trash2,
   FilePlus,
   Eye,
+  Plus,
 } from "lucide-react";
 
 import {
@@ -164,6 +165,15 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
             variant="default"
             size="sm"
             className="gap-1.5"
+            onClick={() => navigate(`/facture/new?dossier=${dossier.id}`)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {invoices.length === 0 ? "Créer" : "Nouvelle"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
@@ -172,7 +182,7 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
             ) : (
               <Upload className="h-3.5 w-3.5" />
             )}
-            Importer PDF
+            Importer
           </Button>
         </div>
       </CardHeader>
@@ -187,20 +197,34 @@ export function InvoiceBlock({ dossier }: InvoiceBlockProps) {
             <Skeleton className="h-24 w-full rounded-lg" />
           </div>
         ) : invoices.length === 0 ? (
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className={cn(
-              "text-center py-8 space-y-3 cursor-pointer rounded-lg border-2 border-dashed border-transparent transition-all",
-              "hover:bg-accent/50 hover:border-muted-foreground/20",
-              uploading && "opacity-50 pointer-events-none"
-            )}
-          >
+          <div className="text-center py-6 space-y-4">
             <FilePlus className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-            <div>
+            <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">Aucune facture</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {uploading ? "Importation en cours..." : "Cliquez ici pour importer une facture au format PDF."}
+              <p className="text-xs text-muted-foreground">
+                Créez une nouvelle facture ou importez un PDF existant.
               </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+              <Button
+                variant="default"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => navigate(`/facture/new?dossier=${dossier.id}`)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Créer une facture
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                Importer un PDF
+              </Button>
             </div>
           </div>
         ) : (
