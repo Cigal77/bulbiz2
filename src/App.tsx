@@ -37,6 +37,8 @@ const PolitiqueConfidentialite = lazy(() => import("./pages/PolitiqueConfidentia
 const DPA = lazy(() => import("./pages/DPA"));
 const Cookies = lazy(() => import("./pages/Cookies"));
 const AdminErrors = lazy(() => import("./pages/AdminErrors"));
+const ComplianceOnboarding = lazy(() => import("./pages/ComplianceOnboarding"));
+const ComplianceSettings = lazy(() => import("./pages/ComplianceSettings"));
 
 const queryClient = new QueryClient();
 
@@ -164,6 +166,26 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AdminErrors />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/onboarding/conformite"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <ComplianceOnboarding />
+                        </AppLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/parametres/conformite"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <ComplianceSettings />
+                        </AppLayout>
                       </ProtectedRoute>
                     }
                   />

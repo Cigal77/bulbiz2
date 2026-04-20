@@ -158,6 +158,22 @@ export default function Settings() {
           {/* Lien client public */}
           <PublicLinkCard />
 
+          {/* Conformité documentaire */}
+          <Card
+            className="cursor-pointer hover:border-primary transition-colors border-l-4 border-l-primary"
+            onClick={() => navigate("/parametres/conformite")}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>📄 Documents & conformité</span>
+                <ArrowLeft className="h-4 w-4 rotate-180" />
+              </CardTitle>
+              <CardDescription>
+                Configurez vos mentions légales, assurance, TVA et règles de paiement pour des devis et factures conformes.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
           {/* Profil */}
           <Card>
             <CardHeader>

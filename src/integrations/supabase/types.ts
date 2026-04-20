@@ -275,6 +275,57 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_settings: {
+        Row: {
+          archive_locked_documents: boolean
+          audit_log_enabled: boolean
+          auto_add_293b_mention: boolean
+          auto_add_40eur_b2b: boolean
+          auto_add_decennial_notice: boolean
+          auto_add_ei_mention: boolean
+          auto_add_waste_mention: boolean
+          block_generation_if_incomplete: boolean
+          created_at: string
+          default_quote_validity_days: number
+          id: string
+          updated_at: string
+          user_id: string
+          waste_management_text: string | null
+        }
+        Insert: {
+          archive_locked_documents?: boolean
+          audit_log_enabled?: boolean
+          auto_add_293b_mention?: boolean
+          auto_add_40eur_b2b?: boolean
+          auto_add_decennial_notice?: boolean
+          auto_add_ei_mention?: boolean
+          auto_add_waste_mention?: boolean
+          block_generation_if_incomplete?: boolean
+          created_at?: string
+          default_quote_validity_days?: number
+          id?: string
+          updated_at?: string
+          user_id: string
+          waste_management_text?: string | null
+        }
+        Update: {
+          archive_locked_documents?: boolean
+          audit_log_enabled?: boolean
+          auto_add_293b_mention?: boolean
+          auto_add_40eur_b2b?: boolean
+          auto_add_decennial_notice?: boolean
+          auto_add_ei_mention?: boolean
+          auto_add_waste_mention?: boolean
+          block_generation_if_incomplete?: boolean
+          created_at?: string
+          default_quote_validity_days?: number
+          id?: string
+          updated_at?: string
+          user_id?: string
+          waste_management_text?: string | null
+        }
+        Relationships: []
+      }
       dossiers: {
         Row: {
           access_code: string | null
@@ -565,6 +616,51 @@ export type Database = {
           },
         ]
       }
+      insurance_profiles: {
+        Row: {
+          created_at: string
+          decennial_required: boolean
+          default_legal_text: string | null
+          geographic_coverage: string | null
+          id: string
+          insurer_contact: string | null
+          insurer_name: string | null
+          policy_number: string | null
+          updated_at: string
+          user_id: string
+          validity_end: string | null
+          validity_start: string | null
+        }
+        Insert: {
+          created_at?: string
+          decennial_required?: boolean
+          default_legal_text?: string | null
+          geographic_coverage?: string | null
+          id?: string
+          insurer_contact?: string | null
+          insurer_name?: string | null
+          policy_number?: string | null
+          updated_at?: string
+          user_id: string
+          validity_end?: string | null
+          validity_start?: string | null
+        }
+        Update: {
+          created_at?: string
+          decennial_required?: boolean
+          default_legal_text?: string | null
+          geographic_coverage?: string | null
+          id?: string
+          insurer_contact?: string | null
+          insurer_name?: string | null
+          policy_number?: string | null
+          updated_at?: string
+          user_id?: string
+          validity_end?: string | null
+          validity_start?: string | null
+        }
+        Relationships: []
+      }
       invoice_lines: {
         Row: {
           created_at: string
@@ -620,6 +716,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          amount_paid: number | null
           artisan_address: string | null
           artisan_company: string | null
           artisan_email: string | null
@@ -627,6 +724,8 @@ export type Database = {
           artisan_phone: string | null
           artisan_siret: string | null
           artisan_tva_intracom: string | null
+          cancel_reason: string | null
+          canceled_at: string | null
           client_address: string | null
           client_company: string | null
           client_email: string | null
@@ -636,16 +735,29 @@ export type Database = {
           client_token: string | null
           client_token_expires_at: string | null
           client_type: Database["public"]["Enums"]["client_type"]
+          compliance_snapshot: Json | null
           created_at: string
+          customer_siren: string | null
+          delivery_address: string | null
           dossier_id: string
+          due_date: string | null
           id: string
           invoice_number: string
+          invoice_type: Database["public"]["Enums"]["invoice_doc_type"]
           issue_date: string
           late_fees_text: string | null
+          late_penalty_rate: number | null
+          legal_mentions_snapshot: Json | null
           notes: string | null
+          operation_category:
+            | Database["public"]["Enums"]["operation_category"]
+            | null
           paid_at: string | null
+          parent_invoice_id: string | null
           payment_terms: string | null
           pdf_url: string | null
+          recovery_fee_applied: boolean | null
+          related_quote_id: string | null
           sent_at: string | null
           service_date: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -655,8 +767,11 @@ export type Database = {
           updated_at: string
           user_id: string
           vat_mode: Database["public"]["Enums"]["vat_mode"]
+          version_number: number
+          worksite_address: string | null
         }
         Insert: {
+          amount_paid?: number | null
           artisan_address?: string | null
           artisan_company?: string | null
           artisan_email?: string | null
@@ -664,6 +779,8 @@ export type Database = {
           artisan_phone?: string | null
           artisan_siret?: string | null
           artisan_tva_intracom?: string | null
+          cancel_reason?: string | null
+          canceled_at?: string | null
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -673,16 +790,29 @@ export type Database = {
           client_token?: string | null
           client_token_expires_at?: string | null
           client_type?: Database["public"]["Enums"]["client_type"]
+          compliance_snapshot?: Json | null
           created_at?: string
+          customer_siren?: string | null
+          delivery_address?: string | null
           dossier_id: string
+          due_date?: string | null
           id?: string
           invoice_number: string
+          invoice_type?: Database["public"]["Enums"]["invoice_doc_type"]
           issue_date?: string
           late_fees_text?: string | null
+          late_penalty_rate?: number | null
+          legal_mentions_snapshot?: Json | null
           notes?: string | null
+          operation_category?:
+            | Database["public"]["Enums"]["operation_category"]
+            | null
           paid_at?: string | null
+          parent_invoice_id?: string | null
           payment_terms?: string | null
           pdf_url?: string | null
+          recovery_fee_applied?: boolean | null
+          related_quote_id?: string | null
           sent_at?: string | null
           service_date?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -692,8 +822,11 @@ export type Database = {
           updated_at?: string
           user_id: string
           vat_mode?: Database["public"]["Enums"]["vat_mode"]
+          version_number?: number
+          worksite_address?: string | null
         }
         Update: {
+          amount_paid?: number | null
           artisan_address?: string | null
           artisan_company?: string | null
           artisan_email?: string | null
@@ -701,6 +834,8 @@ export type Database = {
           artisan_phone?: string | null
           artisan_siret?: string | null
           artisan_tva_intracom?: string | null
+          cancel_reason?: string | null
+          canceled_at?: string | null
           client_address?: string | null
           client_company?: string | null
           client_email?: string | null
@@ -710,16 +845,29 @@ export type Database = {
           client_token?: string | null
           client_token_expires_at?: string | null
           client_type?: Database["public"]["Enums"]["client_type"]
+          compliance_snapshot?: Json | null
           created_at?: string
+          customer_siren?: string | null
+          delivery_address?: string | null
           dossier_id?: string
+          due_date?: string | null
           id?: string
           invoice_number?: string
+          invoice_type?: Database["public"]["Enums"]["invoice_doc_type"]
           issue_date?: string
           late_fees_text?: string | null
+          late_penalty_rate?: number | null
+          legal_mentions_snapshot?: Json | null
           notes?: string | null
+          operation_category?:
+            | Database["public"]["Enums"]["operation_category"]
+            | null
           paid_at?: string | null
+          parent_invoice_id?: string | null
           payment_terms?: string | null
           pdf_url?: string | null
+          recovery_fee_applied?: boolean | null
+          related_quote_id?: string | null
           sent_at?: string | null
           service_date?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -729,6 +877,8 @@ export type Database = {
           updated_at?: string
           user_id?: string
           vat_mode?: Database["public"]["Enums"]["vat_mode"]
+          version_number?: number
+          worksite_address?: string | null
         }
         Relationships: [
           {
@@ -1008,100 +1158,166 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accepted_payment_methods: string[] | null
           address: string | null
           auto_relance_enabled: boolean
           auto_send_client_link: boolean
+          bic: string | null
+          capital_amount: number | null
           client_link_validity_days: number
           client_message_template: string | null
           client_slots_enabled: boolean
           company_name: string | null
+          compliance_score: number | null
           created_at: string
+          default_deposit_type: string | null
+          default_deposit_value: number | null
           default_validity_days: number | null
           default_vat_rate: number | null
+          early_payment_discount_text: string | null
           email: string | null
           email_signature: string | null
+          favorite_vat_rates: number[] | null
           first_name: string | null
+          fixed_recovery_fee_b2b: boolean
+          footer_text: string | null
+          iban: string | null
           id: string
           last_name: string | null
+          late_penalty_rate: number | null
+          legal_form: Database["public"]["Enums"]["legal_form"] | null
           logo_url: string | null
+          onboarding_compliance_completed_at: string | null
+          owner_first_name: string | null
+          owner_last_name: string | null
           payment_terms_default: string | null
           phone: string | null
+          primary_color: string | null
           public_client_slug: string | null
+          rcs_city: string | null
           relance_delay_devis_1: number
           relance_delay_devis_2: number
           relance_delay_facture_1: number
           relance_delay_facture_2: number
           relance_delay_info: number
+          siren: string | null
           siret: string | null
           sms_enabled: boolean
+          trade_name: string | null
           tva_intracom: string | null
           updated_at: string
           user_id: string
           vat_applicable: boolean
+          vat_exemption_293b: boolean
+          vat_on_debits: boolean
         }
         Insert: {
+          accepted_payment_methods?: string[] | null
           address?: string | null
           auto_relance_enabled?: boolean
           auto_send_client_link?: boolean
+          bic?: string | null
+          capital_amount?: number | null
           client_link_validity_days?: number
           client_message_template?: string | null
           client_slots_enabled?: boolean
           company_name?: string | null
+          compliance_score?: number | null
           created_at?: string
+          default_deposit_type?: string | null
+          default_deposit_value?: number | null
           default_validity_days?: number | null
           default_vat_rate?: number | null
+          early_payment_discount_text?: string | null
           email?: string | null
           email_signature?: string | null
+          favorite_vat_rates?: number[] | null
           first_name?: string | null
+          fixed_recovery_fee_b2b?: boolean
+          footer_text?: string | null
+          iban?: string | null
           id?: string
           last_name?: string | null
+          late_penalty_rate?: number | null
+          legal_form?: Database["public"]["Enums"]["legal_form"] | null
           logo_url?: string | null
+          onboarding_compliance_completed_at?: string | null
+          owner_first_name?: string | null
+          owner_last_name?: string | null
           payment_terms_default?: string | null
           phone?: string | null
+          primary_color?: string | null
           public_client_slug?: string | null
+          rcs_city?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_facture_1?: number
           relance_delay_facture_2?: number
           relance_delay_info?: number
+          siren?: string | null
           siret?: string | null
           sms_enabled?: boolean
+          trade_name?: string | null
           tva_intracom?: string | null
           updated_at?: string
           user_id: string
           vat_applicable?: boolean
+          vat_exemption_293b?: boolean
+          vat_on_debits?: boolean
         }
         Update: {
+          accepted_payment_methods?: string[] | null
           address?: string | null
           auto_relance_enabled?: boolean
           auto_send_client_link?: boolean
+          bic?: string | null
+          capital_amount?: number | null
           client_link_validity_days?: number
           client_message_template?: string | null
           client_slots_enabled?: boolean
           company_name?: string | null
+          compliance_score?: number | null
           created_at?: string
+          default_deposit_type?: string | null
+          default_deposit_value?: number | null
           default_validity_days?: number | null
           default_vat_rate?: number | null
+          early_payment_discount_text?: string | null
           email?: string | null
           email_signature?: string | null
+          favorite_vat_rates?: number[] | null
           first_name?: string | null
+          fixed_recovery_fee_b2b?: boolean
+          footer_text?: string | null
+          iban?: string | null
           id?: string
           last_name?: string | null
+          late_penalty_rate?: number | null
+          legal_form?: Database["public"]["Enums"]["legal_form"] | null
           logo_url?: string | null
+          onboarding_compliance_completed_at?: string | null
+          owner_first_name?: string | null
+          owner_last_name?: string | null
           payment_terms_default?: string | null
           phone?: string | null
+          primary_color?: string | null
           public_client_slug?: string | null
+          rcs_city?: string | null
           relance_delay_devis_1?: number
           relance_delay_devis_2?: number
           relance_delay_facture_1?: number
           relance_delay_facture_2?: number
           relance_delay_info?: number
+          siren?: string | null
           siret?: string | null
           sms_enabled?: boolean
+          trade_name?: string | null
           tva_intracom?: string | null
           updated_at?: string
           user_id?: string
           vat_applicable?: boolean
+          vat_exemption_293b?: boolean
+          vat_on_debits?: boolean
         }
         Relationships: []
       }
@@ -1248,12 +1464,19 @@ export type Database = {
           accepted_at: string | null
           accepted_ip: string | null
           accepted_user_agent: string | null
+          cancel_reason: string | null
+          canceled_at: string | null
+          compliance_snapshot: Json | null
           created_at: string
+          deposit_type: string | null
+          deposit_value: number | null
           dossier_id: string
           id: string
           is_imported: boolean
           items: Json | null
+          legal_mentions_snapshot: Json | null
           notes: string | null
+          parent_quote_id: string | null
           pdf_url: string | null
           quote_number: string
           refused_at: string | null
@@ -1269,17 +1492,25 @@ export type Database = {
           updated_at: string
           user_id: string
           validity_days: number | null
+          version_number: number
         }
         Insert: {
           accepted_at?: string | null
           accepted_ip?: string | null
           accepted_user_agent?: string | null
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          compliance_snapshot?: Json | null
           created_at?: string
+          deposit_type?: string | null
+          deposit_value?: number | null
           dossier_id: string
           id?: string
           is_imported?: boolean
           items?: Json | null
+          legal_mentions_snapshot?: Json | null
           notes?: string | null
+          parent_quote_id?: string | null
           pdf_url?: string | null
           quote_number: string
           refused_at?: string | null
@@ -1295,17 +1526,25 @@ export type Database = {
           updated_at?: string
           user_id: string
           validity_days?: number | null
+          version_number?: number
         }
         Update: {
           accepted_at?: string | null
           accepted_ip?: string | null
           accepted_user_agent?: string | null
+          cancel_reason?: string | null
+          canceled_at?: string | null
+          compliance_snapshot?: Json | null
           created_at?: string
+          deposit_type?: string | null
+          deposit_value?: number | null
           dossier_id?: string
           id?: string
           is_imported?: boolean
           items?: Json | null
+          legal_mentions_snapshot?: Json | null
           notes?: string | null
+          parent_quote_id?: string | null
           pdf_url?: string | null
           quote_number?: string
           refused_at?: string | null
@@ -1321,6 +1560,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           validity_days?: number | null
+          version_number?: number
         }
         Relationships: [
           {
@@ -1393,6 +1633,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_credit_note_number: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
+      generate_deposit_invoice_number: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       generate_invoice_number: {
         Args: { p_client_name?: string; p_user_id: string }
         Returns: string
@@ -1435,7 +1683,10 @@ export type Database = {
         | "en_attente_rdv"
         | "rdv_pris"
         | "rdv_termine"
-      invoice_status: "draft" | "sent" | "paid"
+      invoice_doc_type: "standalone" | "final" | "deposit" | "credit_note"
+      invoice_status: "draft" | "sent" | "paid" | "canceled"
+      legal_form: "ei" | "micro" | "eurl" | "sarl" | "sasu" | "sas" | "autre"
+      operation_category: "sale" | "service" | "mixed"
       problem_category:
         | "wc"
         | "fuite"
@@ -1443,7 +1694,13 @@ export type Database = {
         | "evier"
         | "douche"
         | "autre"
-      quote_status: "brouillon" | "envoye" | "signe" | "refuse"
+      quote_status:
+        | "brouillon"
+        | "envoye"
+        | "signe"
+        | "refuse"
+        | "annule"
+        | "expire"
       urgency_level: "aujourdhui" | "48h" | "semaine"
       vat_mode: "normal" | "no_vat_293b"
     }
@@ -1600,7 +1857,10 @@ export const Constants = {
         "rdv_pris",
         "rdv_termine",
       ],
-      invoice_status: ["draft", "sent", "paid"],
+      invoice_doc_type: ["standalone", "final", "deposit", "credit_note"],
+      invoice_status: ["draft", "sent", "paid", "canceled"],
+      legal_form: ["ei", "micro", "eurl", "sarl", "sasu", "sas", "autre"],
+      operation_category: ["sale", "service", "mixed"],
       problem_category: [
         "wc",
         "fuite",
@@ -1609,7 +1869,14 @@ export const Constants = {
         "douche",
         "autre",
       ],
-      quote_status: ["brouillon", "envoye", "signe", "refuse"],
+      quote_status: [
+        "brouillon",
+        "envoye",
+        "signe",
+        "refuse",
+        "annule",
+        "expire",
+      ],
       urgency_level: ["aujourdhui", "48h", "semaine"],
       vat_mode: ["normal", "no_vat_293b"],
     },
