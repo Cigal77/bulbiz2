@@ -28,8 +28,8 @@ export function InvoiceLinesBlock({ lines, onChange, disabled }: InvoiceLinesBlo
     ]);
   };
 
-  const updateLine = (idx: number, patch: Partial<EditableLine>) => {
-    onChange(lines.map((l, i) => (i === idx ? { ...l, ...patch } as InvoiceLine : l)));
+  const updateLine = (idx: number, patch: Partial<InvoiceLine>) => {
+    onChange(lines.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   };
   const duplicateLine = (idx: number) => {
     const copy = { ...lines[idx], id: crypto.randomUUID() };
@@ -86,17 +86,15 @@ export function InvoiceLinesBlock({ lines, onChange, disabled }: InvoiceLinesBlo
                 disabled={disabled}
                 showType={false}
                 onChange={(patch) => {
-                  const mapped: Partial<InvoiceLine> = {
-                    label: patch.label,
-                    description: patch.description,
-                    qty: patch.qty,
-                    unit: patch.unit,
-                    unit_price: patch.unit_price,
-                    tva_rate: patch.vat_rate,
-                    discount: patch.discount,
-                  };
-                  Object.keys(mapped).forEach((k) => mapped[k as keyof InvoiceLine] === undefined && delete mapped[k as keyof InvoiceLine]);
-                  updateLine(idx, mapped as Partial<EditableLine>);
+                  const mapped: Partial<InvoiceLine> = {};
+                  if (patch.label !== undefined) mapped.label = patch.label;
+                  if (patch.description !== undefined) mapped.description = patch.description ?? null;
+                  if (patch.qty !== undefined) mapped.qty = patch.qty;
+                  if (patch.unit !== undefined) mapped.unit = patch.unit;
+                  if (patch.unit_price !== undefined) mapped.unit_price = patch.unit_price;
+                  if (patch.vat_rate !== undefined) mapped.tva_rate = patch.vat_rate;
+                  if (patch.discount !== undefined) mapped.discount = patch.discount;
+                  updateLine(idx, mapped);
                 }}
                 onDuplicate={() => duplicateLine(idx)}
                 onDelete={() => removeLine(idx)}
