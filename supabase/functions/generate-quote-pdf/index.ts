@@ -1,5 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import {
+  loadComplianceContext,
+  buildLegalMentions,
+  getMissingMandatoryFields,
+  getDisplayName,
+  type CustomerInfo,
+} from "../_shared/compliance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -55,7 +62,6 @@ async function embedLogo(doc: any, logoUrl: string): Promise<any | null> {
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("png")) return await doc.embedPng(bytes);
     if (ct.includes("jpeg") || ct.includes("jpg")) return await doc.embedJpg(bytes);
-    // Try PNG first, fallback to JPG
     try { return await doc.embedPng(bytes); } catch { /* ignore */ }
     try { return await doc.embedJpg(bytes); } catch { /* ignore */ }
     return null;
@@ -65,10 +71,12 @@ async function embedLogo(doc: any, logoUrl: string): Promise<any | null> {
 }
 
 async function buildPdf(
-  profile: Record<string, unknown>,
+  rawProfile: Record<string, unknown>,
   dossier: Record<string, unknown>,
   quote: Record<string, unknown>,
-  items: QuoteItem[]
+  items: QuoteItem[],
+  mentions: ReturnType<typeof buildLegalMentions>,
+  artisanDisplayName: string,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -83,9 +91,8 @@ async function buildPdf(
   let page = doc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
-  // Colors
-  const primary = rgb(0.09, 0.24, 0.48);    // deep navy
-  const accent = rgb(0.16, 0.50, 0.73);      // blue accent
+  const primary = rgb(0.09, 0.24, 0.48);
+  const accent = rgb(0.16, 0.50, 0.73);
   const darkText = rgb(0.12, 0.12, 0.14);
   const grayText = rgb(0.40, 0.42, 0.47);
   const lightBg = rgb(0.95, 0.96, 0.97);
@@ -103,17 +110,32 @@ async function buildPdf(
     }
   };
 
-  // === LOGO + ARTISAN HEADER ===
-  const artisanName = (profile.company_name as string) ||
-    [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Artisan";
-
   let logoImage: any = null;
-  if (profile.logo_url) {
-    logoImage = await embedLogo(doc, String(profile.logo_url));
+  if (rawProfile.logo_url) {
+    logoImage = await embedLogo(doc, String(rawProfile.logo_url));
   }
 
   const headerStartY = y;
   let artisanX = margin;
+
+  const drawArtisanInfo = (startX: number, startY: number) => {
+    let infoY = startY;
+    drawText(artisanDisplayName, startX, infoY, logoImage ? 14 : 16, fontBold, primary);
+    if (mentions.ei_mention) {
+      const w = fontBold.widthOfTextAtSize(artisanDisplayName, logoImage ? 14 : 16);
+      drawText(" — " + mentions.ei_mention, startX + w, infoY, 8, fontOblique, grayText);
+    }
+    infoY -= logoImage ? 16 : 18;
+    if (rawProfile.address) { drawText(String(rawProfile.address), startX, infoY, 8, font, grayText); infoY -= 11; }
+    const contactParts: string[] = [];
+    if (rawProfile.phone) contactParts.push("Tél : " + String(rawProfile.phone));
+    if (rawProfile.email) contactParts.push(String(rawProfile.email));
+    if (contactParts.length) { drawText(contactParts.join("  •  "), startX, infoY, 8, font, grayText); infoY -= 11; }
+    if (rawProfile.siret) { drawText("SIRET : " + String(rawProfile.siret), startX, infoY, 8, font, grayText); infoY -= 11; }
+    if (mentions.capital_rcs_mention) { drawText(mentions.capital_rcs_mention, startX, infoY, 7.5, font, grayText); infoY -= 11; }
+    if (rawProfile.tva_intracom) { drawText("TVA : " + String(rawProfile.tva_intracom), startX, infoY, 8, font, grayText); infoY -= 11; }
+    return infoY;
+  };
 
   if (logoImage) {
     const logoDim = logoImage.scale(1);
@@ -124,36 +146,20 @@ async function buildPdf(
     const h = logoDim.height * scale;
     page.drawImage(logoImage, { x: margin, y: y - h + 4, width: w, height: h });
     artisanX = margin + w + 12;
-    // Artisan info next to logo
-    drawText(artisanName, artisanX, y - 4, 14, fontBold, primary);
-    let infoY = y - 20;
-    if (profile.address) { drawText(String(profile.address), artisanX, infoY, 8, font, grayText); infoY -= 11; }
-    const contactParts: string[] = [];
-    if (profile.phone) contactParts.push("Tél : " + String(profile.phone));
-    if (profile.email) contactParts.push(String(profile.email));
-    if (contactParts.length) { drawText(contactParts.join("  •  "), artisanX, infoY, 8, font, grayText); infoY -= 11; }
-    if (profile.siret) { drawText("SIRET : " + String(profile.siret), artisanX, infoY, 8, font, grayText); infoY -= 11; }
-    y = Math.min(y - 54, infoY - 4);
+    const bottom = drawArtisanInfo(artisanX, y - 4);
+    y = Math.min(y - h - 4, bottom - 4);
   } else {
-    drawText(artisanName, margin, y - 4, 16, fontBold, primary);
-    y -= 22;
-    if (profile.address) { drawText(String(profile.address), margin, y, 9, font, grayText); y -= 13; }
-    const contactParts: string[] = [];
-    if (profile.phone) contactParts.push("Tél : " + String(profile.phone));
-    if (profile.email) contactParts.push(String(profile.email));
-    if (contactParts.length) { drawText(contactParts.join("  •  "), margin, y, 9, font, grayText); y -= 13; }
-    if (profile.siret) { drawText("SIRET : " + String(profile.siret), margin, y, 9, font, grayText); y -= 13; }
+    const bottom = drawArtisanInfo(margin, y - 4);
+    y = bottom - 4;
   }
 
-  // === CLIENT BOX (right aligned) ===
   const clientName = [dossier.client_first_name, dossier.client_last_name].filter(Boolean).join(" ") || "Client";
   const boxW = 210;
   const boxX = pageWidth - margin - boxW;
   const boxTopY = headerStartY;
 
-  page.drawRectangle({ x: boxX - 8, y: boxTopY - 72, width: boxW + 8, height: 80, color: lightBg, borderWidth: 0 });
-  // Accent bar on the left of the box
-  page.drawRectangle({ x: boxX - 8, y: boxTopY - 72, width: 3, height: 80, color: accent });
+  page.drawRectangle({ x: boxX - 8, y: boxTopY - 78, width: boxW + 8, height: 86, color: lightBg });
+  page.drawRectangle({ x: boxX - 8, y: boxTopY - 78, width: 3, height: 86, color: accent });
 
   drawText("DESTINATAIRE", boxX + 4, boxTopY - 6, 7, fontBold, grayText);
   drawText(clientName, boxX + 4, boxTopY - 20, 11, fontBold, darkText);
@@ -162,13 +168,12 @@ async function buildPdf(
   if (dossier.client_email) { drawText(String(dossier.client_email), boxX + 4, cY, 8, font, grayText); cY -= 11; }
   if (dossier.client_phone) { drawText(String(dossier.client_phone), boxX + 4, cY, 8, font, grayText); cY -= 11; }
 
-  // === SEPARATOR ===
   y -= 10;
   page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 1.5, color: primary });
   y -= 20;
 
-  // === QUOTE TITLE ===
-  drawText("DEVIS N° " + String(quote.quote_number), margin, y, 16, fontBold, primary);
+  const versionSuffix = (quote.version_number as number) > 1 ? ` — V${quote.version_number}` : "";
+  drawText("DEVIS N° " + String(quote.quote_number) + versionSuffix, margin, y, 16, fontBold, primary);
   y -= 20;
 
   const dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
@@ -181,13 +186,11 @@ async function buildPdf(
     y -= 13;
   }
 
-  // === ITEMS TABLE ===
   y -= 12;
   const colWidths = [contentWidth * 0.42, contentWidth * 0.10, contentWidth * 0.15, contentWidth * 0.13, contentWidth * 0.20];
   const colX = [margin];
   for (let i = 1; i < 5; i++) colX.push(colX[i - 1] + colWidths[i - 1]);
 
-  // Table header
   const headerH = 24;
   page.drawRectangle({ x: margin, y: y - headerH + 6, width: contentWidth, height: headerH, color: primary });
   const headers = ["Désignation", "Qté", "PU HT", "TVA", "Total HT"];
@@ -203,7 +206,7 @@ async function buildPdf(
 
   for (const item of items) {
     const lt = calcLineTotal(item);
-    const tva = (lt * item.vat_rate) / 100;
+    const tva = mentions.vat_293b_mention ? 0 : (lt * item.vat_rate) / 100;
     totalHt += lt;
     totalTva += tva;
 
@@ -211,30 +214,24 @@ async function buildPdf(
     const rowH = 20 + descLines.length * 10;
     addNewPageIfNeeded(rowH + 4);
 
-    // Alternate row background
     if (rowIdx % 2 === 0) {
       page.drawRectangle({ x: margin, y: y - rowH + 4, width: contentWidth, height: rowH, color: lightBg });
     }
 
-    // Label
     drawText(truncate(item.label, 45), colX[0] + 8, y - 6, 9, fontBold, darkText);
     descLines.forEach((line, li) => {
       drawText(line, colX[0] + 8, y - 17 - li * 10, 7.5, fontOblique, grayText);
     });
 
-    // Qty
     const qtyStr = item.qty + " " + item.unit;
     drawText(qtyStr, colX[1] + colWidths[1] - font.widthOfTextAtSize(qtyStr, 9) - 6, y - 6, 9, font, darkText);
 
-    // PU
     const puStr = fmt(item.unit_price);
     drawText(puStr, colX[2] + colWidths[2] - font.widthOfTextAtSize(puStr, 9) - 6, y - 6, 9, font, darkText);
 
-    // TVA
-    const tvaStr = item.vat_rate + " %";
+    const tvaStr = mentions.vat_293b_mention ? "—" : item.vat_rate + " %";
     drawText(tvaStr, colX[3] + colWidths[3] - font.widthOfTextAtSize(tvaStr, 9) - 6, y - 6, 9, font, grayText);
 
-    // Total
     const totalStr = fmt(lt);
     drawText(totalStr, colX[4] + colWidths[4] - fontBold.widthOfTextAtSize(totalStr, 9) - 6, y - 6, 9, fontBold, primary);
 
@@ -242,39 +239,51 @@ async function buildPdf(
     rowIdx++;
   }
 
-  // Table bottom border
   page.drawLine({ start: { x: margin, y: y + 2 }, end: { x: margin + contentWidth, y: y + 2 }, thickness: 1, color: primary });
 
-  // === TOTALS BOX ===
   y -= 14;
   addNewPageIfNeeded(80);
   const totalsW = 200;
   const totalsX = pageWidth - margin - totalsW;
   const totalTtc = totalHt + totalTva;
 
-  // Background for totals
   page.drawRectangle({ x: totalsX - 8, y: y - 68, width: totalsW + 8, height: 72, color: lightBg });
 
   const drawTotalRow = (label: string, value: string, bold = false, highlight = false) => {
     const f = bold ? fontBold : font;
     const sz = bold ? 12 : 10;
-    const color = highlight ? primary : darkText;
     if (highlight) {
       page.drawRectangle({ x: totalsX - 8, y: y - 14, width: totalsW + 8, height: 20, color: primary });
       drawText(label, totalsX, y - 6, sz, f, white);
       drawText(value, totalsX + totalsW - f.widthOfTextAtSize(value, sz), y - 6, sz, f, white);
     } else {
       drawText(label, totalsX, y - 6, sz, f, grayText);
-      drawText(value, totalsX + totalsW - f.widthOfTextAtSize(value, sz), y - 6, sz, f, color);
+      drawText(value, totalsX + totalsW - f.widthOfTextAtSize(value, sz), y - 6, sz, f, darkText);
     }
     y -= 22;
   };
 
   drawTotalRow("Total HT", fmt(totalHt));
-  drawTotalRow("TVA", fmt(totalTva));
+  if (!mentions.vat_293b_mention) drawTotalRow("TVA", fmt(totalTva));
   drawTotalRow("TOTAL TTC", fmt(totalTtc), true, true);
 
-  // === NOTES / CONDITIONS ===
+  if (mentions.vat_293b_mention) {
+    y -= 4;
+    drawText(mentions.vat_293b_mention, totalsX, y, 8, fontOblique, grayText);
+    y -= 14;
+  }
+
+  // Acompte
+  const depositType = quote.deposit_type as string | null;
+  const depositValue = quote.deposit_value as number | null;
+  if (depositType && depositValue && depositType !== "none") {
+    y -= 6;
+    addNewPageIfNeeded(20);
+    const depositAmount = depositType === "percent" ? totalTtc * depositValue / 100 : depositValue;
+    drawText(`Acompte demandé : ${fmt(depositAmount)}${depositType === "percent" ? ` (${depositValue}%)` : ""}`, margin, y, 9, fontBold, accent);
+    y -= 14;
+  }
+
   if (quote.notes) {
     y -= 10;
     addNewPageIfNeeded(70);
@@ -291,27 +300,33 @@ async function buildPdf(
     }
   }
 
-  // === MENTIONS LÉGALES OBLIGATOIRES ===
+  // === MENTIONS LÉGALES AUTO ===
   y -= 16;
   addNewPageIfNeeded(110);
-
   page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: pageWidth - margin, y: y + 4 }, thickness: 0.5, color: lineColor });
   y -= 6;
-
-  const mentions = [
-    "Conditions de paiement : paiement à réception de facture, sauf accord contraire.",
-    "Pénalités de retard : en cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée (art. L.441-10 du Code de commerce).",
-    "Indemnité forfaitaire pour frais de recouvrement : 40 € (art. D.441-5 du Code de commerce).",
-    "Pas d'escompte pour paiement anticipé.",
-    "Le client dispose d'un délai de rétractation de 14 jours à compter de la signature du devis (art. L.221-18 du Code de la consommation).",
-    "Assurance décennale : [à compléter]  •  Garantie biennale applicable.",
-    "Bon pour accord — Date et signature du client :",
-  ];
 
   drawText("Mentions légales", margin, y, 9, fontBold, primary);
   y -= 12;
 
-  for (const m of mentions) {
+  const legalLines: string[] = [];
+
+  if (mentions.decennial_block) {
+    legalLines.push(
+      `Assurance décennale : ${mentions.decennial_block.insurer} — Police n° ${mentions.decennial_block.policy} — Couverture : ${mentions.decennial_block.coverage}.`,
+    );
+    legalLines.push(mentions.decennial_block.legal_text);
+  }
+  if (mentions.late_penalty_text) legalLines.push(mentions.late_penalty_text);
+  if (mentions.recovery_fee_text) legalLines.push(mentions.recovery_fee_text);
+  if (mentions.waste_mention) legalLines.push(mentions.waste_mention);
+  legalLines.push("Le client dispose d'un délai de rétractation de 14 jours à compter de la signature du devis (art. L.221-18 du Code de la consommation).");
+  if (mentions.iban_block) {
+    legalLines.push(`Règlement par virement : IBAN ${mentions.iban_block.iban}${mentions.iban_block.bic ? ` — BIC ${mentions.iban_block.bic}` : ""}.`);
+  }
+  legalLines.push("Bon pour accord — Date et signature du client :");
+
+  for (const m of legalLines) {
     const lines = wrapText(m, font, 7, contentWidth - 8);
     for (const l of lines) {
       addNewPageIfNeeded(10);
@@ -321,17 +336,15 @@ async function buildPdf(
     y -= 2;
   }
 
-  // Signature zone
   y -= 6;
   addNewPageIfNeeded(50);
   page.drawRectangle({ x: pageWidth - margin - 200, y: y - 40, width: 200, height: 44, borderWidth: 0.5, borderColor: lineColor, color: white });
   drawText("Signature client", pageWidth - margin - 190, y - 12, 8, fontOblique, grayText);
 
-  // === FOOTER (all pages) ===
-  const footerParts = [artisanName];
-  if (profile.siret) footerParts.push("SIRET " + String(profile.siret));
-  if (profile.phone) footerParts.push("Tél " + String(profile.phone));
-  if (profile.email) footerParts.push(String(profile.email));
+  const footerParts = [artisanDisplayName];
+  if (rawProfile.siret) footerParts.push("SIRET " + String(rawProfile.siret));
+  if (rawProfile.phone) footerParts.push("Tél " + String(rawProfile.phone));
+  if (rawProfile.email) footerParts.push(String(rawProfile.email));
   const footerText = footerParts.join("  —  ");
   const footerWidth = font.widthOfTextAtSize(footerText, 7);
 
@@ -375,16 +388,49 @@ Deno.serve(async (req: Request) => {
       .from("quotes").select("*").eq("id", quote_id).eq("user_id", user.id).single();
     if (qErr || !quote) throw new Error("Devis introuvable");
 
-    const [{ data: dossier }, { data: profile }] = await Promise.all([
+    const [{ data: dossier }, complianceCtx] = await Promise.all([
       supabase.from("dossiers").select("*").eq("id", quote.dossier_id).single(),
-      supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+      loadComplianceContext(supabase, user.id),
     ]);
     if (!dossier) throw new Error("Dossier introuvable");
 
-    const items = (quote.items as QuoteItem[]) || [];
-    const pdfBytes = await buildPdf(profile || {}, dossier, quote, items);
+    const { profile, insurance, settings, rawProfile } = complianceCtx;
 
-    const filePath = `${quote.dossier_id}/devis_${quote.quote_number.replace(/[^a-zA-Z0-9-]/g, "_")}.pdf`;
+    // === BACKEND VALIDATION (BLOCKING) ===
+    if (settings?.block_generation_if_incomplete !== false) {
+      const blockers = getMissingMandatoryFields(profile, insurance);
+      if (!profile?.onboarding_compliance_completed_at) {
+        blockers.unshift({ code: "onboarding_incomplete", message: "Onboarding conformité non terminé", section: "onboarding" });
+      }
+      if (blockers.length > 0) {
+        return new Response(JSON.stringify({
+          error: "Document non conforme : informations obligatoires manquantes",
+          blockers,
+        }), { status: 422, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      }
+    }
+
+    const customer: CustomerInfo = {
+      type: "individual",
+      first_name: dossier.client_first_name,
+      last_name: dossier.client_last_name,
+      email: dossier.client_email,
+      address: dossier.address,
+    };
+
+    const mentions = profile
+      ? buildLegalMentions(profile, insurance, settings, customer)
+      : {
+          ei_mention: null, vat_293b_mention: null, decennial_block: null,
+          late_penalty_text: null, recovery_fee_text: null, waste_mention: null,
+          capital_rcs_mention: null, iban_block: null,
+        };
+
+    const artisanDisplayName = profile ? getDisplayName(profile) : "Artisan";
+    const items = (quote.items as QuoteItem[]) || [];
+    const pdfBytes = await buildPdf(rawProfile || {}, dossier, quote, items, mentions, artisanDisplayName);
+
+    const filePath = `${quote.dossier_id}/devis_${(quote.quote_number as string).replace(/[^a-zA-Z0-9-]/g, "_")}_v${quote.version_number || 1}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("dossier-medias")
@@ -393,7 +439,18 @@ Deno.serve(async (req: Request) => {
 
     const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
 
-    await supabase.from("quotes").update({ pdf_url: urlData.publicUrl }).eq("id", quote_id);
+    // === SNAPSHOT FIGÉ ===
+    await supabase.from("quotes").update({
+      pdf_url: urlData.publicUrl,
+      legal_mentions_snapshot: mentions,
+      compliance_snapshot: {
+        generated_at: new Date().toISOString(),
+        artisan: artisanDisplayName,
+        siret: rawProfile?.siret ?? null,
+        legal_form: profile?.legal_form ?? null,
+        vat_applicable: profile?.vat_applicable ?? null,
+      },
+    }).eq("id", quote_id);
 
     await supabase.from("historique").insert({
       dossier_id: quote.dossier_id,

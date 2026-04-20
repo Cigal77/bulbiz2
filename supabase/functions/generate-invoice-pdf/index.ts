@@ -1,5 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import {
+  loadComplianceContext,
+  buildLegalMentions,
+  getMissingMandatoryFields,
+  getDisplayName,
+  type CustomerInfo,
+} from "../_shared/compliance.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,10 +80,21 @@ async function embedLogo(doc: any, logoUrl: string): Promise<any | null> {
   }
 }
 
+function invoiceTitle(invoiceType: string): string {
+  switch (invoiceType) {
+    case "credit_note": return "AVOIR";
+    case "deposit": return "FACTURE D'ACOMPTE";
+    case "final": return "FACTURE";
+    default: return "FACTURE";
+  }
+}
+
 async function buildInvoicePdf(
-  profile: Record<string, unknown>,
+  rawProfile: Record<string, unknown>,
   invoice: Record<string, unknown>,
-  lines: InvoiceLine[]
+  lines: InvoiceLine[],
+  mentions: ReturnType<typeof buildLegalMentions>,
+  artisanDisplayName: string,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -111,13 +129,9 @@ async function buildInvoicePdf(
     }
   };
 
-  // === ARTISAN HEADER ===
-  const artisanName = (profile.company_name as string) ||
-    [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "Artisan";
-
   let logoImage: any = null;
-  if (profile.logo_url) {
-    logoImage = await embedLogo(doc, String(profile.logo_url));
+  if (rawProfile.logo_url) {
+    logoImage = await embedLogo(doc, String(rawProfile.logo_url));
   }
 
   const headerStartY = y;
@@ -135,30 +149,34 @@ async function buildInvoicePdf(
   }
 
   const drawArtisanInfo = (startX: number) => {
-    drawText(artisanName, startX, y - 4, logoImage ? 14 : 16, fontBold, primary);
+    drawText(artisanDisplayName, startX, y - 4, logoImage ? 14 : 16, fontBold, primary);
+    if (mentions.ei_mention) {
+      const w = fontBold.widthOfTextAtSize(artisanDisplayName, logoImage ? 14 : 16);
+      drawText(" — " + mentions.ei_mention, startX + w, y - 4, 8, fontOblique, grayText);
+    }
     let infoY = y - (logoImage ? 20 : 22);
-    if (profile.address) { drawText(String(profile.address), startX, infoY, 8, font, grayText); infoY -= 11; }
+    if (rawProfile.address) { drawText(String(rawProfile.address), startX, infoY, 8, font, grayText); infoY -= 11; }
     const contactParts: string[] = [];
-    if (profile.phone) contactParts.push("Tél : " + String(profile.phone));
-    if (profile.email) contactParts.push(String(profile.email));
+    if (rawProfile.phone) contactParts.push("Tél : " + String(rawProfile.phone));
+    if (rawProfile.email) contactParts.push(String(rawProfile.email));
     if (contactParts.length) { drawText(contactParts.join("  •  "), startX, infoY, 8, font, grayText); infoY -= 11; }
-    if (profile.siret) { drawText("SIRET : " + String(profile.siret), startX, infoY, 8, font, grayText); infoY -= 11; }
-    if (profile.tva_intracom) { drawText("TVA Intracom. : " + String(profile.tva_intracom), startX, infoY, 8, font, grayText); infoY -= 11; }
+    if (rawProfile.siret) { drawText("SIRET : " + String(rawProfile.siret), startX, infoY, 8, font, grayText); infoY -= 11; }
+    if (mentions.capital_rcs_mention) { drawText(mentions.capital_rcs_mention, startX, infoY, 7.5, font, grayText); infoY -= 11; }
+    if (rawProfile.tva_intracom) { drawText("TVA Intracom. : " + String(rawProfile.tva_intracom), startX, infoY, 8, font, grayText); infoY -= 11; }
     return infoY;
   };
 
   const bottomInfo = drawArtisanInfo(artisanX);
   y = Math.min(logoImage ? y - 54 : bottomInfo, bottomInfo) - 4;
 
-  // === CLIENT BOX ===
   const clientName = [invoice.client_first_name, invoice.client_last_name].filter(Boolean).join(" ") ||
     (invoice.client_company as string) || "Client";
   const boxW = 210;
   const boxX = pageWidth - margin - boxW;
   const boxTopY = headerStartY;
 
-  page.drawRectangle({ x: boxX - 8, y: boxTopY - 82, width: boxW + 8, height: 90, color: lightBg });
-  page.drawRectangle({ x: boxX - 8, y: boxTopY - 82, width: 3, height: 90, color: accent });
+  page.drawRectangle({ x: boxX - 8, y: boxTopY - 92, width: boxW + 8, height: 100, color: lightBg });
+  page.drawRectangle({ x: boxX - 8, y: boxTopY - 92, width: 3, height: 100, color: accent });
 
   drawText("CLIENT", boxX + 4, boxTopY - 6, 7, fontBold, grayText);
   if (invoice.client_company) {
@@ -171,23 +189,35 @@ async function buildInvoicePdf(
   if (invoice.client_address) { drawText(truncate(String(invoice.client_address), 38), boxX + 4, cY, 8, font, grayText); cY -= 11; }
   if (invoice.client_email) { drawText(String(invoice.client_email), boxX + 4, cY, 8, font, grayText); cY -= 11; }
   if (invoice.client_phone) { drawText(String(invoice.client_phone), boxX + 4, cY, 8, font, grayText); cY -= 11; }
+  if (invoice.customer_siren) { drawText("SIREN : " + String(invoice.customer_siren), boxX + 4, cY, 7.5, font, grayText); cY -= 11; }
 
-  // === SEPARATOR ===
+  // Worksite address
+  if (invoice.worksite_address && invoice.worksite_address !== invoice.client_address) {
+    y -= 4;
+    drawText("Lieu d'intervention : " + truncate(String(invoice.worksite_address), 70), margin, y, 8, fontOblique, grayText);
+    y -= 11;
+  }
+
   y -= 10;
   page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 1.5, color: primary });
   y -= 20;
 
-  // === INVOICE TITLE ===
-  drawText("FACTURE N° " + String(invoice.invoice_number), margin, y, 16, fontBold, primary);
+  const versionSuffix = (invoice.version_number as number) > 1 ? ` — V${invoice.version_number}` : "";
+  const title = invoiceTitle((invoice.invoice_type as string) || "standalone");
+  drawText(title + " N° " + String(invoice.invoice_number) + versionSuffix, margin, y, 16, fontBold, primary);
   y -= 20;
 
   drawText("Date d'émission : " + formatDate(invoice.issue_date as string), margin, y, 9, font, grayText);
   if (invoice.service_date) {
     drawText("Date d'intervention : " + formatDate(invoice.service_date as string), margin + 220, y, 9, font, grayText);
   }
-  y -= 18;
+  y -= 13;
+  if (invoice.due_date) {
+    drawText("Échéance : " + formatDate(invoice.due_date as string), margin, y, 9, font, grayText);
+    y -= 13;
+  }
 
-  // === ITEMS TABLE ===
+  y -= 6;
   const colWidths = [contentWidth * 0.36, contentWidth * 0.08, contentWidth * 0.08, contentWidth * 0.14, contentWidth * 0.12, contentWidth * 0.22];
   const colX = [margin];
   for (let i = 1; i < 6; i++) colX.push(colX[i - 1] + colWidths[i - 1]);
@@ -204,11 +234,13 @@ async function buildInvoicePdf(
   let totalHt = 0;
   const tvaByRate: Record<number, number> = {};
   let rowIdx = 0;
+  const isCreditNote = invoice.invoice_type === "credit_note";
+  const sign = isCreditNote ? -1 : 1;
 
   for (const item of lines) {
-    const lt = calcLineTotal(item);
+    const lt = calcLineTotal(item) * sign;
     totalHt += lt;
-    if ((invoice.vat_mode as string) === "normal") {
+    if (!mentions.vat_293b_mention) {
       const tvaAmount = lt * item.tva_rate / 100;
       tvaByRate[item.tva_rate] = (tvaByRate[item.tva_rate] || 0) + tvaAmount;
     }
@@ -228,13 +260,12 @@ async function buildInvoicePdf(
 
     const qtyStr = String(item.qty);
     drawText(qtyStr, colX[1] + colWidths[1] - font.widthOfTextAtSize(qtyStr, 8.5) - 4, y - 6, 8.5, font, darkText);
-
     drawText(item.unit, colX[2] + 4, y - 6, 8.5, font, grayText);
 
     const puStr = fmt(item.unit_price);
     drawText(puStr, colX[3] + colWidths[3] - font.widthOfTextAtSize(puStr, 8.5) - 4, y - 6, 8.5, font, darkText);
 
-    const tvaStr = item.tva_rate + " %";
+    const tvaStr = mentions.vat_293b_mention ? "—" : item.tva_rate + " %";
     drawText(tvaStr, colX[4] + colWidths[4] - font.widthOfTextAtSize(tvaStr, 8.5) - 4, y - 6, 8.5, font, grayText);
 
     const totalStr = fmt(lt);
@@ -246,16 +277,16 @@ async function buildInvoicePdf(
 
   page.drawLine({ start: { x: margin, y: y + 2 }, end: { x: margin + contentWidth, y: y + 2 }, thickness: 1, color: primary });
 
-  // === TOTALS ===
   y -= 14;
-  addNewPageIfNeeded(100);
+  addNewPageIfNeeded(120);
   const totalsW = 220;
   const totalsX = pageWidth - margin - totalsW;
 
   const totalTva = Object.values(tvaByRate).reduce((a, b) => a + b, 0);
   const totalTtc = totalHt + totalTva;
 
-  page.drawRectangle({ x: totalsX - 8, y: y - 22 * (2 + Object.keys(tvaByRate).length + 1) + 8, width: totalsW + 8, height: 22 * (2 + Object.keys(tvaByRate).length + 1) + 4, color: lightBg });
+  const totalRows = 2 + Object.keys(tvaByRate).length + 1;
+  page.drawRectangle({ x: totalsX - 8, y: y - 22 * totalRows + 8, width: totalsW + 8, height: 22 * totalRows + 4, color: lightBg });
 
   const drawTotalRow = (label: string, value: string, bold = false, highlight = false) => {
     const f = bold ? fontBold : font;
@@ -273,24 +304,24 @@ async function buildInvoicePdf(
 
   drawTotalRow("Total HT", fmt(totalHt));
 
-  if ((invoice.vat_mode as string) === "normal") {
+  if (!mentions.vat_293b_mention) {
     const rates = Object.keys(tvaByRate).map(Number).sort();
     for (const rate of rates) {
       drawTotalRow(`TVA ${rate} %`, fmt(tvaByRate[rate]));
     }
   }
 
-  drawTotalRow("TOTAL TTC", fmt(totalTtc), true, true);
+  drawTotalRow(isCreditNote ? "MONTANT À REMBOURSER" : "TOTAL TTC", fmt(totalTtc), true, true);
 
-  if ((invoice.vat_mode as string) === "no_vat_293b") {
+  if (mentions.vat_293b_mention) {
     y -= 4;
-    drawText("TVA non applicable, art. 293 B du CGI", totalsX, y, 8, fontOblique, grayText);
+    drawText(mentions.vat_293b_mention, totalsX, y, 8, fontOblique, grayText);
     y -= 14;
   }
 
-  // === PAYMENT TERMS & LEGAL MENTIONS ===
+  // === LEGAL MENTIONS AUTO ===
   y -= 16;
-  addNewPageIfNeeded(120);
+  addNewPageIfNeeded(140);
   page.drawLine({ start: { x: margin, y: y + 4 }, end: { x: pageWidth - margin, y: y + 4 }, thickness: 0.5, color: lineColor });
   y -= 6;
 
@@ -298,32 +329,27 @@ async function buildInvoicePdf(
   y -= 14;
 
   const legalLines: string[] = [];
+  if (invoice.payment_terms) legalLines.push("Conditions de paiement : " + String(invoice.payment_terms));
+  else legalLines.push("Conditions de paiement : paiement à réception de facture.");
 
-  if (invoice.payment_terms) {
-    legalLines.push("Conditions de paiement : " + String(invoice.payment_terms));
-  } else {
-    legalLines.push("Conditions de paiement : paiement à réception de facture.");
+  if (invoice.due_date) {
+    legalLines.push("Date limite de paiement : " + formatDate(invoice.due_date as string));
   }
 
-  // Due date (30 days from issue)
-  if (invoice.issue_date) {
-    try {
-      const issueDate = new Date(invoice.issue_date as string);
-      const dueDate = new Date(issueDate);
-      dueDate.setDate(dueDate.getDate() + 30);
-      legalLines.push("Date limite de paiement : " + dueDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }));
-    } catch { /* ignore */ }
+  if (mentions.decennial_block) {
+    legalLines.push(
+      `Assurance décennale : ${mentions.decennial_block.insurer} — Police n° ${mentions.decennial_block.policy} — Couverture : ${mentions.decennial_block.coverage}.`,
+    );
+    legalLines.push(mentions.decennial_block.legal_text);
   }
-
-  legalLines.push("Pas d'escompte pour paiement anticipé.");
-
-  if ((invoice.client_type as string) === "business") {
-    if (invoice.late_fees_text) {
-      legalLines.push("Pénalités de retard : " + String(invoice.late_fees_text));
-    } else {
-      legalLines.push("Pénalités de retard : en cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée (art. L.441-10 du Code de commerce).");
-    }
-    legalLines.push("Indemnité forfaitaire pour frais de recouvrement : 40 € (art. D.441-5 du Code de commerce).");
+  if (mentions.late_penalty_text) legalLines.push(mentions.late_penalty_text);
+  if (mentions.recovery_fee_text) legalLines.push(mentions.recovery_fee_text);
+  if (mentions.waste_mention) legalLines.push(mentions.waste_mention);
+  if (mentions.iban_block) {
+    legalLines.push(`Règlement par virement : IBAN ${mentions.iban_block.iban}${mentions.iban_block.bic ? ` — BIC ${mentions.iban_block.bic}` : ""}.`);
+  }
+  if (invoice.invoice_type === "credit_note") {
+    legalLines.push("Avoir émis en remboursement de la facture initiale. Aucune TVA n'est due au titre de cet avoir si la facture initiale a été régularisée.");
   }
 
   for (const m of legalLines) {
@@ -336,7 +362,6 @@ async function buildInvoicePdf(
     y -= 3;
   }
 
-  // === NOTES ===
   if (invoice.notes) {
     y -= 8;
     addNewPageIfNeeded(50);
@@ -353,11 +378,10 @@ async function buildInvoicePdf(
     }
   }
 
-  // === FOOTER (all pages) ===
-  const footerParts = [artisanName];
-  if (profile.siret) footerParts.push("SIRET " + String(profile.siret));
-  if (profile.phone) footerParts.push("Tél " + String(profile.phone));
-  if (profile.email) footerParts.push(String(profile.email));
+  const footerParts = [artisanDisplayName];
+  if (rawProfile.siret) footerParts.push("SIRET " + String(rawProfile.siret));
+  if (rawProfile.phone) footerParts.push("Tél " + String(rawProfile.phone));
+  if (rawProfile.email) footerParts.push(String(rawProfile.email));
   const footerText = footerParts.join("  —  ");
   const footerWidth = font.widthOfTextAtSize(footerText, 7);
 
@@ -397,20 +421,59 @@ Deno.serve(async (req: Request) => {
     const { invoice_id } = await req.json();
     if (!invoice_id) throw new Error("Missing invoice_id");
 
-    // Fetch invoice, lines, profile in parallel
     const { data: invoice, error: invErr } = await supabase
       .from("invoices").select("*").eq("id", invoice_id).eq("user_id", user.id).single();
     if (invErr || !invoice) throw new Error("Facture introuvable");
 
-    const [{ data: linesData }, { data: profile }] = await Promise.all([
+    const [{ data: linesData }, complianceCtx] = await Promise.all([
       supabase.from("invoice_lines").select("*").eq("invoice_id", invoice_id).order("sort_order"),
-      supabase.from("profiles").select("*").eq("user_id", user.id).single(),
+      loadComplianceContext(supabase, user.id),
     ]);
 
-    const lines = (linesData || []) as InvoiceLine[];
-    const pdfBytes = await buildInvoicePdf(profile || {}, invoice, lines);
+    const { profile, insurance, settings, rawProfile } = complianceCtx;
 
-    const filePath = `${invoice.dossier_id}/facture_${(invoice.invoice_number as string).replace(/[^a-zA-Z0-9-]/g, "_")}.pdf`;
+    // === BACKEND VALIDATION (BLOCKING) ===
+    if (settings?.block_generation_if_incomplete !== false) {
+      const blockers = getMissingMandatoryFields(profile, insurance);
+      if (!profile?.onboarding_compliance_completed_at) {
+        blockers.unshift({ code: "onboarding_incomplete", message: "Onboarding conformité non terminé", section: "onboarding" });
+      }
+      if (invoice.client_type === "business" && !invoice.customer_siren) {
+        blockers.push({ code: "customer_siren_b2b", message: "SIREN du client professionnel obligatoire", section: "customer" });
+      }
+      if (blockers.length > 0) {
+        return new Response(JSON.stringify({
+          error: "Document non conforme : informations obligatoires manquantes",
+          blockers,
+        }), { status: 422, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      }
+    }
+
+    const customer: CustomerInfo = {
+      type: (invoice.client_type as "individual" | "business") || "individual",
+      first_name: invoice.client_first_name,
+      last_name: invoice.client_last_name,
+      company: invoice.client_company,
+      email: invoice.client_email,
+      siren: invoice.customer_siren,
+      address: invoice.client_address,
+    };
+
+    const mentions = profile
+      ? buildLegalMentions(profile, insurance, settings, customer)
+      : {
+          ei_mention: null, vat_293b_mention: null, decennial_block: null,
+          late_penalty_text: null, recovery_fee_text: null, waste_mention: null,
+          capital_rcs_mention: null, iban_block: null,
+        };
+
+    const artisanDisplayName = profile ? getDisplayName(profile) : "Artisan";
+    const lines = (linesData || []) as InvoiceLine[];
+    const pdfBytes = await buildInvoicePdf(rawProfile || {}, invoice, lines, mentions, artisanDisplayName);
+
+    const docTypePrefix = invoice.invoice_type === "credit_note" ? "avoir" :
+                          invoice.invoice_type === "deposit" ? "acompte" : "facture";
+    const filePath = `${invoice.dossier_id}/${docTypePrefix}_${(invoice.invoice_number as string).replace(/[^a-zA-Z0-9-]/g, "_")}_v${invoice.version_number || 1}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("dossier-medias")
@@ -419,13 +482,24 @@ Deno.serve(async (req: Request) => {
 
     const { data: urlData } = supabase.storage.from("dossier-medias").getPublicUrl(filePath);
 
-    await supabase.from("invoices").update({ pdf_url: urlData.publicUrl }).eq("id", invoice_id);
+    await supabase.from("invoices").update({
+      pdf_url: urlData.publicUrl,
+      legal_mentions_snapshot: mentions,
+      compliance_snapshot: {
+        generated_at: new Date().toISOString(),
+        artisan: artisanDisplayName,
+        siret: rawProfile?.siret ?? null,
+        legal_form: profile?.legal_form ?? null,
+        vat_applicable: profile?.vat_applicable ?? null,
+        invoice_type: invoice.invoice_type,
+      },
+    }).eq("id", invoice_id);
 
     await supabase.from("historique").insert({
       dossier_id: invoice.dossier_id,
       user_id: user.id,
       action: "invoice_pdf_generated",
-      details: `PDF généré pour facture ${invoice.invoice_number}`,
+      details: `PDF généré pour ${docTypePrefix} ${invoice.invoice_number}`,
     });
 
     return new Response(JSON.stringify({ success: true, pdf_url: urlData.publicUrl }), {
