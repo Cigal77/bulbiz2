@@ -32,6 +32,9 @@ import { validateQuoteForGeneration } from "@/lib/compliance-engine";
 import type { QuoteItem } from "@/lib/quote-types";
 import { calcTotals } from "@/lib/quote-types";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { InterventionDetectedBadge } from "@/components/quote-editor/InterventionDetectedBadge";
+import { SaveAsKitDialog } from "@/components/quote-editor/SaveAsKitDialog";
+import type { PackLine } from "@/hooks/useInterventionTypes";
 
 export default function QuoteEditor() {
   const { dossierId } = useParams<{ dossierId: string }>();
@@ -69,6 +72,27 @@ export default function QuoteEditor() {
   const [blockerOpen, setBlockerOpen] = useState(false);
   const [blockerAction, setBlockerAction] = useState("générer ce devis");
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [saveKitOpen, setSaveKitOpen] = useState(false);
+
+  const dossierContextText = [dossier?.description, ...(dossier?.problem_types ?? [])]
+    .filter(Boolean)
+    .join(" ");
+
+  const handleAddPackLines = useCallback((lines: PackLine[]) => {
+    const newItems = lines.map((l) => ({
+      id: crypto.randomUUID(),
+      label: l.label,
+      description: l.description ?? "",
+      qty: l.qty,
+      unit: l.unit,
+      unit_price: l.unit_price ?? 0,
+      vat_rate: l.vat_rate ?? 10,
+      discount: 0,
+      type: "standard" as const,
+    }));
+    setItems((prev) => [...prev, ...newItems]);
+    toast({ title: `✓ ${lines.length} ligne${lines.length > 1 ? "s" : ""} ajoutée${lines.length > 1 ? "s" : ""}` });
+  }, [toast]);
 
   // Apply voice actions to quote items
   const applyVoiceActions = useCallback(
@@ -466,6 +490,12 @@ export default function QuoteEditor() {
               mediaCount={medias.length}
             />
 
+            {/* 0c. Intervention détectée */}
+            <InterventionDetectedBadge
+              contextText={dossierContextText}
+              onLoadPack={handleAddPackLines}
+            />
+
             {/* 1. Infos client */}
             <QuoteClientBlock value={client} onChange={handleClientChange} />
 
@@ -499,6 +529,7 @@ export default function QuoteEditor() {
               validityDays={validityDays}
               onNotesChange={setNotes}
               onValidityChange={setValidityDays}
+              onSaveAsKit={() => setSaveKitOpen(true)}
             />
 
             {/* 6. Checklist conformité */}
@@ -573,6 +604,13 @@ export default function QuoteEditor() {
         quoteId={currentQuoteId}
         items={items}
         onApplyActions={applyVoiceActions}
+      />
+
+      <SaveAsKitDialog
+        open={saveKitOpen}
+        onOpenChange={setSaveKitOpen}
+        items={items}
+        defaultCategory={dossier?.category}
       />
     </div>
   );
