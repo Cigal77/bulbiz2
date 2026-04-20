@@ -33,6 +33,7 @@ export default function QuoteEditor() {
   const { dossierId } = useParams<{ dossierId: string }>();
   const [searchParams] = useSearchParams();
   const quoteId = searchParams.get("quote");
+  const aiAuto = searchParams.get("ai") === "auto";
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -342,8 +343,12 @@ export default function QuoteEditor() {
             onAddItem={addItemFromAssistant}
             onAddItems={addItemsFromAssistant}
             onSetLabourContext={handleSetLabourContext}
+            dossierId={dossierId!}
+            quoteId={currentQuoteId}
             dossierCategory={dossier.category}
             dossierDescription={dossier.description ?? undefined}
+            defaultTab={aiAuto ? "ai" : "ai"}
+            autoGenerateAi={aiAuto}
           />
         )}
 
@@ -433,8 +438,12 @@ export default function QuoteEditor() {
           onAddItem={addItemFromAssistant}
           onAddItems={addItemsFromAssistant}
           onSetLabourContext={handleSetLabourContext}
+          dossierId={dossierId!}
+          quoteId={currentQuoteId}
           dossierCategory={dossier.category}
           dossierDescription={dossier.description ?? undefined}
+          defaultTab="ai"
+          autoGenerateAi={aiAuto}
         />
       )}
 
