@@ -287,50 +287,173 @@ export type Database = {
         }
         Relationships: []
       }
+      catalog_import_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_count: number
+          dedup_strategy: string
+          error_count: number
+          errors: Json | null
+          filename: string
+          id: string
+          mapping: Json | null
+          skipped_count: number
+          status: string
+          total_rows: number
+          updated_count: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_count?: number
+          dedup_strategy?: string
+          error_count?: number
+          errors?: Json | null
+          filename: string
+          id?: string
+          mapping?: Json | null
+          skipped_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_count?: number
+          dedup_strategy?: string
+          error_count?: number
+          errors?: Json | null
+          filename?: string
+          id?: string
+          mapping?: Json | null
+          skipped_count?: number
+          status?: string
+          total_rows?: number
+          updated_count?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       catalog_material: {
         Row: {
+          brand: string | null
           category_path: string
           created_at: string
           default_qty: number | null
           id: string
+          import_batch_id: string | null
+          internal_code: string | null
+          is_favorite: boolean
           label: string
+          last_used_at: string | null
+          last_used_price: number | null
+          notes: string | null
           slug: string | null
+          subcategory: string | null
+          supplier: string | null
+          supplier_ref: string | null
           synonyms: string[] | null
           tags: string[] | null
           type: string
           unit: string | null
           unit_price: number | null
+          usage_count: number
           user_id: string | null
           vat_rate: number | null
         }
         Insert: {
+          brand?: string | null
           category_path: string
           created_at?: string
           default_qty?: number | null
           id?: string
+          import_batch_id?: string | null
+          internal_code?: string | null
+          is_favorite?: boolean
           label: string
+          last_used_at?: string | null
+          last_used_price?: number | null
+          notes?: string | null
           slug?: string | null
+          subcategory?: string | null
+          supplier?: string | null
+          supplier_ref?: string | null
           synonyms?: string[] | null
           tags?: string[] | null
           type?: string
           unit?: string | null
           unit_price?: number | null
+          usage_count?: number
           user_id?: string | null
           vat_rate?: number | null
         }
         Update: {
+          brand?: string | null
           category_path?: string
           created_at?: string
           default_qty?: number | null
           id?: string
+          import_batch_id?: string | null
+          internal_code?: string | null
+          is_favorite?: boolean
           label?: string
+          last_used_at?: string | null
+          last_used_price?: number | null
+          notes?: string | null
           slug?: string | null
+          subcategory?: string | null
+          supplier?: string | null
+          supplier_ref?: string | null
           synonyms?: string[] | null
           tags?: string[] | null
           type?: string
           unit?: string | null
           unit_price?: number | null
+          usage_count?: number
           user_id?: string | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
+      catalog_usage_log: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          material_id: string | null
+          qty: number | null
+          quote_id: string | null
+          unit: string | null
+          unit_price: number | null
+          user_id: string
+          vat_rate: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          material_id?: string | null
+          qty?: number | null
+          quote_id?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          user_id: string
+          vat_rate?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          material_id?: string | null
+          qty?: number | null
+          quote_id?: string | null
+          unit?: string | null
+          unit_price?: number | null
+          user_id?: string
           vat_rate?: number | null
         }
         Relationships: []
