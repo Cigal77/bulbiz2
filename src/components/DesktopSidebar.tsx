@@ -1,8 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { ClipboardList, FolderOpen, Plus, Calendar, Settings, LogOut, Library } from "lucide-react";
+import { ClipboardList, FolderOpen, Plus, Calendar, Settings, LogOut, Library, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useDossiers } from "@/hooks/useDossiers";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { useMemo } from "react";
 import { isToday, parseISO } from "date-fns";
 import { BulbizLogo } from "@/components/BulbizLogo";
@@ -48,6 +49,15 @@ export function DesktopSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const badges = useDesktopBadges();
+  const isAdmin = useIsAdmin();
+
+  const navItems = useMemo(() => {
+    const base = [...NAV_ITEMS];
+    if (isAdmin) {
+      base.push({ id: "admin-catalog", icon: Database, label: "Catalogue", path: "/admin/catalogue/sources" });
+    }
+    return base;
+  }, [isAdmin]);
 
   const badgeMap: Record<string, number> = {
     todo: badges.todo,
@@ -73,7 +83,7 @@ export function DesktopSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-2 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive = item.path === "/"
             ? location.pathname === "/"
             : location.pathname.startsWith(item.path);

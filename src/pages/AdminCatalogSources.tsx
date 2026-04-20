@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useDataSources, useIngestionJobs, useUpsertDataSource, useDeleteDataSource, type DataSource } from "@/hooks/useDataSources";
+import { useIngestSource } from "@/hooks/useIngestSource";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Database, Trash2, Edit, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, Database, Trash2, Edit, Loader2, CheckCircle2, AlertCircle, Play } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -35,6 +36,7 @@ export default function AdminCatalogSources() {
   const { data: jobs = [] } = useIngestionJobs();
   const upsert = useUpsertDataSource();
   const del = useDeleteDataSource();
+  const ingest = useIngestSource();
 
   useEffect(() => {
     if (!user) return;
@@ -91,6 +93,19 @@ export default function AdminCatalogSources() {
                     )}
                   </div>
                   <div className="flex gap-1">
+                    {(s.source_type === "csv" || s.source_type === "website" || s.source_type === "firecrawl") && s.base_url && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Lancer l'ingestion"
+                        disabled={ingest.isPending}
+                        onClick={() => ingest.mutate(s.id)}
+                      >
+                        {ingest.isPending && ingest.variables === s.id
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : <Play className="h-3.5 w-3.5 text-primary" />}
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" onClick={() => openEdit(s)}><Edit className="h-3.5 w-3.5" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Supprimer "${s.name}" ?`)) del.mutate(s.id); }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                   </div>
