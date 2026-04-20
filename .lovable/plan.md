@@ -1,115 +1,60 @@
 
 
-Le user demande PATCH 6 — un système ambitieux de catalogue intelligent par intervention. Une grande partie de l'infrastructure existe déjà :
+## Plan — Fix IA dans toute l'app
 
-**Déjà en place :**
-- `catalog_material` avec usage_count, last_used_*, favoris, tags, synonyms, slug, category_path
-- `catalog_usage_log` + trigger automatique `log_quote_line_usage`
-- `problem_taxonomy` + `problem_to_manoeuvre` (arbre intervention → gestes)
-- `material_correspondence` (associations entre matériels)
-- `bundle_templates` + `bundle_template_items` (packs)
-- `ProblemTreePanel`, `BundleSuggestionPanel`, `MaterialPickerPanel`, `RecommendationTabs`
-- `useProblemTaxonomy`, `useMaterialSuggestions`, `useBundles`, `useMaterialCatalog`, `useMaterialCorrespondence`
-- AssistantSidebar avec onglets IA / Packs / Gestes / Matériel
+### Diagnostic
 
-**Manquant pour PATCH 6 :**
-1. Données : taxonomy + manoeuvres + correspondences + bundles couvrant les 20+ interventions clés (la base existante est minimale)
-2. Apprentissage utilisateur : table `user_intervention_pattern` (déduite via vues SQL)
-3. UX unifiée "Suggestions intelligentes" qui combine indispensables / souvent ajoutés / habitudes / consommables / main-d'œuvre+déplacement, reranké par historique perso
-4. Possibilité de masquer une suggestion (`user_suggestion_preference`)
-5. Création de kits perso depuis une sélection (sauvegarder en `bundle_templates user_id=auth.uid()`)
-6. Détection auto de l'intervention depuis la catégorie/description du dossier
+J'ai testé toutes les fonctions IA backend et **elles fonctionnent toutes** (200 OK) :
+- `summarize-dossier` ✅ (résumé dossier)
+- `generate-ai-quote-draft` ✅ (pré-devis IA)
+- `generate-labour-summary` ✅ (résumé main-d'œuvre)
 
-Vu le volume, je propose un découpage en 3 lots livrables.
+Le problème n'est donc **pas** côté serveur ni côté clé API.
 
-Plan concis ci-dessous.
+### Bugs identifiés côté client
 
-## Plan — Devis intelligent par intervention (PATCH 6)
+**Bug 1 (critique) — `src/components/quote-editor/AiQuoteDraftPanel.tsx` ligne 35-38**
+Side effect `generate()` + `setHasAutoTriggered()` appelés **pendant le render** (pas dans un `useEffect`). React peut entrer en boucle ou planter silencieusement → **le pré-devis IA ne s'affiche jamais** quand on arrive via `?ai=auto`.
 
-### Lot 1 — Données métier (le cœur du moteur)
+**Bug 2 — Warnings refs `MaterialCard` & `SuggestionsPanel`**
+Ces composants reçoivent un `ref` (probablement via `TabsContent` ou `Card`) sans utiliser `forwardRef`. Pas critique mais pollue la console.
 
-**Seed massif** dans les tables existantes (via outil insert) :
+**Bug 3 (probable) — Cache navigateur**
+Les `error_logs` montrent encore des erreurs anciennes (`NewQuoteRedirect`, `handleSkip`) déjà corrigées dans le code. Un hard refresh du navigateur peut être nécessaire.
 
-a. `problem_taxonomy` : créer ~25 interventions canoniques avec keywords riches FR
-- Plomberie : remplacement WC, fuite WC, mécanisme chasse, robinet d'arrêt, mitigeur lavabo/évier/douche, siphon, débouchage évier, débouchage WC, recherche fuite, remplacement flexible, vanne 1/4 tour, manchette WC
-- Chauffage : remplacement chauffe-eau, panne chauffe-eau, groupe sécurité, vidange CE, fuite radiateur, purge radiateur, robinet thermostatique, circulateur
-- Sanitaire : remplacement lavabo, vasque, receveur douche, paroi
-- Forfaits : urgence, déplacement, diagnostic
+### Corrections
 
-b. `problem_to_manoeuvre` : pour chaque intervention, ~6-10 lignes (article principal, raccords, consommables, main-d'œuvre, déplacement, dépose/repose) avec `weight` (100=indispensable, 60=fréquent, <60=optionnel) et `type` correctement typé
+1. **`AiQuoteDraftPanel.tsx`** : remplacer le side effect inline par un `useEffect`
+   ```tsx
+   useEffect(() => {
+     if (autoGenerate && !hasAutoTriggered && !draft && !isGenerating) {
+       setHasAutoTriggered(true);
+       generate(dossierId, quoteId);
+     }
+   }, [autoGenerate, hasAutoTriggered, draft, isGenerating, dossierId, quoteId, generate]);
+   ```
 
-c. `material_correspondence` : associer entre eux les ~90 articles déjà seedés (ex : mitigeur évier → flexibles + raccords + joints + téflon + main-d'œuvre)
+2. **`MaterialCard.tsx`** + **`SuggestionsPanel.tsx`** : envelopper d'un `React.forwardRef` pour absorber le ref de leur parent.
 
-d. `bundle_templates` globaux : packs "Remplacement WC complet", "Remplacement mitigeur évier", "Vidange chauffe-eau", "Débouchage canalisation" avec items requis + optionnels
+3. **Améliorer la robustesse de `summarize-dossier`** :
+   - Renvoyer un message d'erreur explicite au lieu de "Unknown error" (utiliser `e.message ?? String(e)`)
+   - Ne pas faire échouer toute la fonction si le dossier est introuvable → renvoyer 404 propre
 
-### Lot 2 — Moteur de suggestions unifié
+4. **Améliorer le feedback UX** dans `useAiQuoteDraft.tsx` et `SummaryBlock.tsx` :
+   - Ajouter un `console.error` détaillé sur les erreurs pour faciliter debug futur
+   - Afficher un toast quand l'IA échoue (au lieu de silencieusement retomber sur le fallback)
 
-**Nouvelle vue/hook `useSmartSuggestions(dossierId, currentItems[])`** qui combine :
-- Détection intervention auto : match `dossier.category` + `description` vs `problem_taxonomy.keywords`
-- Charge le pack lié (manoeuvres + correspondences + bundle items)
-- Fusionne avec `catalog_usage_log` agrégé par user (lignes fréquentes après cette intervention)
-- Reranke : favori user > usage_count user > weight global
-- Filtre les items déjà dans le devis et ceux masqués par l'user
+### Fichiers modifiés
+- `src/components/quote-editor/AiQuoteDraftPanel.tsx` (fix critique)
+- `src/components/material-library/MaterialCard.tsx` (forwardRef)
+- `src/components/material-library/SuggestionsPanel.tsx` (forwardRef)
+- `supabase/functions/summarize-dossier/index.ts` (meilleurs messages d'erreur)
+- `src/components/dossier/SummaryBlock.tsx` (toast sur erreur réelle)
+- `src/hooks/useAiQuoteDraft.tsx` (log + toast amélioré)
 
-**Nouvelle table `user_suggestion_preference`** :
-- `user_id`, `item_signature` (label normalisé ou material_id), `intervention_id` nullable, `is_hidden` bool
-- Permet "ne plus me proposer ça"
+### Hors scope
+- Refonte du module IA (la logique reste identique)
+- Migration vers un autre modèle (gemini-3-flash-preview reste OK)
 
-**Nouveau composant `SmartSuggestionsPanel.tsx`** dans l'AssistantSidebar (remplace ou complète les onglets actuels Packs/Gestes/Matériel par une vue unifiée plus claire) :
-- Sections collapsibles : 🔧 Indispensables • ✨ Souvent ajoutés • 💡 Tes habitudes • 🛠️ Consommables • 👷 Main-d'œuvre & déplacement • ⚙️ Options
-- Chaque carte : libellé + prix + qty + boutons [+ Ajouter] [👁️‍🗨️ Masquer] [⭐ Favori]
-- Bouton "Tout ajouter (indispensables)" en haut
-
-### Lot 3 — Kits personnels & arbre d'intervention
-
-a. **Bouton "Sauvegarder cette sélection comme pack"** dans `QuoteSections.tsx` → ouvre dialog → insère dans `bundle_templates` (user_id) + items courants en `bundle_template_items`
-
-b. **Composant `InterventionTreeView.tsx`** (nouvelle vue dans AssistantSidebar) : arbre visuel
-```
-🚽 Remplacement WC
-├─ Éléments principaux (WC, mécanisme, abattant)
-├─ Raccords / évacuation (pipe, manchon)
-├─ Alimentation (robinet d'arrêt, flexible)
-├─ Consommables (joints, silicone)
-├─ Pose / dépose
-└─ Déplacement
-```
-Chaque branche permet "+ tout ajouter" ou pick individuel.
-
-c. **Détection intervention dans le dossier** : afficher en haut du devis un badge "Intervention détectée : Remplacement WC" cliquable pour pré-charger le pack.
-
-### Fichiers
-
-**Migrations (schéma) :**
-- `user_suggestion_preference` (nouvelle table + RLS)
-
-**Insert (données) :**
-- Seed `problem_taxonomy` (~25 interventions)
-- Seed `problem_to_manoeuvre` (~200 lignes)
-- Seed `material_correspondence` (~150 associations)
-- Seed `bundle_templates` + items (~10 packs globaux)
-
-**Créés :**
-- `src/hooks/useSmartSuggestions.tsx`
-- `src/hooks/useInterventionDetection.tsx`
-- `src/hooks/useSuggestionPreferences.tsx`
-- `src/components/quote-editor/SmartSuggestionsPanel.tsx`
-- `src/components/quote-editor/InterventionTreeView.tsx`
-- `src/components/quote-editor/SaveAsKitDialog.tsx`
-- `src/components/quote-editor/InterventionDetectedBadge.tsx`
-
-**Modifiés :**
-- `src/components/quote-editor/AssistantSidebar.tsx` — onglet "Suggestions" prioritaire qui regroupe l'expérience
-- `src/components/quote-editor/RecommendationTabs.tsx` — ajout boutons masquer/favori
-- `src/pages/QuoteEditor.tsx` — affichage badge intervention détectée + handler save-as-kit
-
-### Hors scope v1 (à itérer)
-- `UserInterventionPattern` matérialisé : version 1 calculée à la volée via SQL agrégation (pas de table dédiée encore)
-- IA générative pour créer dynamiquement des packs depuis la description dossier (le pré-devis IA existant fait déjà cela)
-- Compatibilités produits cross-marque (Geberit ↔ Grohe)
-- Multi-métiers hors plomberie/chauffage/sanitaire (extension prévue mais non seedée)
-- Questions de qualification interactives (prévues structure, UI v1.1)
-
-### Stratégie de livraison
-Je propose de livrer **Lot 1 (données) + Lot 2 (moteur unifié)** dans cette première itération — c'est le cœur de valeur. Le Lot 3 (kits perso + arbre visuel) suivra dans une 2e itération si tu valides.
+Après ces fixes, je te demanderai de **vider le cache navigateur** (Cmd+Shift+R) pour purger l'ancien bundle qui causait les `NewQuoteRedirect` errors.
 
