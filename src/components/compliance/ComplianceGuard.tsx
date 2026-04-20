@@ -12,10 +12,12 @@ interface ComplianceGuardProps {
 
 /**
  * Garde de redirection vers l'onboarding conformité.
- * Comptes existants (au moins 1 devis/facture) : pas de redirection brutale.
+ * Tolérant : ne redirige QUE si le profil n'a strictement aucun signal
+ * de configuration préalable (pas de SIRET, pas de raison sociale,
+ * pas d'onboarding daté, et aucun document déjà créé).
  */
 export function ComplianceGuard({ children }: ComplianceGuardProps) {
-  const { profile, isLoading } = useComplianceProfile();
+  const { rawProfile, isLoading } = useComplianceProfile();
   const { user } = useAuth();
   const location = useLocation();
 
@@ -32,11 +34,18 @@ export function ComplianceGuard({ children }: ComplianceGuardProps) {
     staleTime: 60_000,
   });
 
-  if (isLoading || existingDocsQuery.isLoading) return <PageLoader />;
+  // On attend les données pour éviter une redirection prématurée
+  if (isLoading || existingDocsQuery.isLoading || !user) return <PageLoader />;
 
+  const p = rawProfile as any;
   const hasExistingDocs = (existingDocsQuery.data ?? 0) > 0;
+  const hasOnboardingCompleted = !!p?.onboarding_compliance_completed_at;
+  const hasMinimalSetup = !!(p?.siret || p?.siren || p?.company_name);
 
-  if (!profile?.onboarding_compliance_completed_at && !hasExistingDocs) {
+  // Compte considéré comme configuré si AU MOINS UN de ces signaux est présent
+  const isConfigured = hasOnboardingCompleted || hasExistingDocs || hasMinimalSetup;
+
+  if (!isConfigured) {
     return <Navigate to="/onboarding/conformite" state={{ from: location.pathname, reason: "compliance_required" }} replace />;
   }
 
