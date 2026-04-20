@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,12 @@ import { MaterialCard } from "@/components/material-library/MaterialCard";
 import { MaterialEditDialog } from "@/components/material-library/MaterialEditDialog";
 import { CsvImportDialog } from "@/components/material-library/CsvImportDialog";
 import { SuggestionsPanel } from "@/components/material-library/SuggestionsPanel";
+import {
+  MaterialFilters,
+  DEFAULT_FILTERS,
+  type MaterialFiltersValue,
+} from "@/components/material-library/MaterialFilters";
+import { MaterialGroupedGrid } from "@/components/material-library/MaterialGroupedGrid";
 import {
   useMaterialLibrary,
   useToggleFavorite,
@@ -27,18 +33,45 @@ const TABS: { id: MaterialTab; label: string; emoji: string }[] = [
   { id: "suggestions", label: "Suggestions IA", emoji: "✨" },
 ];
 
+const FILTERED_TABS: MaterialTab[] = ["bulbiz", "mine", "imported", "frequent"];
+const STORAGE_KEY = "bulbiz_material_filters";
+
+function loadFilters(): MaterialFiltersValue {
+  if (typeof window === "undefined") return DEFAULT_FILTERS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_FILTERS;
+    return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
 export default function MaterialLibrary() {
   const { user } = useAuth();
   const [tab, setTab] = useState<MaterialTab>("mine");
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<MaterialFiltersValue>(loadFilters);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<LibraryMaterial | null>(null);
   const [editInitial, setEditInitial] = useState<Partial<MaterialUpsertPayload> | undefined>();
   const [csvOpen, setCsvOpen] = useState(false);
 
-  const { data, isLoading } = useMaterialLibrary(tab, search);
+  const filtersActive = FILTERED_TABS.includes(tab);
+  const effectiveFilters = filtersActive ? filters : DEFAULT_FILTERS;
+
+  const { data, isLoading } = useMaterialLibrary(tab, search, effectiveFilters);
   const toggleFav = useToggleFavorite();
   const del = useDeleteMaterial();
+
+  // Persist filters
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+    } catch {
+      /* ignore */
+    }
+  }, [filters]);
 
   const openCreate = (initial?: Partial<MaterialUpsertPayload>) => {
     setEditing(null);
@@ -50,6 +83,13 @@ export default function MaterialLibrary() {
     setEditInitial(undefined);
     setEditOpen(true);
   };
+
+  const handleDelete = (m: LibraryMaterial) => {
+    if (confirm(`Supprimer "${m.label}" ?`)) del.mutate(m.id);
+  };
+
+  const showGrouped =
+    tab === "bulbiz" && !filters.categoryId && (data?.length ?? 0) > 0;
 
   return (
     <div className="container max-w-7xl mx-auto p-4 md:p-6 space-y-4">
@@ -96,28 +136,64 @@ export default function MaterialLibrary() {
         </TabsList>
 
         {TABS.map((t) => (
-          <TabsContent key={t.id} value={t.id} className="mt-4">
+          <TabsContent key={t.id} value={t.id} className="mt-4 space-y-4">
             {t.id === "suggestions" ? (
               <SuggestionsPanel search={search} onCreate={openCreate} />
-            ) : isLoading ? (
-              <p className="text-sm text-muted-foreground py-12 text-center">Chargement…</p>
-            ) : !data?.length ? (
-              <EmptyState tab={t.id} onImport={() => setCsvOpen(true)} onCreate={() => openCreate()} onSwitchToBulbiz={() => setTab("bulbiz")} />
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {data.map((m) => (
-                  <MaterialCard
-                    key={m.id}
-                    material={m}
-                    isOwner={m.user_id === user?.id}
-                    onToggleFavorite={() => toggleFav.mutate({ id: m.id, is_favorite: !m.is_favorite })}
-                    onEdit={() => openEdit(m)}
-                    onDelete={() => {
-                      if (confirm(`Supprimer "${m.label}" ?`)) del.mutate(m.id);
-                    }}
+              <>
+                {FILTERED_TABS.includes(t.id) && (
+                  <MaterialFilters
+                    value={filters}
+                    onChange={setFilters}
+                    results={data ?? []}
+                    resultCount={data?.length ?? 0}
                   />
-                ))}
-              </div>
+                )}
+
+                {isLoading ? (
+                  <p className="text-sm text-muted-foreground py-12 text-center">Chargement…</p>
+                ) : !data?.length ? (
+                  <EmptyState
+                    tab={t.id}
+                    hasFilters={
+                      FILTERED_TABS.includes(t.id) &&
+                      (!!filters.sectorId ||
+                        !!filters.categoryId ||
+                        !!filters.type ||
+                        !!filters.brand)
+                    }
+                    onClearFilters={() => setFilters(DEFAULT_FILTERS)}
+                    onImport={() => setCsvOpen(true)}
+                    onCreate={() => openCreate()}
+                    onSwitchToBulbiz={() => setTab("bulbiz")}
+                  />
+                ) : t.id === "bulbiz" && showGrouped ? (
+                  <MaterialGroupedGrid
+                    materials={data}
+                    currentUserId={user?.id}
+                    onToggleFavorite={(m) =>
+                      toggleFav.mutate({ id: m.id, is_favorite: !m.is_favorite })
+                    }
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {data.map((m) => (
+                      <MaterialCard
+                        key={m.id}
+                        material={m}
+                        isOwner={m.user_id === user?.id}
+                        onToggleFavorite={() =>
+                          toggleFav.mutate({ id: m.id, is_favorite: !m.is_favorite })
+                        }
+                        onEdit={() => openEdit(m)}
+                        onDelete={() => handleDelete(m)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </TabsContent>
         ))}
@@ -131,15 +207,33 @@ export default function MaterialLibrary() {
 
 function EmptyState({
   tab,
+  hasFilters,
+  onClearFilters,
   onImport,
   onCreate,
   onSwitchToBulbiz,
 }: {
   tab: MaterialTab;
+  hasFilters: boolean;
+  onClearFilters: () => void;
   onImport: () => void;
   onCreate: () => void;
   onSwitchToBulbiz: () => void;
 }) {
+  if (hasFilters) {
+    return (
+      <div className="text-center py-16 space-y-3 border border-dashed rounded-lg">
+        <Search className="h-10 w-10 mx-auto text-muted-foreground/40" />
+        <div>
+          <p className="font-medium">Aucun article ne correspond à ces filtres</p>
+          <p className="text-sm text-muted-foreground">Essaie d'élargir ta recherche.</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onClearFilters}>
+          Effacer les filtres
+        </Button>
+      </div>
+    );
+  }
   if (tab === "mine") {
     return (
       <div className="text-center py-16 space-y-3 border border-dashed rounded-lg">
@@ -155,10 +249,28 @@ function EmptyState({
       </div>
     );
   }
+  if (tab === "bulbiz") {
+    return (
+      <div className="text-center py-16 space-y-3 border border-dashed rounded-lg">
+        <Library className="h-12 w-12 mx-auto text-muted-foreground/40" />
+        <div>
+          <p className="font-medium">La base Bulbiz BTP se construit</p>
+          <p className="text-sm text-muted-foreground">
+            Les articles seront bientôt disponibles. En attendant, importe ton propre catalogue.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onImport}>
+          <Upload className="h-4 w-4 mr-1.5" /> Importer mon CSV
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="text-center py-16 text-muted-foreground space-y-2">
       <p className="text-sm">Aucun article ici pour le moment.</p>
-      <Button variant="outline" size="sm" onClick={onCreate}><Plus className="h-4 w-4 mr-1.5" /> Créer un article</Button>
+      <Button variant="outline" size="sm" onClick={onCreate}>
+        <Plus className="h-4 w-4 mr-1.5" /> Créer un article
+      </Button>
     </div>
   );
 }
