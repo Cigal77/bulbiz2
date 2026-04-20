@@ -13,6 +13,11 @@ import { QuoteHeaderBar } from "@/components/quote-editor/QuoteHeaderBar";
 import { QuoteSectionChecklist } from "@/components/quote-editor/QuoteSectionChecklist";
 import { AssistantSidebar } from "@/components/quote-editor/AssistantSidebar";
 import { QuoteSections } from "@/components/quote-editor/QuoteSections";
+import { QuoteClientBlock, type QuoteClientData } from "@/components/quote-editor/QuoteClientBlock";
+import { QuoteWorksiteBlock } from "@/components/quote-editor/QuoteWorksiteBlock";
+import { QuoteDocumentBlock } from "@/components/quote-editor/QuoteDocumentBlock";
+import { QuotePreviewBlock } from "@/components/quote-editor/QuotePreviewBlock";
+import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
 import { ComplianceBlockerDialog } from "@/components/compliance/ComplianceBlockerDialog";
 import { useComplianceProfile } from "@/hooks/useComplianceProfile";
@@ -43,6 +48,12 @@ export default function QuoteEditor() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [client, setClient] = useState<QuoteClientData>({
+    type: "individual", first_name: null, last_name: null, email: null, phone: null, company: null,
+  });
+  const [worksiteAddress, setWorksiteAddress] = useState<string | null>(null);
+  const [depositType, setDepositType] = useState<string | null>(null);
+  const [depositValue, setDepositValue] = useState<number | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { profile: compProfile, insurance, settings } = useComplianceProfile();
   const [blockerOpen, setBlockerOpen] = useState(false);
@@ -88,6 +99,20 @@ export default function QuoteEditor() {
       setValidityDays(profile.default_validity_days);
     }
   }, [profile, quoteId]);
+
+  // Prefill client + worksite from dossier
+  useEffect(() => {
+    if (dossier) {
+      setClient((prev) => ({
+        ...prev,
+        first_name: prev.first_name ?? dossier.client_first_name,
+        last_name: prev.last_name ?? dossier.client_last_name,
+        email: prev.email ?? dossier.client_email,
+        phone: prev.phone ?? dossier.client_phone,
+      }));
+      setWorksiteAddress((prev) => prev ?? dossier.address ?? null);
+    }
+  }, [dossier]);
 
   // Auto-save
   const saveDraft = useCallback(async () => {
@@ -266,12 +291,32 @@ export default function QuoteEditor() {
           />
         )}
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Main content — 8 blocs */}
+        <main className="flex-1 overflow-y-auto pb-24 md:pb-4">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
-            <ComplianceChecklist validation={validation} title="Conformité du devis" />
-            <QuoteSectionChecklist items={items} />
+            {/* 1. Infos client */}
+            <QuoteClientBlock value={client} onChange={setClient} />
 
+            {/* 2. Infos chantier */}
+            <QuoteWorksiteBlock
+              worksiteAddress={worksiteAddress}
+              clientAddress={dossier.address ?? undefined}
+              onChange={setWorksiteAddress}
+            />
+
+            {/* 3. Infos document */}
+            <QuoteDocumentBlock
+              quoteNumber={quoteNumber}
+              validityDays={validityDays}
+              depositType={depositType}
+              depositValue={depositValue}
+              onValidityChange={setValidityDays}
+              onDepositTypeChange={setDepositType}
+              onDepositValueChange={setDepositValue}
+            />
+
+            {/* 4. Lignes + 5. Totaux (inclus dans QuoteSections) */}
+            <QuoteSectionChecklist items={items} />
             <QuoteSections
               items={items}
               setItems={setItems}
@@ -283,9 +328,31 @@ export default function QuoteEditor() {
               onNotesChange={setNotes}
               onValidityChange={setValidityDays}
             />
+
+            {/* 6. Checklist conformité */}
+            <ComplianceChecklist validation={validation} title="Conformité du devis" />
+
+            {/* 7. Aperçu */}
+            <QuotePreviewBlock
+              items={items}
+              onPreview={handleGeneratePdf}
+              isGenerating={isGeneratingPdf}
+            />
           </div>
         </main>
       </div>
+
+      {/* Sticky mobile actions */}
+      {isMobile && (
+        <QuickActionsBar
+          isSaving={isSaving}
+          isSending={isSending}
+          isGeneratingPdf={isGeneratingPdf}
+          canSend={items.length > 0}
+          onPreview={handleGeneratePdf}
+          onSend={handleSend}
+        />
+      )}
 
       {/* Mobile assistant (floating button + drawer) */}
       {isMobile && (

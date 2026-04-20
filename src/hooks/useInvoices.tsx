@@ -44,6 +44,9 @@ export interface Invoice {
   sent_at: string | null;
   paid_at: string | null;
 
+  due_date: string | null;
+  customer_siren: string | null;
+
   created_at: string;
   updated_at: string;
 }
