@@ -545,6 +545,31 @@ export default function QuoteEditor() {
         validation={validation}
         action={blockerAction}
       />
+
+      {/* Floating mic button — voice quote */}
+      <button
+        onClick={() => setVoiceOpen(true)}
+        aria-label="Devis vocal"
+        className={cn(
+          "fixed z-40 flex items-center justify-center gap-2",
+          "h-14 rounded-full shadow-lg",
+          "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground",
+          "hover:shadow-xl active:scale-95 transition-all",
+          "ring-4 ring-primary/15",
+          isMobile ? "bottom-24 right-4 w-14" : "bottom-6 right-6 px-5",
+        )}
+      >
+        <Mic className="h-5 w-5" />
+        {!isMobile && <span className="text-sm font-medium">Devis vocal</span>}
+      </button>
+
+      <VoiceQuoteSheet
+        open={voiceOpen}
+        onOpenChange={setVoiceOpen}
+        quoteId={currentQuoteId}
+        items={items}
+        onApplyActions={applyVoiceActions}
+      />
     </div>
   );
 }
