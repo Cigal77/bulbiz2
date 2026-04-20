@@ -439,7 +439,9 @@ export default function QuoteEditor() {
             quoteId={currentQuoteId}
             dossierCategory={dossier.category}
             dossierDescription={dossier.description ?? undefined}
-            defaultTab={aiAuto ? "ai" : "ai"}
+            dossierProblemTypes={dossier.problem_types ?? null}
+            currentItems={items}
+            defaultTab={aiAuto ? "ai" : "smart"}
             autoGenerateAi={aiAuto}
           />
         )}
@@ -534,7 +536,9 @@ export default function QuoteEditor() {
           quoteId={currentQuoteId}
           dossierCategory={dossier.category}
           dossierDescription={dossier.description ?? undefined}
-          defaultTab="ai"
+          dossierProblemTypes={dossier.problem_types ?? null}
+          currentItems={items}
+          defaultTab={aiAuto ? "ai" : "smart"}
           autoGenerateAi={aiAuto}
         />
       )}
