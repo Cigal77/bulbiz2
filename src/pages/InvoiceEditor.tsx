@@ -324,6 +324,27 @@ export default function InvoiceEditor() {
 
       <main className="flex-1 overflow-y-auto pb-24 md:pb-4">
         <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+          {/* 0a. Préremplissage depuis dossier */}
+          {dossier && (
+            <DossierPrefillBanner
+              dossierRef={dossier.id}
+              fields={prefillFields}
+              onRefresh={refreshFromDossier}
+            />
+          )}
+
+          {/* 0b. Résumé du dossier */}
+          {dossier && (
+            <DossierContextSummary
+              category={dossier.category}
+              urgency={dossier.urgency}
+              description={dossier.description}
+              notes={null}
+              updatedAt={dossier.updated_at}
+              mediaCount={medias.length}
+            />
+          )}
+
           {/* 1. Origine */}
           <InvoiceOriginBlock value={origin} onChange={setOrigin} disabled={isLocked} />
 
