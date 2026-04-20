@@ -97,7 +97,28 @@ export default function InvoiceEditor() {
 
   const totals = computeTotals(localLines, form.vat_mode || "normal");
 
-  const patchForm = (patch: Partial<Invoice>) => setForm((f) => ({ ...f, ...patch }));
+  const patchForm = (patch: Partial<Invoice>) => {
+    setTouchedFields((prev) => {
+      const next = new Set(prev);
+      Object.keys(patch).forEach((k) => next.add(k));
+      return next;
+    });
+    setForm((f) => ({ ...f, ...patch }));
+  };
+
+  const prefillFields: PrefillField[] = dossier
+    ? [
+        {
+          key: "client_last_name",
+          label: "Nom",
+          value: [form.client_first_name, form.client_last_name].filter(Boolean).join(" ") || null,
+          modified: touchedFields.has("client_first_name") || touchedFields.has("client_last_name"),
+        },
+        { key: "client_email", label: "Email", value: form.client_email, modified: touchedFields.has("client_email") },
+        { key: "client_phone", label: "Téléphone", value: form.client_phone, modified: touchedFields.has("client_phone") },
+        { key: "client_address", label: "Adresse", value: form.client_address, modified: touchedFields.has("client_address") },
+      ]
+    : [];
 
   const handleSave = async () => {
     if (!invoice) return;
