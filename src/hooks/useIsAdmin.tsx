@@ -12,14 +12,14 @@ export function useIsAdmin() {
       setIsAdmin(false);
       return;
     }
-    supabase
-      .rpc("has_role", { _user_id: user.id, _role: "admin" })
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const { data } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
         if (!cancelled) setIsAdmin(!!data);
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setIsAdmin(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
