@@ -43,6 +43,7 @@ const AdminErrors = lazy(() => import("./pages/AdminErrors"));
 const ComplianceOnboarding = lazy(() => import("./pages/ComplianceOnboarding"));
 const ComplianceSettings = lazy(() => import("./pages/ComplianceSettings"));
 const MaterialLibrary = lazy(() => import("./pages/MaterialLibrary"));
+const AdminCatalogSources = lazy(() => import("./pages/AdminCatalogSources"));
 
 const queryClient = new QueryClient();
 
@@ -174,6 +175,16 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AdminErrors />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/catalogue/sources"
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout>
+                          <AdminCatalogSources />
+                        </AppLayout>
                       </ProtectedRoute>
                     }
                   />
