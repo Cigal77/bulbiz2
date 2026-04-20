@@ -13,6 +13,10 @@ import { QuoteHeaderBar } from "@/components/quote-editor/QuoteHeaderBar";
 import { QuoteSectionChecklist } from "@/components/quote-editor/QuoteSectionChecklist";
 import { AssistantSidebar } from "@/components/quote-editor/AssistantSidebar";
 import { QuoteSections } from "@/components/quote-editor/QuoteSections";
+import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
+import { ComplianceBlockerDialog } from "@/components/compliance/ComplianceBlockerDialog";
+import { useComplianceProfile } from "@/hooks/useComplianceProfile";
+import { validateQuoteForGeneration } from "@/lib/compliance-engine";
 import type { QuoteItem } from "@/lib/quote-types";
 import { calcTotals } from "@/lib/quote-types";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -40,6 +44,29 @@ export default function QuoteEditor() {
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { profile: compProfile, insurance, settings } = useComplianceProfile();
+  const [blockerOpen, setBlockerOpen] = useState(false);
+  const [blockerAction, setBlockerAction] = useState("générer ce devis");
+
+  const validation = validateQuoteForGeneration(
+    {
+      items,
+      total_ttc: calcTotals(items).total_ttc,
+      validity_days: validityDays,
+      customer: dossier
+        ? {
+            type: "individual",
+            first_name: dossier.client_first_name,
+            last_name: dossier.client_last_name,
+            email: dossier.client_email,
+            address: dossier.address,
+          }
+        : null,
+    },
+    compProfile,
+    insurance,
+    settings,
+  );
 
   // Load existing quote
   useEffect(() => {
@@ -121,6 +148,11 @@ export default function QuoteEditor() {
   }, [items, notes, validityDays, saveDraft]);
 
   const handleGeneratePdf = async () => {
+    if (!validation.ok) {
+      setBlockerAction("générer ce devis");
+      setBlockerOpen(true);
+      return;
+    }
     await saveDraft();
     if (!currentQuoteId) {
       toast({ title: "Ajoutez au moins une ligne", variant: "destructive" });
@@ -132,6 +164,7 @@ export default function QuoteEditor() {
         body: { quote_id: currentQuoteId },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.pdf_url) {
         window.open(data.pdf_url, "_blank");
         toast({ title: "PDF généré !" });
@@ -145,6 +178,11 @@ export default function QuoteEditor() {
   };
 
   const handleSend = async () => {
+    if (!validation.ok) {
+      setBlockerAction("envoyer ce devis");
+      setBlockerOpen(true);
+      return;
+    }
     await saveDraft();
     if (!currentQuoteId) return;
     setIsSending(true);
@@ -249,6 +287,26 @@ export default function QuoteEditor() {
       </div>
 
       {/* Mobile assistant (floating button + drawer) */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+            <ComplianceChecklist validation={validation} title="Conformité du devis" />
+            <QuoteSectionChecklist items={items} />
+
+            <QuoteSections
+              items={items}
+              setItems={setItems}
+              labourSummary={labourSummary}
+              onLabourSummaryChange={setLabourSummary}
+              problemLabel={problemLabel}
+              notes={notes}
+              validityDays={validityDays}
+              onNotesChange={setNotes}
+              onValidityChange={setValidityDays}
+            />
+          </div>
+        </main>
+      </div>
+
       {isMobile && (
         <AssistantSidebar
           onAddItem={addItemFromAssistant}
@@ -258,6 +316,13 @@ export default function QuoteEditor() {
           dossierDescription={dossier.description ?? undefined}
         />
       )}
+
+      <ComplianceBlockerDialog
+        open={blockerOpen}
+        onOpenChange={setBlockerOpen}
+        validation={validation}
+        action={blockerAction}
+      />
     </div>
   );
 }
