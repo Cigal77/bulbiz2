@@ -29,7 +29,7 @@ export function QuickActionsBar({
             </>
           ) : (
             <>
-              <Check className="h-3 w-3 shrink-0 text-emerald-500" />
+              <Check className="h-3 w-3 shrink-0 text-primary" />
               <span className="truncate">Brouillon enregistré</span>
             </>
           )}
