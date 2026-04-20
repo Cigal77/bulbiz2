@@ -31,6 +31,8 @@ const QuoteValidation = lazy(() => import("./pages/QuoteValidation"));
 const InvoiceEditor = lazy(() => import("./pages/InvoiceEditor"));
 const InvoiceView = lazy(() => import("./pages/InvoiceView"));
 const PublicClientForm = lazy(() => import("./pages/PublicClientForm"));
+const NewQuoteRedirect = lazy(() => import("./pages/NewQuoteRedirect"));
+const NewInvoiceRedirect = lazy(() => import("./pages/NewInvoiceRedirect"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const CGU = lazy(() => import("./pages/CGU"));
 const MentionsLegales = lazy(() => import("./pages/MentionsLegales"));
@@ -151,7 +153,7 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <ComingSoon />
+                          <NewQuoteRedirect />
                         </AppLayout>
                       </ProtectedRoute>
                     }
@@ -161,7 +163,7 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <ComingSoon />
+                          <NewInvoiceRedirect />
                         </AppLayout>
                       </ProtectedRoute>
                     }
