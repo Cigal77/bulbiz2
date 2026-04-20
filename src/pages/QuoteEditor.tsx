@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { Mic } from "lucide-react";
+import { VoiceQuoteSheet } from "@/components/quote-editor/VoiceQuoteSheet";
+import type { VoiceAction } from "@/lib/voice-quote-types";
+import { cn } from "@/lib/utils";
 import { useDossier } from "@/hooks/useDossier";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuotes } from "@/hooks/useQuotes";
@@ -64,6 +68,94 @@ export default function QuoteEditor() {
   const { data: medias = [] } = useDossierMedias(dossierId!);
   const [blockerOpen, setBlockerOpen] = useState(false);
   const [blockerAction, setBlockerAction] = useState("générer ce devis");
+  const [voiceOpen, setVoiceOpen] = useState(false);
+
+  // Apply voice actions to quote items
+  const applyVoiceActions = useCallback(
+    async (actions: VoiceAction[], transcript: string) => {
+      let next = [...items];
+      let renamed: string | null = null;
+
+      const findIndex = (ref: string) => {
+        const byId = next.findIndex((it) => it.id === ref);
+        if (byId !== -1) return byId;
+        const lower = ref.toLowerCase();
+        return next.findIndex((it) => it.label.toLowerCase().includes(lower));
+      };
+
+      for (const a of actions) {
+        if (a.type === "add_line") {
+          next.push({
+            id: crypto.randomUUID(),
+            label: a.label,
+            description: a.description ?? "",
+            qty: a.qty || 1,
+            unit: a.unit || "u",
+            unit_price: a.unit_price || 0,
+            vat_rate: a.vat_rate ?? 10,
+            discount: 0,
+            type: a.line_type || "standard",
+          });
+        } else if (a.type === "delete_line") {
+          const idx = findIndex(a.line_ref);
+          if (idx !== -1) next.splice(idx, 1);
+        } else if (a.type === "update_line") {
+          const idx = findIndex(a.line_ref);
+          if (idx === -1) continue;
+          const numericFields = ["qty", "unit_price", "vat_rate", "discount"];
+          const value = numericFields.includes(a.field) ? Number(a.value) : String(a.value);
+          next[idx] = { ...next[idx], [a.field]: value } as typeof next[number];
+        } else if (a.type === "set_discount") {
+          if (a.line_ref === "global") {
+            const totalHt = next.reduce((s, it) => s + it.qty * it.unit_price, 0);
+            if (totalHt > 0) {
+              const pct = a.unit === "PERCENT" ? a.value : (a.value / totalHt) * 100;
+              next = next.map((it) => ({ ...it, discount: pct }));
+            }
+          } else {
+            const idx = findIndex(a.line_ref);
+            if (idx !== -1) {
+              const it = next[idx];
+              const pct =
+                a.unit === "PERCENT"
+                  ? a.value
+                  : it.qty * it.unit_price > 0
+                    ? (a.value / (it.qty * it.unit_price)) * 100
+                    : 0;
+              next[idx] = { ...it, discount: pct };
+            }
+          }
+        } else if (a.type === "set_vat") {
+          const idx = findIndex(a.line_ref);
+          if (idx !== -1) next[idx] = { ...next[idx], vat_rate: Number(a.value) };
+        } else if (a.type === "rename_quote") {
+          renamed = a.value;
+        }
+      }
+
+      setItems(next);
+      if (renamed) setNotes((prev) => (prev ? `${renamed}\n${prev}` : renamed!));
+
+      toast({
+        title: `✓ ${actions.length} action${actions.length > 1 ? "s" : ""} appliquée${actions.length > 1 ? "s" : ""}`,
+        description: transcript.slice(0, 80) + (transcript.length > 80 ? "…" : ""),
+      });
+
+      if (dossierId && user) {
+        try {
+          await supabase.from("historique").insert({
+            dossier_id: dossierId,
+            user_id: user.id,
+            action: "voice_quote_edit",
+            details: `${actions.length} action(s) vocales — « ${transcript.slice(0, 200)} »`,
+          });
+        } catch (e) {
+          console.warn("historique insert failed", e);
+        }
+      }
+    },
+    [items, dossierId, user, toast],
+  );
 
   const validation = validateQuoteForGeneration(
     {
