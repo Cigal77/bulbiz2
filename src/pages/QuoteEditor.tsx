@@ -33,6 +33,7 @@ export default function QuoteEditor() {
   const { dossierId } = useParams<{ dossierId: string }>();
   const [searchParams] = useSearchParams();
   const quoteId = searchParams.get("quote");
+  const aiAuto = searchParams.get("ai") === "auto";
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
