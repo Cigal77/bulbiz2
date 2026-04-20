@@ -1,5 +1,5 @@
 import { Resend } from "npm:resend@2.0.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,7 +85,7 @@ async function getGmailConnection(supabase: any, userId: string) {
   return conn;
 }
 
-Deno.serve(async (req) => {
+Deno.Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

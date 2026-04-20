@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -392,7 +392,7 @@ const CORRESPONDENCE_DATA = [
   ["clim_ventilation_ventilation_vmc_vmc_simple_flux_groupe","clim_ventilation_ventilation_vmc_colliers_de_serrage_vmc",100,"Réseau",1,"{\"vmc\":true}"],
 ];
 
-Deno.serve(async (req) => {
+Deno.Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
