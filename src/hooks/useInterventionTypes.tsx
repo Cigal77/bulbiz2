@@ -59,7 +59,7 @@ export function useInterventionPack(interventionTypeId: string | null) {
         .eq("intervention_type_id", interventionTypeId)
         .maybeSingle();
       if (error) throw error;
-      return data as InterventionPack | null;
+      return data as unknown as InterventionPack | null;
     },
     enabled: !!interventionTypeId,
     staleTime: 1000 * 60 * 5,
