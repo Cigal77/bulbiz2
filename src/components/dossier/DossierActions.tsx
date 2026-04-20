@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,7 @@ interface DossierActionsProps {
 }
 
 export function DossierActions({ dossier }: DossierActionsProps) {
+  const navigate = useNavigate();
   const { toggleRelance, sendRelance, addNote } = useDossierActions(dossier.id);
   const { uploadFiles } = useMediaUpload(dossier.id);
   const { user } = useAuth();
@@ -137,6 +139,25 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
+        {/* Primary: Create devis & facture */}
+        <Button
+          variant="default"
+          className="w-full justify-start gap-2 h-11"
+          onClick={() => navigate(`/devis/new?dossier=${dossier.id}`)}
+        >
+          <FileText className="h-4 w-4" />
+          Créer un devis
+        </Button>
+        <Button
+          variant="default"
+          className="w-full justify-start gap-2 h-11"
+          onClick={() => navigate(`/facture/new?dossier=${dossier.id}`)}
+        >
+          <Receipt className="h-4 w-4" />
+          Créer une facture
+        </Button>
+
+        <div className="h-px bg-border my-2" />
 
         {/* 1. Phone */}
         <Button variant="outline" className="w-full justify-start gap-2" disabled={!dossier.client_phone} asChild={!!dossier.client_phone}>
