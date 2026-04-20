@@ -97,6 +97,7 @@ export function useComplianceProfile() {
 
   return {
     profile: complianceProfile,
+    rawProfile: profile ?? null,
     insurance: insuranceQuery.data ?? null,
     settings: settingsQuery.data ?? null,
     isLoading: profileLoading || insuranceQuery.isLoading || settingsQuery.isLoading,

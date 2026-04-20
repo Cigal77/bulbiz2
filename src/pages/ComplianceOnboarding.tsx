@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useComplianceProfile } from "@/hooks/useComplianceProfile";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, ShieldCheck, Loader2, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import type { LegalForm } from "@/lib/compliance-engine";
 
@@ -49,24 +49,35 @@ const STEPS = [
 
 export default function ComplianceOnboarding() {
   const navigate = useNavigate();
-  const { profile, insurance, settings, isLoading, score, updateProfile, updateInsurance, updateSettings } =
+  const { profile, rawProfile, insurance, settings, isLoading, score, updateProfile, updateInsurance, updateSettings } =
     useComplianceProfile();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
 
-  // Form state (initialised from server)
+  // Form state (initialised once from server, then user-owned)
   const [form, setForm] = useState<Record<string, any>>({});
   const [insForm, setInsForm] = useState<Record<string, any>>({});
   const [setForm_, setSetForm] = useState<Record<string, any>>({});
 
+  const initRef = useRef({ profile: false, insurance: false, settings: false });
+
   useEffect(() => {
-    if (profile) setForm({ ...profile });
-  }, [profile]);
+    if (!initRef.current.profile && (rawProfile || profile)) {
+      setForm({ ...((rawProfile as any) ?? profile) });
+      initRef.current.profile = true;
+    }
+  }, [rawProfile, profile]);
   useEffect(() => {
-    if (insurance) setInsForm({ ...insurance });
+    if (!initRef.current.insurance && insurance) {
+      setInsForm({ ...insurance });
+      initRef.current.insurance = true;
+    }
   }, [insurance]);
   useEffect(() => {
-    if (settings) setSetForm({ ...settings });
+    if (!initRef.current.settings && settings) {
+      setSetForm({ ...settings });
+      initRef.current.settings = true;
+    }
   }, [settings]);
 
   const setField = (k: string, v: any) => setForm((p) => ({ ...p, [k]: v }));
@@ -79,6 +90,27 @@ export default function ComplianceOnboarding() {
       "accepted_payment_methods",
       current.includes(m) ? current.filter((x) => x !== m) : [...current, m],
     );
+  };
+
+  /** Validation par étape — true si OK, sinon affiche un toast */
+  const validateStep = (s: number): boolean => {
+    if (s === 1) {
+      if (!form.legal_form) { toast.error("Forme juridique requise"); return false; }
+      if (!form.company_name?.trim()) { toast.error("Raison sociale requise"); return false; }
+      const siret = (form.siret ?? "").replace(/\s/g, "");
+      if (!/^\d{14}$/.test(siret)) { toast.error("SIRET invalide (14 chiffres requis)"); return false; }
+      if (!form.address?.trim()) { toast.error("Adresse du siège requise"); return false; }
+      if (!form.email?.trim()) { toast.error("Email professionnel requis"); return false; }
+    }
+    if (s === 3 && insForm.decennial_required) {
+      if (!insForm.insurer_name?.trim()) { toast.error("Nom de l'assureur requis"); return false; }
+      if (!insForm.policy_number?.trim()) { toast.error("N° de police requis"); return false; }
+    }
+    if (s === 4) {
+      if (!form.iban?.trim()) { toast.error("IBAN requis pour être payé"); return false; }
+      if (!form.payment_terms_default?.trim()) { toast.error("Conditions de règlement requises"); return false; }
+    }
+    return true;
   };
 
   const saveCurrentStep = async () => {
@@ -96,11 +128,28 @@ export default function ComplianceOnboarding() {
   };
 
   const handleNext = async () => {
+    if (!validateStep(step)) return;
     try {
       await saveCurrentStep();
       if (step < STEPS.length) setStep(step + 1);
     } catch {
       /* toast déjà affiché */
+    }
+  };
+
+  const handleSkip = async () => {
+    setSaving(true);
+    try {
+      await updateProfile.mutateAsync({
+        ...form,
+        onboarding_compliance_completed_at: new Date().toISOString(),
+      } as any);
+      toast.success("Configuration reportée — vous pourrez la compléter dans les paramètres.");
+      navigate("/");
+    } catch (e: any) {
+      toast.error(e.message || "Erreur");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -135,9 +184,22 @@ export default function ComplianceOnboarding() {
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6 pb-32">
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Configurer mes documents conformes</h1>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <h1 className="text-2xl font-bold">Configurer mes documents conformes</h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkip}
+            disabled={saving}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <SkipForward className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Configurer plus tard</span>
+            <span className="sm:hidden">Plus tard</span>
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">
           Étape {step} sur {STEPS.length} — {STEPS[step - 1]}
