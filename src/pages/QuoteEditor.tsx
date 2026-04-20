@@ -18,6 +18,9 @@ import { QuoteWorksiteBlock } from "@/components/quote-editor/QuoteWorksiteBlock
 import { QuoteDocumentBlock } from "@/components/quote-editor/QuoteDocumentBlock";
 import { QuotePreviewBlock } from "@/components/quote-editor/QuotePreviewBlock";
 import { QuickActionsBar } from "@/components/quote-editor/QuickActionsBar";
+import { DossierPrefillBanner, type PrefillField } from "@/components/documents/DossierPrefillBanner";
+import { DossierContextSummary } from "@/components/documents/DossierContextSummary";
+import { useDossierMedias } from "@/hooks/useDossier";
 import { ComplianceChecklist } from "@/components/compliance/ComplianceChecklist";
 import { ComplianceBlockerDialog } from "@/components/compliance/ComplianceBlockerDialog";
 import { useComplianceProfile } from "@/hooks/useComplianceProfile";
