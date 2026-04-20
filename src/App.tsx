@@ -6,6 +6,7 @@ import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ComplianceGuard } from "@/components/compliance/ComplianceGuard";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { AppLayout } from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -114,7 +115,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <QuoteEditor />
+                          <ComplianceGuard>
+                            <QuoteEditor />
+                          </ComplianceGuard>
                         </AppLayout>
                       </ProtectedRoute>
                     }
@@ -124,7 +127,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <AppLayout>
-                          <InvoiceEditor />
+                          <ComplianceGuard>
+                            <InvoiceEditor />
+                          </ComplianceGuard>
                         </AppLayout>
                       </ProtectedRoute>
                     }
