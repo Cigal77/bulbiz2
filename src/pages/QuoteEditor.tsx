@@ -100,6 +100,20 @@ export default function QuoteEditor() {
     }
   }, [profile, quoteId]);
 
+  // Prefill client + worksite from dossier
+  useEffect(() => {
+    if (dossier) {
+      setClient((prev) => ({
+        ...prev,
+        first_name: prev.first_name ?? dossier.client_first_name,
+        last_name: prev.last_name ?? dossier.client_last_name,
+        email: prev.email ?? dossier.client_email,
+        phone: prev.phone ?? dossier.client_phone,
+      }));
+      setWorksiteAddress((prev) => prev ?? dossier.address ?? null);
+    }
+  }, [dossier]);
+
   // Auto-save
   const saveDraft = useCallback(async () => {
     if (!user || !dossierId) return;
