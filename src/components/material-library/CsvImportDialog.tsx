@@ -218,8 +218,8 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
 
         {step === "report" && result && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 p-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            <div className="flex items-center gap-2 rounded-md bg-primary/10 p-3">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
               <p className="font-medium text-sm">Import terminé</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-sm">
