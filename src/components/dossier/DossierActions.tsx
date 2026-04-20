@@ -13,7 +13,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   Phone, MessageSquarePlus, FileText, Bell, BellOff, Calendar, RefreshCw, Loader2,
-  Mic, Camera, Map, Receipt, CheckCircle2,
+  Mic, Camera, Map, Receipt, CheckCircle2, Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -139,7 +139,15 @@ export function DossierActions({ dossier }: DossierActionsProps) {
       <div className="rounded-xl border border-border bg-card p-5 space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Actions rapides</h3>
 
-        {/* Primary: Create devis & facture */}
+        {/* Primary: Pré-devis IA */}
+        <Button
+          variant="default"
+          className="w-full justify-start gap-2 h-11 bg-gradient-to-r from-primary to-primary/80"
+          onClick={() => navigate(`/dossier/${dossier.id}/devis?ai=auto`)}
+        >
+          <Sparkles className="h-4 w-4" />
+          Générer un pré-devis avec l'IA
+        </Button>
         <Button
           variant="default"
           className="w-full justify-start gap-2 h-11"

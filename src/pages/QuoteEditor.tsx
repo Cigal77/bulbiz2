@@ -343,8 +343,12 @@ export default function QuoteEditor() {
             onAddItem={addItemFromAssistant}
             onAddItems={addItemsFromAssistant}
             onSetLabourContext={handleSetLabourContext}
+            dossierId={dossierId!}
+            quoteId={currentQuoteId}
             dossierCategory={dossier.category}
             dossierDescription={dossier.description ?? undefined}
+            defaultTab={aiAuto ? "ai" : "ai"}
+            autoGenerateAi={aiAuto}
           />
         )}
 
@@ -434,8 +438,12 @@ export default function QuoteEditor() {
           onAddItem={addItemFromAssistant}
           onAddItems={addItemsFromAssistant}
           onSetLabourContext={handleSetLabourContext}
+          dossierId={dossierId!}
+          quoteId={currentQuoteId}
           dossierCategory={dossier.category}
           dossierDescription={dossier.description ?? undefined}
+          defaultTab="ai"
+          autoGenerateAi={aiAuto}
         />
       )}
 
