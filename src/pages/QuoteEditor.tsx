@@ -268,7 +268,8 @@ export default function QuoteEditor() {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+            <ComplianceChecklist validation={validation} title="Conformité du devis" />
             <QuoteSectionChecklist items={items} />
 
             <QuoteSections
