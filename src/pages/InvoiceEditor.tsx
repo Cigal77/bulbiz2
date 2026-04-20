@@ -295,12 +295,11 @@ export default function InvoiceEditor() {
           <ComplianceChecklist
             validation={{
               ok: localLines.length > 0 && !!form.client_email,
-              missing: [
-                ...(localLines.length === 0 ? ["Au moins une ligne"] : []),
-                ...(!form.client_email ? ["Email client"] : []),
+              blockers: [
+                ...(localLines.length === 0 ? [{ code: "NO_LINES", message: "Au moins une ligne", section: "Lignes" }] : []),
+                ...(!form.client_email ? [{ code: "NO_EMAIL", message: "Email client requis", section: "Client" }] : []),
               ],
               warnings: [],
-              score: localLines.length > 0 && !!form.client_email ? 100 : 60,
             }}
             title="Conformité de la facture"
           />
