@@ -57,8 +57,10 @@ export default function QuoteEditor() {
   const [worksiteAddress, setWorksiteAddress] = useState<string | null>(null);
   const [depositType, setDepositType] = useState<string | null>(null);
   const [depositValue, setDepositValue] = useState<number | null>(null);
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { profile: compProfile, insurance, settings } = useComplianceProfile();
+  const { data: medias = [] } = useDossierMedias(dossierId!);
   const [blockerOpen, setBlockerOpen] = useState(false);
   const [blockerAction, setBlockerAction] = useState("générer ce devis");
 
