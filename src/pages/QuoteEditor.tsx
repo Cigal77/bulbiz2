@@ -105,7 +105,22 @@ export default function QuoteEditor() {
     }
   }, [profile, quoteId]);
 
-  // Prefill client + worksite from dossier
+  // Prefill client + worksite from dossier — n'écrase JAMAIS un champ déjà touché
+  const refreshFromDossier = useCallback(() => {
+    if (!dossier) return;
+    setClient((prev) => ({
+      ...prev,
+      first_name: touchedFields.has("first_name") ? prev.first_name : dossier.client_first_name,
+      last_name: touchedFields.has("last_name") ? prev.last_name : dossier.client_last_name,
+      email: touchedFields.has("email") ? prev.email : dossier.client_email,
+      phone: touchedFields.has("phone") ? prev.phone : dossier.client_phone,
+    }));
+    if (!touchedFields.has("worksite")) {
+      setWorksiteAddress(dossier.address ?? null);
+    }
+    toast({ title: "Données rechargées depuis le dossier" });
+  }, [dossier, touchedFields, toast]);
+
   useEffect(() => {
     if (dossier) {
       setClient((prev) => ({
@@ -118,6 +133,42 @@ export default function QuoteEditor() {
       setWorksiteAddress((prev) => prev ?? dossier.address ?? null);
     }
   }, [dossier]);
+
+  // Wrappers qui marquent les champs comme "touchés"
+  const handleClientChange = (next: QuoteClientData) => {
+    const changed = new Set(touchedFields);
+    (Object.keys(next) as Array<keyof QuoteClientData>).forEach((k) => {
+      if (next[k] !== client[k]) changed.add(k as string);
+    });
+    setTouchedFields(changed);
+    setClient(next);
+  };
+
+  const handleWorksiteChange = (addr: string | null) => {
+    if (addr !== worksiteAddress) {
+      setTouchedFields((prev) => new Set(prev).add("worksite"));
+    }
+    setWorksiteAddress(addr);
+  };
+
+  const prefillFields: PrefillField[] = dossier
+    ? [
+        {
+          key: "name",
+          label: "Nom",
+          value: [client.first_name, client.last_name].filter(Boolean).join(" ") || null,
+          modified: touchedFields.has("first_name") || touchedFields.has("last_name"),
+        },
+        { key: "email", label: "Email", value: client.email, modified: touchedFields.has("email") },
+        { key: "phone", label: "Téléphone", value: client.phone, modified: touchedFields.has("phone") },
+        {
+          key: "worksite",
+          label: "Chantier",
+          value: worksiteAddress,
+          modified: touchedFields.has("worksite"),
+        },
+      ]
+    : [];
 
   // Auto-save
   const saveDraft = useCallback(async () => {
