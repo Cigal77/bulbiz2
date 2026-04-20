@@ -1811,6 +1811,41 @@ export type Database = {
         }
         Relationships: []
       }
+      user_suggestion_preference: {
+        Row: {
+          created_at: string
+          id: string
+          intervention_id: string | null
+          is_hidden: boolean
+          item_signature: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intervention_id?: string | null
+          is_hidden?: boolean
+          item_signature: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intervention_id?: string | null
+          is_hidden?: boolean
+          item_signature?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_suggestion_preference_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "problem_taxonomy"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
