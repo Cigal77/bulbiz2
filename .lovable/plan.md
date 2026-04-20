@@ -1,59 +1,66 @@
 
 
-L'utilisateur veut que je termine **tout** ce qui reste pour PATCH 6 + PATCH 7. Récap de l'état actuel :
+L'utilisateur est sur `/bibliotheque-materiel` onglet "Base Bulbiz BTP" et veut des filtres + catégories pour faciliter la recherche.
 
-**Déjà fait :**
-- Schéma : 9 tables nouvelles (product_sectors/categories, data_sources, ingestion_jobs, intervention_types, intervention_product_packs, product_associations, user_product_usage, user_intervention_kits, user_suggestion_preference)
-- Seed : 9 secteurs, 32 catégories, 12 interventions standard
-- Hooks : useSmartSuggestions, useInterventionDetection, useSuggestionPreferences, useDataSources, useProductTaxonomy, useInterventionTypes
-- UI : SmartSuggestionsPanel, InterventionSuggestionsPanel, AdminCatalogSources
+Contexte trouvé :
+- `MaterialLibrary.tsx` a juste un `Input` de recherche global
+- `useMaterialLibrary("bulbiz", search)` retourne tous les matériels globaux (`user_id IS NULL`)
+- On dispose maintenant de `product_sectors` (9 secteurs) + `product_categories` (32 catégories) avec hooks `useProductSectors` / `useProductCategories`
+- `catalog_material` a déjà `sector_id`, `category_id`, `category_path`, `subcategory`, `brand`, `supplier`
+- Vue actuelle : grille de cartes sans groupement
 
-**Restant (le "tout"):**
+## Plan — Filtres & catégories pour la base Bulbiz BTP
 
-### Lot A — Wiring & accès
-1. Route `/admin/catalogue/sources` dans `App.tsx` (ProtectedRoute + admin check)
-2. Lien "Catalogue" dans `DesktopSidebar` visible uniquement pour admin
-3. Intégrer `InterventionSuggestionsPanel` dans `AssistantSidebar` (nouvel onglet "Pack" prioritaire)
+### 1. Nouveau composant `MaterialFilters.tsx`
+Barre de filtres horizontale (sticky sous la recherche) avec :
+- **Sélecteur Secteur** (chips horizontaux scrollables avec icône emoji) : Tous / Plomberie / Sanitaire / Chauffage / Électricité / etc.
+- **Sélecteur Catégorie** (Select dropdown) — alimenté dynamiquement selon le secteur choisi
+- **Filtre Type** (Select) : Tous / Matériel / Fourniture / Main-d'œuvre / Forfait
+- **Filtre Marque** (Select recherchable) — extraction distincte depuis les résultats
+- **Tri** (Select) : Plus utilisés / A→Z / Prix croissant / Prix décroissant
+- Bouton **"Réinitialiser"** quand au moins 1 filtre actif
 
-### Lot B — Lot 3 PATCH 6 (kits perso + arbre intervention + badge)
-4. `InterventionDetectedBadge.tsx` — badge en haut de QuoteEditor "Intervention détectée : X" + bouton "Charger le pack"
-5. `SaveAsKitDialog.tsx` — bouton "Sauvegarder comme pack" dans QuoteSections, insère dans bundle_templates user
-6. `InterventionTreeView.tsx` — arbre visuel des étapes (intégré comme onglet AssistantSidebar)
+### 2. Étendre `useMaterialLibrary` 
+Ajouter un paramètre `filters` :
+```ts
+interface MaterialFilters {
+  sectorId?: string | null;
+  categoryId?: string | null;
+  type?: string | null;
+  brand?: string | null;
+  sort?: "popular" | "alpha" | "price_asc" | "price_desc";
+}
+useMaterialLibrary(tab, search, filters)
+```
+La requête Supabase applique `.eq("sector_id", …)`, `.eq("category_id", …)`, `.eq("type", …)`, `.ilike("brand", …)` + ordre dynamique.
 
-### Lot C — Worker d'ingestion (PATCH 7 backend)
-7. Edge function `ingest-catalog-source` : worker qui lit `data_sources`, crée un `ingestion_jobs`, scrape via Firecrawl OU parse CSV URL, normalise vers `catalog_material` avec `confidence_score`. Bouton "Lancer ingestion" dans `AdminCatalogSources`.
-8. Fix erreur runtime 401 "Non authentifié" sur la fonction concernée (probable `summarize-dossier` côté logged-out)
+### 3. Affichage groupé par catégorie (onglet Bulbiz uniquement)
+Quand aucun filtre catégorie actif, regrouper visuellement les cartes par `category_path` avec un header sticky par groupe + compteur. Quand filtre actif → grille plate normale.
 
-### Lot D — Apprentissage usage
-9. Trigger automatique : quand un item est ajouté à un devis, logger dans `user_product_usage` (déjà partiellement via `catalog_usage_log` — étendre avec `intervention_type_id` détecté + `behavior_type`)
-10. Hook `useUserPatterns` qui agrège `user_product_usage` par intervention pour reranker les suggestions
+### 4. Compteurs
+- Badge sur chaque chip secteur : nombre de matériels disponibles dans ce secteur (calculé via une query `count`)
+- Compteur de résultats global au-dessus de la grille : "32 articles trouvés"
 
-### Périmètre v1 (raisonnable pour cette itération)
-Je propose de livrer **Lots A + B + C** dans un seul gros patch. Lot D (apprentissage avancé) reste partiellement géré par `useSmartSuggestions` qui exploite déjà `catalog_usage_log` — un raffinement futur plus sophistiqué peut suivre.
+### 5. État vide enrichi
+"Aucun article ne correspond à ces filtres" + bouton "Effacer les filtres".
+
+### 6. Persistance légère
+Mémoriser le dernier secteur/tri sélectionné via `localStorage` (clé `bulbiz_material_filters`) pour retrouver l'état au prochain accès.
+
+### Périmètre
+Filtres actifs uniquement sur les onglets `bulbiz`, `mine`, `imported` et `frequent`. Les autres onglets (favoris, recent, suggestions) restent simples.
 
 ### Fichiers
-
 **Créés :**
-- `src/components/quote-editor/InterventionDetectedBadge.tsx`
-- `src/components/quote-editor/SaveAsKitDialog.tsx`
-- `src/components/quote-editor/InterventionTreeView.tsx`
-- `supabase/functions/ingest-catalog-source/index.ts`
+- `src/components/material-library/MaterialFilters.tsx`
+- `src/components/material-library/MaterialGroupedGrid.tsx` (regroupement par catégorie)
 
 **Modifiés :**
-- `src/App.tsx` — route admin catalogue
-- `src/components/DesktopSidebar.tsx` — lien admin (conditionnel `has_role admin`)
-- `src/components/quote-editor/AssistantSidebar.tsx` — onglet Pack intervention + onglet Arbre
-- `src/pages/QuoteEditor.tsx` — affichage badge + handler save-as-kit
-- `src/components/quote-editor/QuoteSections.tsx` — bouton "Sauvegarder comme pack"
-- `src/pages/AdminCatalogSources.tsx` — bouton "Lancer ingestion" qui appelle l'edge function
-- `supabase/functions/summarize-dossier/index.ts` — fix 401 (probablement appel sans auth header)
+- `src/hooks/useMaterialLibrary.tsx` (signature + logique requête)
+- `src/pages/MaterialLibrary.tsx` (intégration UI)
 
-**Hooks créés :**
-- `src/hooks/useIngestSource.tsx` — mutation pour déclencher l'edge function
-
-### Hors scope (vraiment futur)
-- IA de catégorisation auto fine pendant l'ingestion (regex basique en v1)
-- Multi-métier hors plomberie/sanitaire/chauffage (extensible mais non seedé)
-- UI admin pour éditer manuellement les correspondances produits
-- Fusion de doublons inter-source semi-automatique
+### Hors scope
+- Filtre par fourchette de prix (slider) — reportable v2
+- Recherche full-text PG / synonymes avancés (déjà partielle via `or` ilike)
+- Filtre TVA (peu utile à la recherche)
 
