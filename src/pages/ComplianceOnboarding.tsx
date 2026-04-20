@@ -135,9 +135,22 @@ export default function ComplianceOnboarding() {
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6 pb-32">
       <div>
-        <div className="flex items-center gap-2 mb-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Configurer mes documents conformes</h1>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <h1 className="text-2xl font-bold">Configurer mes documents conformes</h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkip}
+            disabled={saving}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <SkipForward className="h-4 w-4 mr-1" />
+            <span className="hidden sm:inline">Configurer plus tard</span>
+            <span className="sm:hidden">Plus tard</span>
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">
           Étape {step} sur {STEPS.length} — {STEPS[step - 1]}
