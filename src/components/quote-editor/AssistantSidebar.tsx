@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Wrench, Package, Lightbulb, PackageOpen } from "lucide-react";
+import { Wrench, Package, Lightbulb, PackageOpen, Sparkles } from "lucide-react";
 import { ProblemTreePanel } from "./ProblemTreePanel";
 import { MaterialPickerPanel } from "./MaterialPickerPanel";
 import { BundleSuggestionPanel } from "./BundleSuggestionPanel";
+import { AiQuoteDraftPanel } from "./AiQuoteDraftPanel";
 import type { QuoteItem } from "@/lib/quote-types";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -13,14 +14,32 @@ interface AssistantSidebarProps {
   onAddItem: (item: Omit<QuoteItem, "id">) => void;
   onAddItems: (items: Omit<QuoteItem, "id">[]) => void;
   onSetLabourContext: (tags: string[], problemLabel: string) => void;
+  dossierId: string;
+  quoteId?: string | null;
   dossierCategory?: string;
   dossierDescription?: string;
+  defaultTab?: "ai" | "packs" | "problems" | "material";
+  autoGenerateAi?: boolean;
 }
 
-function AssistantContent({ onAddItem, onAddItems, onSetLabourContext, dossierCategory, dossierDescription }: AssistantSidebarProps) {
+function AssistantContent({
+  onAddItem,
+  onAddItems,
+  onSetLabourContext,
+  dossierId,
+  quoteId,
+  dossierCategory,
+  dossierDescription,
+  defaultTab = "ai",
+  autoGenerateAi,
+}: AssistantSidebarProps) {
   return (
-    <Tabs defaultValue="packs" className="flex-1 flex flex-col">
-      <TabsList className="w-full grid grid-cols-3 h-10 mb-3 mx-0">
+    <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col h-full">
+      <TabsList className="w-full grid grid-cols-4 h-10 mb-3 mx-0">
+        <TabsTrigger value="ai" className="gap-1 text-xs font-semibold">
+          <Sparkles className="h-3.5 w-3.5" />
+          IA
+        </TabsTrigger>
         <TabsTrigger value="packs" className="gap-1 text-xs font-semibold">
           <PackageOpen className="h-3.5 w-3.5" />
           Packs
@@ -31,9 +50,18 @@ function AssistantContent({ onAddItem, onAddItems, onSetLabourContext, dossierCa
         </TabsTrigger>
         <TabsTrigger value="material" className="gap-1 text-xs font-semibold">
           <Package className="h-3.5 w-3.5" />
-          Matériel
+          Mat.
         </TabsTrigger>
       </TabsList>
+      <TabsContent value="ai" className="flex-1 mt-0 overflow-hidden">
+        <AiQuoteDraftPanel
+          dossierId={dossierId}
+          quoteId={quoteId}
+          autoGenerate={autoGenerateAi}
+          onAddItem={onAddItem}
+          onAddItems={onAddItems}
+        />
+      </TabsContent>
       <TabsContent value="packs" className="flex-1 mt-0 overflow-hidden">
         <BundleSuggestionPanel
           dossierCategory={dossierCategory}
@@ -64,13 +92,16 @@ export function AssistantSidebar(props: AssistantSidebarProps) {
           size="icon"
           onClick={() => setDrawerOpen(true)}
         >
-          <Lightbulb className="h-5 w-5" />
+          <Sparkles className="h-5 w-5" />
         </Button>
 
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col rounded-t-xl">
             <SheetHeader className="px-4 pt-4 pb-2">
-              <SheetTitle className="text-sm font-bold">Assistant devis</SheetTitle>
+              <SheetTitle className="text-sm font-bold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Assistant devis
+              </SheetTitle>
             </SheetHeader>
             <div className="flex-1 overflow-hidden px-4 pb-4">
               <AssistantContent {...props} />
