@@ -350,14 +350,31 @@ export default function QuoteEditor() {
         {/* Main content — 8 blocs */}
         <main className="flex-1 overflow-y-auto pb-24 md:pb-4">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 space-y-4">
+            {/* 0a. Préremplissage depuis dossier */}
+            <DossierPrefillBanner
+              dossierRef={dossier.id}
+              fields={prefillFields}
+              onRefresh={refreshFromDossier}
+            />
+
+            {/* 0b. Résumé du dossier */}
+            <DossierContextSummary
+              category={dossier.category}
+              urgency={dossier.urgency}
+              description={dossier.description}
+              notes={null}
+              updatedAt={dossier.updated_at}
+              mediaCount={medias.length}
+            />
+
             {/* 1. Infos client */}
-            <QuoteClientBlock value={client} onChange={setClient} />
+            <QuoteClientBlock value={client} onChange={handleClientChange} />
 
             {/* 2. Infos chantier */}
             <QuoteWorksiteBlock
               worksiteAddress={worksiteAddress}
               clientAddress={dossier.address ?? undefined}
-              onChange={setWorksiteAddress}
+              onChange={handleWorksiteChange}
             />
 
             {/* 3. Infos document */}
