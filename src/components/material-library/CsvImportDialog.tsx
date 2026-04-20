@@ -104,9 +104,19 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
               className="hidden"
               onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
             />
-            <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">Astuce</p>
-              <p>La 1ère ligne doit contenir les noms des colonnes (ex: nom, prix, tva, fournisseur). Le mapping sera détecté automatiquement.</p>
+            <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-2">
+              <div>
+                <p className="font-medium text-foreground mb-1">Astuce</p>
+                <p>La 1ère ligne doit contenir les noms des colonnes (ex: nom, prix, tva, fournisseur). Le mapping sera détecté automatiquement.</p>
+              </div>
+              <a
+                href="/exemple-catalogue.csv"
+                download
+                className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Télécharger un exemple CSV
+              </a>
             </div>
           </div>
         )}
